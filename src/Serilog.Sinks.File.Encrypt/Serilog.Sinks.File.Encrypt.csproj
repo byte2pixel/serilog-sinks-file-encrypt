@@ -1,0 +1,27 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <Description>Lifecycle hook for Serilog File Sink that encrypts log messages using hybrid encryption.</Description>
+    <VersionPrefix>0.0.1</VersionPrefix>
+    <Authors>Mel Dommer</Authors>
+    <Copyright>Byte2Pixel 2025</Copyright>
+    <TargetFramework>net8.0</TargetFramework>
+    <AssemblyName>Serilog.Sinks.File.Encrypt</AssemblyName>
+    <RootNamespace>Serilog.Sinks.File.Encrypt</RootNamespace>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <RepositoryUrl>https://github.com/byte2pixel/serilog-sinks-file-encrypt</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <IsPackable>true</IsPackable>
+    <PackageTags>serilog;file;encryption</PackageTags>
+    <PackageProjectUrl>https://github.com/byte2pixel/serilog-sinks-file-encrypt</PackageProjectUrl>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="DeviceId" />
+    <PackageReference Include="Serilog.Sinks.File" />
+  </ItemGroup>
+
+</Project>
