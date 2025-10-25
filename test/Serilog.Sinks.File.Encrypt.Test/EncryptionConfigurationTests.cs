@@ -49,7 +49,7 @@ public class EncryptionConfigurationTests : IDisposable
             .WriteTo.File(
                 new JsonFormatter(),
                 logFilePath,
-                hooks: new EncryptHooks(_rsaKeyPair.publicKey))
+                hooks: new DeviceEncryptHooks(_rsaKeyPair.publicKey))
             .CreateLogger();
 
         // Log message with properties
@@ -75,7 +75,7 @@ public class EncryptionConfigurationTests : IDisposable
             .WriteTo.File(
                 path: fileNamePattern,
                 rollingInterval: RollingInterval.Day,
-                hooks: new EncryptHooks(_rsaKeyPair.publicKey))
+                hooks: new DeviceEncryptHooks(_rsaKeyPair.publicKey))
             .CreateLogger();
 
         logger.Information(logMessage);
@@ -102,11 +102,11 @@ public class EncryptionConfigurationTests : IDisposable
 
         // Act - Create two loggers with different encryption keys
         Logger logger1 = new LoggerConfiguration()
-            .WriteTo.File(path: logFile1, hooks: new EncryptHooks(_rsaKeyPair.publicKey))
+            .WriteTo.File(path: logFile1, hooks: new DeviceEncryptHooks(_rsaKeyPair.publicKey))
             .CreateLogger();
 
         Logger logger2 = new LoggerConfiguration()
-            .WriteTo.File(path: logFile2, hooks: new EncryptHooks(secondKeyPair.publicKey))
+            .WriteTo.File(path: logFile2, hooks: new DeviceEncryptHooks(secondKeyPair.publicKey))
             .CreateLogger();
 
         // Write to both logs
@@ -125,10 +125,10 @@ public class EncryptionConfigurationTests : IDisposable
         Assert.Contains("Message for log 2", content2);
 
         // Verify cross-decryption fails
-        Assert.Throws<CryptographicException>(() =>
-            EncryptionUtils.DecryptLogFile(logFile1, secondKeyPair.privateKey));
-        Assert.Throws<CryptographicException>(() =>
-            EncryptionUtils.DecryptLogFile(logFile2, _rsaKeyPair.privateKey));
+        string result1 = EncryptionUtils.DecryptLogFile(logFile1, secondKeyPair.privateKey);
+        string result2 = EncryptionUtils.DecryptLogFile(logFile2, _rsaKeyPair.privateKey);
+        Assert.Contains("[Error decrypting keys:", result1);
+        Assert.Contains("[Error decrypting keys:", result2);
     }
 
     [Fact]
@@ -142,7 +142,7 @@ public class EncryptionConfigurationTests : IDisposable
             .MinimumLevel.Warning()
             .WriteTo.File(
                 path: logFilePath,
-                hooks: new EncryptHooks(_rsaKeyPair.publicKey))
+                hooks: new DeviceEncryptHooks(_rsaKeyPair.publicKey))
             .CreateLogger();
 
         // Log different levels
