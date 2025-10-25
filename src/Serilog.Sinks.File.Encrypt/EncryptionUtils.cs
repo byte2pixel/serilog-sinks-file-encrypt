@@ -15,7 +15,7 @@ public static class EncryptionUtils
     /// <returns>A tuple containing the public and private keys in XML format</returns>
     public static (string publicKey, string privateKey) GenerateRsaKeyPair(int keySize = 2048)
     {
-        using var rsa = RSA.Create(keySize);
+        using RSA rsa = RSA.Create(keySize);
         string publicKey = rsa.ToXmlString(includePrivateParameters: false);
         string privateKey = rsa.ToXmlString(includePrivateParameters: true);
         return (publicKey, privateKey);
@@ -29,11 +29,11 @@ public static class EncryptionUtils
     /// <returns>The decrypted content as a string</returns>
     public static string DecryptLogFile(string encryptedFilePath, string rsaPrivateKey)
     {
-        using var rsa = RSA.Create();
+        using RSA rsa = RSA.Create();
         rsa.FromXmlString(rsaPrivateKey);
         using FileStream fileStream = System.IO.File.OpenRead(encryptedFilePath);
 
-        var result = new StringBuilder();
+        StringBuilder result = new StringBuilder();
         byte[] chunkMarker = "LOGCHUNK"u8.ToArray();
 
         try
@@ -57,8 +57,8 @@ public static class EncryptionUtils
                 }
 
                 // Read header info
-                var keyLengthBytes = new byte[sizeof(int)];
-                var ivLengthBytes = new byte[sizeof(int)];
+                byte[] keyLengthBytes = new byte[sizeof(int)];
+                byte[] ivLengthBytes = new byte[sizeof(int)];
 
                 if (
                     fileStream.Read(keyLengthBytes, 0, keyLengthBytes.Length)
@@ -81,8 +81,8 @@ public static class EncryptionUtils
                 }
 
                 // Read encrypted key and IV
-                var encryptedKey = new byte[keyLength];
-                var encryptedIv = new byte[ivLength];
+                byte[] encryptedKey = new byte[keyLength];
+                byte[] encryptedIv = new byte[ivLength];
 
                 if (
                     fileStream.Read(encryptedKey, 0, encryptedKey.Length) != encryptedKey.Length
@@ -110,7 +110,7 @@ public static class EncryptionUtils
                 }
 
                 // Capture all data until the next LOGCHUNK marker or EOF
-                var encryptedDataMs = new MemoryStream();
+                MemoryStream encryptedDataMs = new MemoryStream();
                 byte[] buffer = new byte[4096];
                 long startPosition = fileStream.Position;
 
@@ -182,14 +182,14 @@ public static class EncryptionUtils
                     byte[] encryptedBytes = encryptedDataMs.ToArray();
                     if (encryptedBytes.Length > 0)
                     {
-                        using var aes = Aes.Create();
+                        using Aes aes = Aes.Create();
                         aes.Key = key;
                         aes.IV = iv;
                         aes.Padding = PaddingMode.PKCS7;
 
-                        using var decryptor = aes.CreateDecryptor();
-                        using var memoryStream = new MemoryStream();
-                        using var cryptoStream = new CryptoStream(
+                        using ICryptoTransform decryptor = aes.CreateDecryptor();
+                        using MemoryStream memoryStream = new MemoryStream();
+                        using CryptoStream cryptoStream = new CryptoStream(
                             memoryStream,
                             decryptor,
                             CryptoStreamMode.Write

@@ -24,7 +24,7 @@ internal class EncryptedChunkStream : Stream
     private void StartNewEncryptionChunk()
     {
         // Generate a new random key and IV for this chunk
-        using var aes = Aes.Create();
+        using Aes aes = Aes.Create();
         _currentKey = aes.Key;
         _currentIv = aes.IV;
 
@@ -41,7 +41,7 @@ internal class EncryptedChunkStream : Stream
         _underlyingStream.Write(encryptedIv, 0, encryptedIv.Length);
 
         // Create a new crypto stream - store the Aes instance to ensure it's not disposed
-        var aesAlg = Aes.Create();
+        Aes aesAlg = Aes.Create();
         aesAlg.Padding = PaddingMode.PKCS7; // Ensure proper padding
         _currentCryptoStream?.Dispose();
         _currentCryptoStream = new CryptoStream(
@@ -59,20 +59,14 @@ internal class EncryptedChunkStream : Stream
 
     public override void Flush()
     {
-        if (_bufferStream.Length > 0)
-        {
-            byte[] data = _bufferStream.ToArray();
+        if (_bufferStream.Length <= 0) return;
+        byte[] data = _bufferStream.ToArray();
 
-            // Write this data to the current crypto stream
-            _currentCryptoStream!.Write(data, 0, data.Length);
-
-            // Remove this line - don't write length bytes after encrypted data
-            // byte[] lengthBytes = BitConverter.GetBytes(data.Length);
-            // _underlyingStream.Write(lengthBytes, 0, lengthBytes.Length);
-
-            // Reset buffer for next batch
-            _bufferStream = new MemoryStream();
-        }
+        // Write this data to the current crypto stream
+        _currentCryptoStream!.Write(data, 0, data.Length);
+        
+        // Reset buffer for next batch
+        _bufferStream = new MemoryStream();
     }
 
     protected override void Dispose(bool disposing)
@@ -89,6 +83,7 @@ internal class EncryptedChunkStream : Stream
                 _currentCryptoStream.Dispose();
             }
             _bufferStream.Dispose();
+            _underlyingStream.Dispose();
         }
         base.Dispose(disposing);
     }

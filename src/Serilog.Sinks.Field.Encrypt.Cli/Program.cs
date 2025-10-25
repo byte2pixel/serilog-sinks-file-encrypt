@@ -4,13 +4,16 @@ using Serilog.Sinks.Field.Encrypt.Cli.Commands;
 using Serilog.Sinks.Field.Encrypt.Cli.Infrastructure;
 using Spectre.Console.Cli;
 
-var registrations = new ServiceCollection();
-registrations.AddSingleton<IGreeter, HelloWorldGreeter>();
+ServiceCollection registrations = new();
+// DI Registrations
+// e.g. registrations.AddSingleton<,>();
 
-var registrar = new TypeRegistrar(registrations);
-var app = new CommandApp(registrar);
+TypeRegistrar registrar = new(registrations);
+CommandApp app = new(registrar);
+
 app.Configure(c =>
 {
     c.AddCommand<DecryptCommand>("decrypt");
 });
+
 return await app.RunAsync(args);

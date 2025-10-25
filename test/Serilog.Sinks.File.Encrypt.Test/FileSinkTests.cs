@@ -63,8 +63,8 @@ public sealed class FileSinkTests : IDisposable
         Assert.NotEqual(keyPair.publicKey, keyPair.privateKey);
 
         // Verify keys are valid by loading them into RSA objects
-        using var publicRsa = RSA.Create();
-        using var privateRsa = RSA.Create();
+        using RSA publicRsa = RSA.Create();
+        using RSA privateRsa = RSA.Create();
 
         publicRsa.FromXmlString(keyPair.publicKey);
         privateRsa.FromXmlString(keyPair.privateKey);
@@ -80,7 +80,7 @@ public sealed class FileSinkTests : IDisposable
         Logger logger = new LoggerConfiguration()
             .WriteTo.File(
                 path: _logFilePath,
-                hooks: new EncryptHooks(_rsaKeyPair.publicKey))
+                hooks: new DeviceEncryptHooks(_rsaKeyPair.publicKey))
             .CreateLogger();
 
         // Write a test message
@@ -107,7 +107,7 @@ public sealed class FileSinkTests : IDisposable
         Logger logger = new LoggerConfiguration()
             .WriteTo.File(
                 path: _logFilePath,
-                hooks: new EncryptHooks(_rsaKeyPair.publicKey))
+                hooks: new DeviceEncryptHooks(_rsaKeyPair.publicKey))
             .CreateLogger();
 
         // Write a test message
@@ -130,7 +130,7 @@ public sealed class FileSinkTests : IDisposable
         Logger logger = new LoggerConfiguration()
             .WriteTo.File(
                 path: _logFilePath,
-                hooks: new EncryptHooks(_rsaKeyPair.publicKey))
+                hooks: new DeviceEncryptHooks(_rsaKeyPair.publicKey))
             .CreateLogger();
 
         logger.Information("Secret data");
@@ -140,8 +140,8 @@ public sealed class FileSinkTests : IDisposable
         (string publicKey, string privateKey) differentKeyPair = EncryptionUtils.GenerateRsaKeyPair();
 
         // Act & Assert
-        Assert.Throws<CryptographicException>(() =>
-            EncryptionUtils.DecryptLogFile(_logFilePath, differentKeyPair.privateKey));
+        string result = EncryptionUtils.DecryptLogFile(_logFilePath, differentKeyPair.privateKey);
+        Assert.Contains("[Error decrypting keys:", result);
     }
 
     [Fact]
@@ -151,11 +151,11 @@ public sealed class FileSinkTests : IDisposable
         Logger logger = new LoggerConfiguration()
             .WriteTo.File(
                 path: _logFilePath,
-                hooks: new EncryptHooks(_rsaKeyPair.publicKey))
+                hooks: new DeviceEncryptHooks(_rsaKeyPair.publicKey))
             .CreateLogger();
 
         // Act - Write multiple messages
-        for (var i = 1; i <= 10; i++)
+        for (int i = 1; i <= 10; i++)
         {
             logger.Information("Log message {MessageNumber}", i);
         }
@@ -167,9 +167,39 @@ public sealed class FileSinkTests : IDisposable
         string decryptedContent = EncryptionUtils.DecryptLogFile(_logFilePath, _rsaKeyPair.privateKey);
 
         // Assert - Check that all messages are present
-        for (var i = 1; i <= 10; i++)
+        for (int i = 1; i <= 10; i++)
         {
             Assert.Contains($"Log message {i}", decryptedContent);
         }
+    }
+
+    [Fact]
+    public void CanAppendToEncryptedLogFile()
+    {
+        // Arrange
+        const string firstMessage = "First log entry";
+        const string secondMessage = "Second log entry";
+
+        // Create logger and write first message
+        Logger logger = new LoggerConfiguration()
+            .WriteTo.File(
+                path: _logFilePath,
+                hooks: new DeviceEncryptHooks(_rsaKeyPair.publicKey),
+                rollingInterval: RollingInterval.Infinite).CreateLogger();
+        logger.Information(firstMessage);
+        logger.Dispose();
+        // Recreate logger to append second message
+        logger = new LoggerConfiguration()
+            .WriteTo.File(
+                path: _logFilePath,
+                hooks: new DeviceEncryptHooks(_rsaKeyPair.publicKey),
+                rollingInterval: RollingInterval.Infinite).CreateLogger();
+        logger.Information(secondMessage);
+        logger.Dispose();
+        // Act - Decrypt the log file
+        string decryptedContent = EncryptionUtils.DecryptLogFile(_logFilePath, _rsaKeyPair.privateKey);
+        // Assert
+        Assert.Contains(firstMessage, decryptedContent);
+        Assert.Contains(secondMessage, decryptedContent);
     }
 }
