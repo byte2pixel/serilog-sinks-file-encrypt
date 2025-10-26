@@ -33,7 +33,7 @@ public static class EncryptionUtils
         rsa.FromXmlString(rsaPrivateKey);
         using FileStream fileStream = System.IO.File.OpenRead(encryptedFilePath);
 
-        StringBuilder result = new StringBuilder();
+        StringBuilder result = new();
         byte[] chunkMarker = "LOGCHUNK"u8.ToArray();
 
         try
@@ -91,8 +91,7 @@ public static class EncryptionUtils
                     break; // End of file reached
 
                 // Read all data until next chunk marker
-                byte[] key,
-                    iv;
+                byte[] key, iv;
                 try
                 {
                     // Decrypt key and IV
@@ -110,9 +109,8 @@ public static class EncryptionUtils
                 }
 
                 // Capture all data until the next LOGCHUNK marker or EOF
-                MemoryStream encryptedDataMs = new MemoryStream();
+                MemoryStream encryptedDataMs = new();
                 byte[] buffer = new byte[4096];
-                long startPosition = fileStream.Position;
 
                 // Read until EOF or until we find the next marker
                 while (true)
@@ -188,8 +186,8 @@ public static class EncryptionUtils
                         aes.Padding = PaddingMode.PKCS7;
 
                         using ICryptoTransform decryptor = aes.CreateDecryptor();
-                        using MemoryStream memoryStream = new MemoryStream();
-                        using CryptoStream cryptoStream = new CryptoStream(
+                        using MemoryStream memoryStream = new();
+                        using CryptoStream cryptoStream = new(
                             memoryStream,
                             decryptor,
                             CryptoStreamMode.Write
@@ -280,19 +278,87 @@ public static class EncryptionUtils
         return false;
     }
 
-    /// <summary>
-    /// Decrypts an encrypted log file and saves the content to a new file.
-    /// </summary>
-    /// <param name="encryptedFilePath">The path to the encrypted log file</param>
-    /// <param name="decryptedFilePath">The path where the decrypted content will be saved</param>
-    /// <param name="rsaPrivateKey">The RSA private key in XML format</param>
-    public static void DecryptLogFileToFile(
-        string encryptedFilePath,
-        string decryptedFilePath,
-        string rsaPrivateKey
-    )
+    public static void DecryptLogFileToFile(string inputPath, string outputPath, string rsaPrivateKey)
     {
-        string decryptedContent = DecryptLogFile(encryptedFilePath, rsaPrivateKey);
-        System.IO.File.WriteAllText(decryptedFilePath, decryptedContent);
+        
+        using RSA rsa = RSA.Create();
+        rsa.FromXmlString(rsaPrivateKey);
+        
+        using FileStream inputStream = System.IO.File.OpenRead(inputPath);
+        using FileStream outputStream = System.IO.File.Create(outputPath);
+        using StreamWriter writer = new(outputStream, Encoding.UTF8, leaveOpen: true);
+
+        while (inputStream.Position < inputStream.Length)
+        {
+            if (!TryReadChunk(inputStream, rsa, out string decryptedText))
+                break;
+
+            writer.Write(decryptedText);
+            writer.Flush();
+        }
+    }
+
+    private static bool TryReadChunk(Stream stream, RSA rsaPrivateKey, out string decryptedText)
+    {
+        decryptedText = string.Empty;
+
+        // Read chunk header
+        byte[] marker = new byte[8];
+        if (stream.Read(marker, 0, 8) != 8)
+            return false;
+
+        if (Encoding.UTF8.GetString(marker) != "LOGCHUNK")
+            return false;
+
+        // Read encrypted key/IV lengths and data
+        byte[] keyLengthBytes = new byte[4];
+        byte[] ivLengthBytes = new byte[4];
+
+        stream.ReadExactly(keyLengthBytes, 0, 4);
+        stream.ReadExactly(ivLengthBytes, 0, 4);
+
+        int keyLength = BitConverter.ToInt32(keyLengthBytes, 0);
+        int ivLength = BitConverter.ToInt32(ivLengthBytes, 0);
+
+        byte[] encryptedKey = new byte[keyLength];
+        byte[] encryptedIv = new byte[ivLength];
+
+        stream.ReadExactly(encryptedKey, 0, keyLength);
+        stream.ReadExactly(encryptedIv, 0, ivLength);
+
+        // Decrypt AES key/IV
+        byte[] key = rsaPrivateKey.Decrypt(encryptedKey, RSAEncryptionPadding.OaepSHA256);
+        byte[] iv = rsaPrivateKey.Decrypt(encryptedIv, RSAEncryptionPadding.OaepSHA256);
+
+        // Read until next chunk marker or end of file
+        using MemoryStream chunkBuffer = new();
+        byte[] readBuffer = new byte[4096];
+
+        while (stream.Position < stream.Length)
+        {
+            long checkPos = stream.Position;
+            int bytesRead = stream.Read(readBuffer, 0, Math.Min(8, readBuffer.Length));
+
+            if (bytesRead == 8 && Encoding.UTF8.GetString(readBuffer, 0, 8) == "LOGCHUNK")
+            {
+                stream.Position = checkPos; // Rewind
+                break;
+            }
+
+            stream.Position = checkPos;
+            bytesRead = stream.Read(readBuffer, 0, readBuffer.Length);
+            if (bytesRead == 0) break;
+
+            chunkBuffer.Write(readBuffer, 0, bytesRead);
+        }
+
+        // Decrypt the chunk
+        using Aes aes = Aes.Create();
+        using ICryptoTransform decryptor = aes.CreateDecryptor(key, iv);
+        using CryptoStream cryptoStream = new(new MemoryStream(chunkBuffer.ToArray()), decryptor, CryptoStreamMode.Read);
+        using StreamReader reader = new(cryptoStream, Encoding.UTF8);
+
+        decryptedText = reader.ReadToEnd();
+        return true;
     }
 }
