@@ -10,7 +10,9 @@ internal class EncryptedChunkStream : Stream
     private byte[]? _currentKey;
     private byte[]? _currentIv;
     private MemoryStream _bufferStream;
-
+    private long _currentChunkSize;
+    private const long MaxChunkSize = 10 * 1024 * 1024; // 10 MB chunks
+    
     public EncryptedChunkStream(Stream underlyingStream, RSA rsaPublicKey)
     {
         _underlyingStream = underlyingStream;
@@ -62,11 +64,30 @@ internal class EncryptedChunkStream : Stream
         if (_bufferStream.Length <= 0) return;
         byte[] data = _bufferStream.ToArray();
 
-        // Write this data to the current crypto stream
+        // Check if we should rotate to a new chunk
+        if (_currentChunkSize + data.Length > MaxChunkSize)
+        {
+            RotateChunk();
+        }
+
         _currentCryptoStream!.Write(data, 0, data.Length);
-        
-        // Reset buffer for next batch
+        _currentChunkSize += data.Length;
+
         _bufferStream = new MemoryStream();
+    }
+    
+    private void RotateChunk()
+    {
+        // Finalize current chunk
+        if (_currentCryptoStream != null)
+        {
+            _currentCryptoStream.FlushFinalBlock();
+            _currentCryptoStream.Dispose();
+        }
+
+        // Start new chunk
+        _currentChunkSize = 0;
+        StartNewEncryptionChunk();
     }
 
     protected override void Dispose(bool disposing)
