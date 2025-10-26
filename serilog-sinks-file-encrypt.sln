@@ -11,7 +11,7 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "test", "test", "{0C88DD14-F
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Serilog.Sinks.File.Encrypt.Test", "test\Serilog.Sinks.File.Encrypt.Test\Serilog.Sinks.File.Encrypt.Test.csproj", "{945ACA50-D54E-4C14-B865-812C1D9009CE}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Serilog.Sinks.Field.Encrypt.Cli", "src\Serilog.Sinks.Field.Encrypt.Cli\Serilog.Sinks.Field.Encrypt.Cli.csproj", "{6A26925F-F9C2-4393-AD7D-F1C09440FB75}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Serilog.Sinks.File.Encrypt.Cli", "src\Serilog.Sinks.File.Encrypt.Cli\Serilog.Sinks.File.Encrypt.Cli.csproj", "{6A26925F-F9C2-4393-AD7D-F1C09440FB75}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "examples", "examples", "{66966427-EC5F-42A8-AB6B-4239098DF247}"
 	ProjectSection(SolutionItems) = preProject
