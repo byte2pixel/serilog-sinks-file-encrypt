@@ -70,7 +70,7 @@ internal class EncryptedChunkStream : Stream
             RotateChunk();
         }
 
-        _currentCryptoStream!.Write(data, 0, data.Length);
+        _currentCryptoStream?.Write(data, 0, data.Length);
         _currentChunkSize += data.Length;
 
         _bufferStream = new MemoryStream();
