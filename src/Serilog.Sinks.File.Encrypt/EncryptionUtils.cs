@@ -91,7 +91,9 @@ public static class EncryptionUtils
                     break; // End of file reached
 
                 // Read all data until next chunk marker
-                byte[] key, iv;
+                byte[] key;
+                byte[] iv;
+
                 try
                 {
                     // Decrypt key and IV
@@ -135,43 +137,36 @@ public static class EncryptionUtils
                             fileStream.Position = currentPosition;
                             break;
                         }
-                        else
-                        {
-                            // Not a full marker - rewind and continue
-                            fileStream.Position = currentPosition + 1;
-                            encryptedDataMs.WriteByte(markerBuffer[0]);
-                        }
+
+                        // Not a full marker - rewind and continue
+                        fileStream.Position = currentPosition + 1;
                     }
-                    else
-                    {
-                        // Not the start of a marker - write the byte
-                        encryptedDataMs.WriteByte(markerBuffer[0]);
-                    }
+
+                    // Not the start of a marker - write the byte
+                    encryptedDataMs.WriteByte(markerBuffer[0]);
+
+                    if (encryptedDataMs.Length < buffer.Length)
+                        continue;
 
                     // Check if we have a full buffer to process
-                    if (encryptedDataMs.Length >= buffer.Length)
+                    encryptedDataMs.Position = 0;
+                    bytesRead = encryptedDataMs.Read(buffer, 0, buffer.Length);
+                    encryptedDataMs.SetLength(0);
+
+                    // Check for any marker in the buffer
+                    int markerPos = IndexOf(buffer, chunkMarker, bytesRead);
+                    if (markerPos >= 0)
                     {
-                        encryptedDataMs.Position = 0;
-                        bytesRead = encryptedDataMs.Read(buffer, 0, buffer.Length);
-                        encryptedDataMs.SetLength(0);
+                        // Write data up to the marker
+                        encryptedDataMs.Write(buffer, 0, markerPos);
 
-                        // Check for any marker in the buffer
-                        int markerPos = IndexOf(buffer, chunkMarker, bytesRead);
-                        if (markerPos >= 0)
-                        {
-                            // Write data up to the marker
-                            encryptedDataMs.Write(buffer, 0, markerPos);
-
-                            // Position file stream at start of marker
-                            fileStream.Position = currentPosition - bytesRead + markerPos;
-                            break;
-                        }
-                        else
-                        {
-                            // No marker in buffer, write everything
-                            encryptedDataMs.Write(buffer, 0, bytesRead);
-                        }
+                        // Position file stream at start of marker
+                        fileStream.Position = currentPosition - bytesRead + markerPos;
+                        break;
                     }
+
+                    // No marker in buffer, write everything
+                    encryptedDataMs.Write(buffer, 0, bytesRead);
                 }
 
                 // Decrypt the data
@@ -224,11 +219,11 @@ public static class EncryptionUtils
             bool found = true;
             for (int j = 0; j < needle.Length; j++)
             {
-                if (haystack[i + j] != needle[j])
-                {
-                    found = false;
-                    break;
-                }
+                if (haystack[i + j] == needle[j])
+                    continue;
+
+                found = false;
+                break;
             }
             if (found)
                 return i;
@@ -251,19 +246,19 @@ public static class EncryptionUtils
                 bool found = true;
                 for (int j = 0; j < marker.Length; j++)
                 {
-                    if (buffer[i + j] != marker[j])
-                    {
-                        found = false;
-                        break;
-                    }
+                    if (buffer[i + j] == marker[j])
+                        continue;
+
+                    found = false;
+                    break;
                 }
 
-                if (found)
-                {
-                    // Found the marker - position stream at start of marker
-                    stream.Position -= (bytesRead - i);
-                    return true;
-                }
+                if (!found)
+                    continue;
+
+                // Found the marker - position stream at start of marker
+                stream.Position -= (bytesRead - i);
+                return true;
             }
 
             // If no complete marker was found in this buffer, check if the
@@ -278,23 +273,39 @@ public static class EncryptionUtils
         return false;
     }
 
-    public static void DecryptLogFileToFile(string inputPath, string outputPath, string rsaPrivateKey)
+    public static void DecryptLogFileToFile(
+        string inputPath,
+        string outputPath,
+        string rsaPrivateKey
+    )
     {
-        
         using RSA rsa = RSA.Create();
         rsa.FromXmlString(rsaPrivateKey);
-        
+
         using FileStream inputStream = System.IO.File.OpenRead(inputPath);
         using FileStream outputStream = System.IO.File.Create(outputPath);
         using StreamWriter writer = new(outputStream, Encoding.UTF8, leaveOpen: true);
 
-        while (inputStream.Position < inputStream.Length)
+        try
         {
-            if (!TryReadChunk(inputStream, rsa, out string decryptedText))
-                break;
+            while (inputStream.Position < inputStream.Length)
+            {
+                if (!TryReadChunk(inputStream, rsa, out string decryptedText))
+                {
+                    // If we can't read a chunk, try to find the next valid chunk marker
+                    byte[] chunkMarker = "LOGCHUNK"u8.ToArray();
+                    if (!TryFindNextChunk(inputStream, chunkMarker))
+                        break; // No more valid chunks found
+                    continue;
+                }
 
-            writer.Write(decryptedText);
-            writer.Flush();
+                writer.Write(decryptedText);
+                writer.Flush();
+            }
+        }
+        catch (Exception ex)
+        {
+            writer.WriteLine($"[Decryption error: {ex.Message}]");
         }
     }
 
@@ -302,63 +313,122 @@ public static class EncryptionUtils
     {
         decryptedText = string.Empty;
 
-        // Read chunk header
-        byte[] marker = new byte[8];
-        if (stream.Read(marker, 0, 8) != 8)
-            return false;
-
-        if (Encoding.UTF8.GetString(marker) != "LOGCHUNK")
-            return false;
-
-        // Read encrypted key/IV lengths and data
-        byte[] keyLengthBytes = new byte[4];
-        byte[] ivLengthBytes = new byte[4];
-
-        stream.ReadExactly(keyLengthBytes, 0, 4);
-        stream.ReadExactly(ivLengthBytes, 0, 4);
-
-        int keyLength = BitConverter.ToInt32(keyLengthBytes, 0);
-        int ivLength = BitConverter.ToInt32(ivLengthBytes, 0);
-
-        byte[] encryptedKey = new byte[keyLength];
-        byte[] encryptedIv = new byte[ivLength];
-
-        stream.ReadExactly(encryptedKey, 0, keyLength);
-        stream.ReadExactly(encryptedIv, 0, ivLength);
-
-        // Decrypt AES key/IV
-        byte[] key = rsaPrivateKey.Decrypt(encryptedKey, RSAEncryptionPadding.OaepSHA256);
-        byte[] iv = rsaPrivateKey.Decrypt(encryptedIv, RSAEncryptionPadding.OaepSHA256);
-
-        // Read until next chunk marker or end of file
-        using MemoryStream chunkBuffer = new();
-        byte[] readBuffer = new byte[4096];
-
-        while (stream.Position < stream.Length)
+        try
         {
-            long checkPos = stream.Position;
-            int bytesRead = stream.Read(readBuffer, 0, Math.Min(8, readBuffer.Length));
+            // Read chunk header
+            byte[] marker = new byte[8];
+            if (stream.Read(marker, 0, 8) != 8)
+                return false;
 
-            if (bytesRead == 8 && Encoding.UTF8.GetString(readBuffer, 0, 8) == "LOGCHUNK")
-            {
-                stream.Position = checkPos; // Rewind
-                break;
-            }
+            if (Encoding.UTF8.GetString(marker) != "LOGCHUNK")
+                return false;
 
-            stream.Position = checkPos;
-            bytesRead = stream.Read(readBuffer, 0, readBuffer.Length);
-            if (bytesRead == 0) break;
+            // Read encrypted key/IV lengths and data
+            byte[] keyLengthBytes = new byte[4];
+            byte[] ivLengthBytes = new byte[4];
 
-            chunkBuffer.Write(readBuffer, 0, bytesRead);
+            if (stream.Read(keyLengthBytes, 0, 4) != 4 || stream.Read(ivLengthBytes, 0, 4) != 4)
+                return false;
+
+            int keyLength = BitConverter.ToInt32(keyLengthBytes, 0);
+            int ivLength = BitConverter.ToInt32(ivLengthBytes, 0);
+
+            // Sanity check - key and IV lengths should be reasonable
+            if (keyLength <= 0 || keyLength > 1024 || ivLength <= 0 || ivLength > 1024)
+                return false;
+
+            byte[] encryptedKey = new byte[keyLength];
+            byte[] encryptedIv = new byte[ivLength];
+
+            if (
+                stream.Read(encryptedKey, 0, keyLength) != keyLength
+                || stream.Read(encryptedIv, 0, ivLength) != ivLength
+            )
+                return false;
+
+            // Decrypt AES key/IV
+            byte[] key = rsaPrivateKey.Decrypt(encryptedKey, RSAEncryptionPadding.OaepSHA256);
+            byte[] iv = rsaPrivateKey.Decrypt(encryptedIv, RSAEncryptionPadding.OaepSHA256);
+
+            // Read until next chunk marker or end of file using the same logic as DecryptLogFile
+            using MemoryStream encryptedDataMs = new();
+            byte[] chunkMarker = "LOGCHUNK"u8.ToArray();
+
+            // Read until EOF or until we find the next marker
+            ProcessChunk(stream, chunkMarker, encryptedDataMs);
+
+            // Decrypt the data
+            byte[] encryptedBytes = encryptedDataMs.ToArray();
+            if (encryptedBytes.Length <= 0)
+                return true;
+
+            using Aes aes = Aes.Create();
+            aes.Key = key;
+            aes.IV = iv;
+            aes.Padding = PaddingMode.PKCS7;
+
+            using ICryptoTransform decryptor = aes.CreateDecryptor();
+            using MemoryStream memoryStream = new();
+            using CryptoStream cryptoStream = new(memoryStream, decryptor, CryptoStreamMode.Write);
+
+            cryptoStream.Write(encryptedBytes, 0, encryptedBytes.Length);
+            cryptoStream.FlushFinalBlock();
+
+            decryptedText = Encoding.UTF8.GetString(memoryStream.ToArray());
+
+            return true;
         }
+        catch (CryptographicException)
+        {
+            // Failed to decrypt - return false to stop processing
+            return false;
+        }
+        catch (Exception)
+        {
+            // Other errors - return false to stop processing
+            return false;
+        }
+    }
 
-        // Decrypt the chunk
-        using Aes aes = Aes.Create();
-        using ICryptoTransform decryptor = aes.CreateDecryptor(key, iv);
-        using CryptoStream cryptoStream = new(new MemoryStream(chunkBuffer.ToArray()), decryptor, CryptoStreamMode.Read);
-        using StreamReader reader = new(cryptoStream, Encoding.UTF8);
+    private static void ProcessChunk(Stream stream, byte[] chunkMarker, MemoryStream encryptedDataMs)
+    {
+        while (true)
+        {
+            // Check if we've hit a marker
+            long currentPosition = stream.Position;
+            byte[] markerBuffer = new byte[1];
+            int bytesRead = stream.Read(markerBuffer, 0, 1);
+            if (bytesRead == 0)
+                break; // EOF
 
-        decryptedText = reader.ReadToEnd();
-        return true;
+            // Check if this could be the start of a marker
+            if (markerBuffer[0] == chunkMarker[0])
+            {
+                // Could be a marker - read the rest to check
+                byte[] fullMarkerBuffer = new byte[chunkMarker.Length];
+                fullMarkerBuffer[0] = markerBuffer[0];
+                bytesRead = stream.Read(fullMarkerBuffer, 1, chunkMarker.Length - 1);
+                if (
+                    bytesRead == chunkMarker.Length - 1
+                    && fullMarkerBuffer.SequenceEqual(chunkMarker)
+                )
+                {
+                    // Found a marker - go back to the start of it
+                    stream.Position = currentPosition;
+                    break;
+                }
+                else
+                {
+                    // Not a full marker - rewind and continue
+                    stream.Position = currentPosition + 1;
+                    encryptedDataMs.WriteByte(fullMarkerBuffer[0]);
+                }
+            }
+            else
+            {
+                // Not the start of a marker - write the byte
+                encryptedDataMs.WriteByte(markerBuffer[0]);
+            }
+        }
     }
 }
