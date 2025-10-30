@@ -1,10 +1,11 @@
 ﻿using System.ComponentModel;
+using System.IO.Abstractions;
 using Serilog.Sinks.File.Encrypt;
 using Spectre.Console.Cli;
 
 namespace Serilog.Sinks.Field.Encrypt.Cli.Commands;
 
-public sealed class DecryptCommand : Command<DecryptCommand.Settings>
+public sealed class DecryptCommand(IFileSystem fileSystem) : Command<DecryptCommand.Settings>
 {
     public sealed class Settings : CommandSettings
     {
@@ -22,13 +23,13 @@ public sealed class DecryptCommand : Command<DecryptCommand.Settings>
     public override int Execute(CommandContext context, Settings settings)
     {
         // Read the RSA private key from the specified file
-        if (!System.IO.File.Exists(settings.KeyFile))
+        if (!fileSystem.File.Exists(settings.KeyFile))
         {
             Console.Error.WriteLine($"Error: Key file '{settings.KeyFile}' does not exist.");
             return 1;
         }
-        string rsaPrivateKey = System.IO.File.ReadAllText(settings.KeyFile);
-        if (!System.IO.File.Exists(settings.EncryptedFile))
+        string rsaPrivateKey = fileSystem.File.ReadAllText(settings.KeyFile);
+        if (!fileSystem.File.Exists(settings.EncryptedFile))
         {
             Console.Error.WriteLine($"Error: Encrypted file '{settings.EncryptedFile}' does not exist.");
             return 1;
