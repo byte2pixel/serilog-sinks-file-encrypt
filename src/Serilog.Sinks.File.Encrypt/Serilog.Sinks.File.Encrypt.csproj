@@ -18,6 +18,11 @@
     <PackageProjectUrl>https://github.com/byte2pixel/serilog-sinks-file-encrypt</PackageProjectUrl>
     <Nullable>enable</Nullable>
   </PropertyGroup>
+    
+  <!-- make internals visible to test project -->
+  <ItemGroup>
+    <InternalsVisibleTo Include="Serilog.Sinks.File.Encrypt.Tests" />
+  </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="DeviceId" />

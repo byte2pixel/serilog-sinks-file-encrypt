@@ -1,8 +1,4 @@
-﻿using System.Security.Cryptography;
-using Serilog.Core;
-using Serilog.Formatting.Json;
-
-namespace Serilog.Sinks.File.Encrypt.Test;
+﻿namespace Serilog.Sinks.File.Encrypt.Tests;
 
 public class EncryptionConfigurationTests : IDisposable
 {

@@ -4,14 +4,17 @@ namespace Serilog.Sinks.File.Encrypt;
 
 internal class EncryptedChunkStream : Stream
 {
+    private const long MaxChunkSize = 10 * 1024 * 1024; // 10 MB chunks
     private readonly Stream _underlyingStream;
     private readonly RSA _rsaPublicKey;
+    
     private CryptoStream? _currentCryptoStream;
     private byte[]? _currentKey;
     private byte[]? _currentIv;
     private MemoryStream _bufferStream;
     private long _currentChunkSize;
-    private const long MaxChunkSize = 10 * 1024 * 1024; // 10 MB chunks
+    
+    private bool _isDisposed;
     
     public EncryptedChunkStream(Stream underlyingStream, RSA rsaPublicKey)
     {
@@ -92,6 +95,10 @@ internal class EncryptedChunkStream : Stream
 
     protected override void Dispose(bool disposing)
     {
+        if (_isDisposed) return;
+        
+        _isDisposed = true;
+        
         if (disposing)
         {
             // Flush any remaining data

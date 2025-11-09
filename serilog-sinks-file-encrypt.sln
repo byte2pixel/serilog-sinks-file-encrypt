@@ -8,8 +8,11 @@ EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Serilog.Sinks.File.Encrypt", "src\Serilog.Sinks.File.Encrypt\Serilog.Sinks.File.Encrypt.csproj", "{0386137F-0A12-41D9-921F-E47229BC9F92}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "test", "test", "{0C88DD14-F956-CE84-757C-A364CCF449FC}"
+	ProjectSection(SolutionItems) = preProject
+		test\Directory.Packages.props = test\Directory.Packages.props
+	EndProjectSection
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Serilog.Sinks.File.Encrypt.Test", "test\Serilog.Sinks.File.Encrypt.Test\Serilog.Sinks.File.Encrypt.Test.csproj", "{945ACA50-D54E-4C14-B865-812C1D9009CE}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Serilog.Sinks.File.Encrypt.Tests", "test\Serilog.Sinks.File.Encrypt.Tests\Serilog.Sinks.File.Encrypt.Tests.csproj", "{945ACA50-D54E-4C14-B865-812C1D9009CE}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Serilog.Sinks.File.Encrypt.Cli", "src\Serilog.Sinks.File.Encrypt.Cli\Serilog.Sinks.File.Encrypt.Cli.csproj", "{6A26925F-F9C2-4393-AD7D-F1C09440FB75}"
 EndProject
