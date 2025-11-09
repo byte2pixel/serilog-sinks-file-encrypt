@@ -1,7 +1,4 @@
-﻿using System.Security.Cryptography;
-using Serilog.Core;
-
-namespace Serilog.Sinks.File.Encrypt.Test;
+﻿namespace Serilog.Sinks.File.Encrypt.Tests;
 
 public sealed class FileSinkTests : IDisposable
 {
