@@ -34,7 +34,10 @@ public sealed class DecryptCommand(IFileSystem fileSystem) : Command<DecryptComm
             Console.Error.WriteLine($"Error: Encrypted file '{settings.EncryptedFile}' does not exist.");
             return 1;
         }
-        EncryptionUtils.DecryptLogFileToFile(settings.EncryptedFile, settings.OutputFile, rsaPrivateKey);
+        //EncryptionUtils.DecryptChunkedLogFileToFile(settings.EncryptedFile, settings.OutputFile, rsaPrivateKey);
+        var data = EncryptionUtils.DecryptLogFile(settings.EncryptedFile, rsaPrivateKey);
+        fileSystem.File.WriteAllText(settings.OutputFile, data);
+        Console.WriteLine($"Decrypted log written to '{settings.OutputFile}'.");
         return 0;
     }
 }

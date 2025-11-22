@@ -3,7 +3,7 @@ namespace Serilog.Sinks.File.Encrypt.Tests.unit;
 public class DeviceEncryptHooksTests
 {
     [Fact]
-    public void OnFileOpened_ReturnsEncryptedChunkStream()
+    public void OnFileOpened_ReturnsEncryptedStream()
     {
         // Arrange
         (string publicKey, string _) = EncryptionUtils.GenerateRsaKeyPair();
@@ -15,6 +15,6 @@ public class DeviceEncryptHooksTests
         using Stream resultStream = hooks.OnFileOpened("test.log", memoryStream, encoding);
 
         // Assert
-        Assert.IsType<EncryptedChunkStream>(resultStream);
+        Assert.IsType<EncryptedStream>(resultStream);
     }
 }

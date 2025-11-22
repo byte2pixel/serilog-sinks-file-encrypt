@@ -27,13 +27,13 @@ public class EncryptionUtilsTests
     {
         // Arrange
         (string publicKey, string privateKey) = EncryptionUtils.GenerateRsaKeyPair();
-        const string originalText = "Hello, encrypted log!";
+        const string originalText = "Hello, simple encrypted log!";
         string tempFile = Path.GetTempFileName();
         using (FileStream fs = System.IO.File.Create(tempFile))
         using (RSA rsa = RSA.Create())
         {
             rsa.FromXmlString(publicKey);
-            using (EncryptedChunkStream encStream = new(fs, rsa))
+            using (EncryptedStream encStream = new(fs, rsa))
             {
                 byte[] data = Encoding.UTF8.GetBytes(originalText);
                 encStream.Write(data, 0, data.Length);
@@ -48,48 +48,37 @@ public class EncryptionUtilsTests
         decrypted.ShouldContain(originalText);
         System.IO.File.Delete(tempFile);
     }
-
+    
     [Fact]
-    public void DecryptLogFileToFile_WritesDecryptedContentToFile()
+    public void DecryptLogFile_ReturnsMultipleDecryptedEntries()
     {
         // Arrange
         (string publicKey, string privateKey) = EncryptionUtils.GenerateRsaKeyPair();
-        const string logMessage1 = "Log file to file test!";
-        const string logMessage2 = "Second log entry!";
-        string inputFile = Path.GetTempFileName();
-        string outputFile = Path.GetTempFileName();
+        const string logMessage1 = "Simple log file test!";
+        const string logMessage2 = "Second simple log entry!";
+        string tempFile = Path.GetTempFileName();
+        using (FileStream fs = System.IO.File.Create(tempFile))
         using (RSA rsa = RSA.Create())
         {
             rsa.FromXmlString(publicKey);
-            using (FileStream fs = System.IO.File.Create(inputFile))
+            using (EncryptedStream encStream = new(fs, rsa))
             {
-                using (EncryptedChunkStream encStream = new(fs, rsa))
-                {
-                    byte[] data = Encoding.UTF8.GetBytes(logMessage1);
-                    encStream.Write(data, 0, data.Length);
-                    encStream.Flush();
-                }
-            }
-
-            using (FileStream fs = System.IO.File.Open(inputFile, FileMode.Append))
-            {
-                using (EncryptedChunkStream encStream = new(fs, rsa))
-                {
-                    byte[] data = Encoding.UTF8.GetBytes(logMessage2);
-                    encStream.Write(data, 0, data.Length);
-                    encStream.Flush();
-                }
+                byte[] data1 = Encoding.UTF8.GetBytes(logMessage1);
+                encStream.Write(data1, 0, data1.Length);
+                encStream.Flush();
+                
+                byte[] data2 = Encoding.UTF8.GetBytes(logMessage2);
+                encStream.Write(data2, 0, data2.Length);
+                encStream.Flush();
             }
         }
         
         // Act
-        EncryptionUtils.DecryptLogFileToFile(inputFile, outputFile, privateKey);
-        string result = System.IO.File.ReadAllText(outputFile);
+        string decrypted = EncryptionUtils.DecryptLogFile(tempFile, privateKey);
         
         // Assert
-        result.ShouldContain(logMessage1);
-        result.ShouldContain(logMessage2);
-        System.IO.File.Delete(inputFile);
-        System.IO.File.Delete(outputFile);
+        decrypted.ShouldContain(logMessage1);
+        decrypted.ShouldContain(logMessage2);
+        System.IO.File.Delete(tempFile);
     }
 }

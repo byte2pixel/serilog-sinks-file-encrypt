@@ -135,7 +135,7 @@ public sealed class FileSinkIntegrationTests : IDisposable
         logger.Information("This is a second log message");
         logger.Dispose();
         // Act - Decrypt the log file to a specified file
-        EncryptionUtils.DecryptLogFileToFile(_logFilePath, decryptedFilePath, _rsaKeyPair.privateKey);
+        EncryptionUtils.DecryptLogFileToFile(_logFilePath, _rsaKeyPair.privateKey, decryptedFilePath);
         // Assert
         string decryptedContent = System.IO.File.ReadAllText(decryptedFilePath);
         decryptedContent.ShouldContain(logMessage);
@@ -311,7 +311,7 @@ public sealed class FileSinkIntegrationTests : IDisposable
         // Verify cross-decryption fails
         string result1 = EncryptionUtils.DecryptLogFile(logFile1, secondKeyPair.privateKey);
         string result2 = EncryptionUtils.DecryptLogFile(logFile2, _rsaKeyPair.privateKey);
-        result1.ShouldContain("[Error decrypting keys:");
-        result2.ShouldContain("[Error decrypting keys:");
+        result1.ShouldContain("[Decryption error at chunk 0:");
+        result2.ShouldContain("[Decryption error at chunk 0:");
     }
 }
