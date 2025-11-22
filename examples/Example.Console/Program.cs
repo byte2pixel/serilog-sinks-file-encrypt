@@ -25,6 +25,11 @@ Logger logger = new LoggerConfiguration()
     .CreateLogger();
 
 logger.Information("Application started at {StartTime}", DateTimeOffset.Now);
+for (int i = 0; i < 20; i++)
+{
+    logger.Information("Processing item {ItemNumber}", i + 1);
+    logger.Warning("Item {ItemNumber} took longer than expected", i + 1);
+}
 logger.Debug("This is a debug message.");
 logger.Warning("This is a warning message.");
 logger.Error(new Exception("This is an error message."), "This is an error message.");

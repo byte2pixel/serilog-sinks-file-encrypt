@@ -1,6 +1,5 @@
 ﻿using System.Security.Cryptography;
 using System.Text;
-using DeviceId;
 
 namespace Serilog.Sinks.File.Encrypt;
 
@@ -16,6 +15,6 @@ public class DeviceEncryptHooks : FileLifecycleHooks
 
     public override Stream OnFileOpened(string path, Stream underlyingStream, Encoding encoding)
     {
-        return new EncryptedChunkStream(underlyingStream, _rsaPublicKey);
+        return new EncryptedStream(underlyingStream, _rsaPublicKey);
     }
 }

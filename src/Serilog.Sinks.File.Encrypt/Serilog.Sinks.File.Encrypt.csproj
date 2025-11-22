@@ -18,6 +18,11 @@
     <PackageProjectUrl>https://github.com/byte2pixel/serilog-sinks-file-encrypt</PackageProjectUrl>
     <Nullable>enable</Nullable>
   </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)'=='Release'">
+    <DebugType>pdbonly</DebugType>
+    <DebugSymbols>true</DebugSymbols>
+  </PropertyGroup>
     
   <!-- make internals visible to test project -->
   <ItemGroup>
@@ -25,7 +30,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="DeviceId" />
     <PackageReference Include="Serilog.Sinks.File" />
   </ItemGroup>
 

@@ -6,15 +6,18 @@
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
     </PropertyGroup>
-
+    
+    <PropertyGroup Condition="'$(Configuration)'=='Release'">
+        <DebugType>pdbonly</DebugType>
+        <DebugSymbols>true</DebugSymbols>
+    </PropertyGroup>
+    
     <ItemGroup>
       <ProjectReference Include="..\..\src\Serilog.Sinks.File.Encrypt\Serilog.Sinks.File.Encrypt.csproj" />
     </ItemGroup>
     
     <ItemGroup>
-      <PackageReference Include="Serilog" Version="4.3.0" />
-      <PackageReference Include="Serilog.Sinks.Console" Version="6.0.0" />
-      <PackageReference Include="Serilog.Sinks.File" Version="7.0.0" />
+      <PackageReference Include="BenchmarkDotNet" Version="0.14.0" />
     </ItemGroup>
 
   <ItemGroup>
