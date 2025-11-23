@@ -1,7 +1,8 @@
-using BenchmarkDotNet.Attributes;
-using Serilog.Sinks.File.Encrypt;
+using System.Diagnostics.CodeAnalysis;
 using System.Security.Cryptography;
+using BenchmarkDotNet.Attributes;
 using Example.Benchmarks.Keys;
+using Serilog.Sinks.File.Encrypt;
 
 namespace Example.Benchmarks.Encryption;
 
@@ -10,7 +11,9 @@ public class EncryptedStreamBenchmarks
     private byte[] _buffer = [];
     private readonly string _publicKey = new KeyService().PublicKey;
     private readonly RSA _rsaPublicKey = RSA.Create();
+
     [Params(512, 1024, 2048)]
+    [SuppressMessage("ReSharper", "UnusedAutoPropertyAccessor.Global")]
     public int BufferSize { get; set; }
 
     [GlobalSetup]
@@ -21,8 +24,7 @@ public class EncryptedStreamBenchmarks
         _buffer = new byte[BufferSize];
         new Random(42).NextBytes(_buffer);
     }
-    
-    
+
     [Benchmark]
     public void EncryptedMemoryStreamWrite()
     {
@@ -31,11 +33,10 @@ public class EncryptedStreamBenchmarks
         es.Write(_buffer, 0, _buffer.Length);
         es.Flush();
     }
-    
+
     [GlobalCleanup]
     public void Cleanup()
     {
         _rsaPublicKey.Dispose();
     }
 }
-

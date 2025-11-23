@@ -50,7 +50,7 @@ public static class EncryptionUtils
                 chunkOffsets.Add((int)fileStream.Position - buffer.Length);
             }
         }
-        
+
         // Now decrypt each chunk
         for (int i = 0; i < chunkOffsets.Count; i++)
         {
@@ -79,9 +79,10 @@ public static class EncryptionUtils
                 byte[] iv = rsa.Decrypt(encryptedIv, RSAEncryptionPadding.OaepSHA256);
 
                 // Read encrypted data
-                int dataLength = (i + 1 < chunkOffsets.Count)
-                    ? chunkOffsets[i + 1] - (int)fileStream.Position
-                    : (int)(fileStream.Length - fileStream.Position);
+                int dataLength =
+                    (i + 1 < chunkOffsets.Count)
+                        ? chunkOffsets[i + 1] - (int)fileStream.Position
+                        : (int)(fileStream.Length - fileStream.Position);
 
                 byte[] encryptedData = new byte[dataLength];
                 fileStream.ReadExactly(encryptedData, 0, dataLength);
@@ -110,8 +111,12 @@ public static class EncryptionUtils
         }
         return result.ToString();
     }
-    
-    public static void DecryptLogFileToFile(string encryptedFilePath, string rsaPrivateKey, string outputFilePath)
+
+    public static void DecryptLogFileToFile(
+        string encryptedFilePath,
+        string rsaPrivateKey,
+        string outputFilePath
+    )
     {
         string decryptedContent = DecryptLogFile(encryptedFilePath, rsaPrivateKey);
         System.IO.File.WriteAllText(outputFilePath, decryptedContent);

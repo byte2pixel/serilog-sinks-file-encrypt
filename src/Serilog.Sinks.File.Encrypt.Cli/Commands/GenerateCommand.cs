@@ -6,7 +6,8 @@ using Spectre.Console.Cli;
 
 namespace Serilog.Sinks.Field.Encrypt.Cli.Commands;
 
-public sealed class GenerateCommand(IAnsiConsole console, IFileSystem fileSystem) : Command<GenerateCommand.Settings>
+public sealed class GenerateCommand(IAnsiConsole console, IFileSystem fileSystem)
+    : Command<GenerateCommand.Settings>
 {
     public sealed class Settings : CommandSettings
     {
