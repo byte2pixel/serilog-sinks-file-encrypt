@@ -1,11 +1,11 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <Description>Lifecycle hook for Serilog File Sink that encrypts log messages using hybrid encryption.</Description>
+    <Description>Lifecycle hook for Serilog File Sink that encrypts logs using hybrid encryption.</Description>
     <VersionPrefix>0.0.1</VersionPrefix>
     <Authors>Mel Dommer</Authors>
     <Copyright>Byte2Pixel 2025</Copyright>
-    <TargetFramework>net8.0</TargetFramework>
+    <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
     <AssemblyName>Serilog.Sinks.File.Encrypt</AssemblyName>
     <RootNamespace>Serilog.Sinks.File.Encrypt</RootNamespace>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
@@ -18,17 +18,7 @@
     <PackageProjectUrl>https://github.com/byte2pixel/serilog-sinks-file-encrypt</PackageProjectUrl>
     <Nullable>enable</Nullable>
   </PropertyGroup>
-
-  <PropertyGroup Condition="'$(Configuration)'=='Release'">
-    <DebugType>pdbonly</DebugType>
-    <DebugSymbols>true</DebugSymbols>
-  </PropertyGroup>
     
-  <!-- make internals visible to test project -->
-  <ItemGroup>
-    <InternalsVisibleTo Include="Serilog.Sinks.File.Encrypt.Tests" />
-  </ItemGroup>
-
   <ItemGroup>
     <PackageReference Include="Serilog.Sinks.File" />
   </ItemGroup>

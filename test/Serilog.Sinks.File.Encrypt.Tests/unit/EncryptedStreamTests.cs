@@ -29,7 +29,7 @@ public class EncryptedStreamTests
         Assert.Throws<NotSupportedException>(() => encStream.Seek(0, SeekOrigin.Begin));
         Assert.Throws<NotSupportedException>(() => encStream.SetLength(100));
     }
-    
+
     [Fact]
     public void SingleFlush_DoesNotThrow()
     {
@@ -41,7 +41,7 @@ public class EncryptedStreamTests
         encStream.Write("Hello"u8.ToArray(), 0, 5);
         encStream.Flush();
     }
-    
+
     [Fact]
     public void MultipleFlushes_DoNotThrow()
     {

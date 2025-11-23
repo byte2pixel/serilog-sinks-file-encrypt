@@ -5,7 +5,8 @@ namespace Serilog.Sinks.Field.Encrypt.Cli.Infrastructure;
 
 public class TypeRegistrar(IServiceCollection builder) : ITypeRegistrar
 {
-    private readonly IServiceCollection _builder = builder ?? throw new ArgumentNullException(nameof(builder));
+    private readonly IServiceCollection _builder =
+        builder ?? throw new ArgumentNullException(nameof(builder));
 
     public ITypeResolver Build()
     {
@@ -22,10 +23,10 @@ public class TypeRegistrar(IServiceCollection builder) : ITypeRegistrar
         _builder.AddSingleton(service, implementation);
     }
 
-    public void RegisterLazy(Type service, Func<object> func)
+    public void RegisterLazy(Type service, Func<object> factory)
     {
-        ArgumentNullException.ThrowIfNull(func);
+        ArgumentNullException.ThrowIfNull(factory);
 
-        _builder.AddSingleton(service, _ => func());
+        _builder.AddSingleton(service, _ => factory());
     }
 }

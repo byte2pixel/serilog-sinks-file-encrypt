@@ -2,9 +2,10 @@
 
 namespace Serilog.Sinks.Field.Encrypt.Cli.Infrastructure;
 
-public class TypeResolver(IServiceProvider provider) : ITypeResolver, IDisposable
+public sealed class TypeResolver(IServiceProvider provider) : ITypeResolver, IDisposable
 {
-    private readonly IServiceProvider _provider = provider ?? throw new ArgumentNullException(nameof(provider));
+    private readonly IServiceProvider _provider =
+        provider ?? throw new ArgumentNullException(nameof(provider));
 
     public object? Resolve(Type? type)
     {
@@ -17,6 +18,5 @@ public class TypeResolver(IServiceProvider provider) : ITypeResolver, IDisposabl
         {
             disposable.Dispose();
         }
-        GC.SuppressFinalize(this);
     }
 }

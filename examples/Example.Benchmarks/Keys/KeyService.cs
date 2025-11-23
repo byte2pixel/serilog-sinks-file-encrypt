@@ -9,8 +9,11 @@ public class KeyService
     private static string GetPublicKeyXml()
     {
         Assembly assembly = Assembly.GetExecutingAssembly();
-        string resourceName = assembly.GetManifestResourceNames()
-            .FirstOrDefault(n => n.EndsWith("public_key.xml")) ?? throw new InvalidOperationException("public_key.xml not found as embedded resource.");
+        string resourceName =
+            assembly.GetManifestResourceNames().FirstOrDefault(n => n.EndsWith("public_key.xml"))
+            ?? throw new InvalidOperationException(
+                "public_key.xml not found as embedded resource."
+            );
         using Stream stream = assembly.GetManifestResourceStream(resourceName)!;
         using StreamReader reader = new(stream);
         return reader.ReadToEnd();

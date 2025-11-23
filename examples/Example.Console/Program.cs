@@ -5,7 +5,7 @@ using Serilog.Sinks.File.Encrypt;
 
 Console.WriteLine("Hello, World!");
 
-LoggingService loggingService = new();
+KeyService keyService = new();
 string logDirectory = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Logs");
 if (!Directory.Exists(logDirectory))
 {
@@ -20,7 +20,7 @@ Logger logger = new LoggerConfiguration()
         path: Path.Combine(logDirectory, "log.txt"),
         rollingInterval: RollingInterval.Day,
         retainedFileCountLimit: 31, // Keep logs for 31 days
-        hooks: new DeviceEncryptHooks(loggingService.PublicKey) // Use public key for encryption
+        hooks: new DeviceEncryptHooks(keyService.PublicKey) // Use public key for encryption
     )
     .CreateLogger();
 

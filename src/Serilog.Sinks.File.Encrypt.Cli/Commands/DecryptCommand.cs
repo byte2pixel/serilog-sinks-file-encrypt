@@ -12,9 +12,11 @@ public sealed class DecryptCommand(IFileSystem fileSystem) : Command<DecryptComm
         [CommandOption("-k|--key <KEY>")]
         [Description("The file containing the RSA private key in XML format")]
         public string KeyFile { get; set; } = "privateKey.xml";
+
         [CommandOption("-f|--file <FILE>")]
         [Description("The encrypted log file to decrypt")]
         public string EncryptedFile { get; set; } = "log.encrypted.txt";
+
         [CommandOption("-o|--output <OUTPUT>")]
         [Description("The output file for the decrypted log content")]
         public string OutputFile { get; set; } = "log.decrypted.txt";
@@ -31,12 +33,13 @@ public sealed class DecryptCommand(IFileSystem fileSystem) : Command<DecryptComm
         string rsaPrivateKey = fileSystem.File.ReadAllText(settings.KeyFile);
         if (!fileSystem.File.Exists(settings.EncryptedFile))
         {
-            Console.Error.WriteLine($"Error: Encrypted file '{settings.EncryptedFile}' does not exist.");
+            Console.Error.WriteLine(
+                $"Error: Encrypted file '{settings.EncryptedFile}' does not exist."
+            );
             return 1;
         }
-        //EncryptionUtils.DecryptChunkedLogFileToFile(settings.EncryptedFile, settings.OutputFile, rsaPrivateKey);
-        var data = EncryptionUtils.DecryptLogFile(settings.EncryptedFile, rsaPrivateKey);
-        fileSystem.File.WriteAllText(settings.OutputFile, data);
+        
+        EncryptionUtils.DecryptLogFileToFile(settings.EncryptedFile, rsaPrivateKey, settings.OutputFile);
         Console.WriteLine($"Decrypted log written to '{settings.OutputFile}'.");
         return 0;
     }

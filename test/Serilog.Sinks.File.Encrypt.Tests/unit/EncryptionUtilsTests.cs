@@ -7,17 +7,17 @@ public class EncryptionUtilsTests
     {
         // Arrange, Act
         (string publicKey, string privateKey) = EncryptionUtils.GenerateRsaKeyPair();
-        
+
         using RSA privateKeyRsa = RSA.Create();
         privateKeyRsa.FromXmlString(privateKey);
-        
+
         using RSA publicKeyRsa = RSA.Create();
         publicKeyRsa.FromXmlString(publicKey);
-        
+
         byte[] data = "ABCD"u8.ToArray();
         byte[] encryptedData = publicKeyRsa.Encrypt(data, RSAEncryptionPadding.Pkcs1);
         byte[] decryptedData = privateKeyRsa.Decrypt(encryptedData, RSAEncryptionPadding.Pkcs1);
-        
+
         // Assert
         decryptedData.ShouldBe(data);
     }
@@ -40,15 +40,15 @@ public class EncryptionUtilsTests
                 encStream.Flush();
             }
         }
-        
+
         // Act
         string decrypted = EncryptionUtils.DecryptLogFile(tempFile, privateKey);
-        
+
         // Assert
         decrypted.ShouldContain(originalText);
         System.IO.File.Delete(tempFile);
     }
-    
+
     [Fact]
     public void DecryptLogFile_ReturnsMultipleDecryptedEntries()
     {
@@ -66,16 +66,16 @@ public class EncryptionUtilsTests
                 byte[] data1 = Encoding.UTF8.GetBytes(logMessage1);
                 encStream.Write(data1, 0, data1.Length);
                 encStream.Flush();
-                
+
                 byte[] data2 = Encoding.UTF8.GetBytes(logMessage2);
                 encStream.Write(data2, 0, data2.Length);
                 encStream.Flush();
             }
         }
-        
+
         // Act
         string decrypted = EncryptionUtils.DecryptLogFile(tempFile, privateKey);
-        
+
         // Assert
         decrypted.ShouldContain(logMessage1);
         decrypted.ShouldContain(logMessage2);
