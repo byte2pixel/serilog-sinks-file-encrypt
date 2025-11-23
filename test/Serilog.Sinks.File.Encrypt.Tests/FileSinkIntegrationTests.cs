@@ -328,7 +328,7 @@ public sealed class FileSinkIntegrationTests : IDisposable
         // Verify cross-decryption fails
         string result1 = EncryptionUtils.DecryptLogFile(logFile1, secondKeyPair.privateKey);
         string result2 = EncryptionUtils.DecryptLogFile(logFile2, _rsaKeyPair.privateKey);
-        result1.ShouldContain("[Decryption error at chunk 0:");
-        result2.ShouldContain("[Decryption error at chunk 0:");
+        result1.ShouldContain("[Decryption error at position");
+        result2.ShouldContain("[Decryption error at position");
     }
 }
