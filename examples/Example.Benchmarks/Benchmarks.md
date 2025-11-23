@@ -68,3 +68,11 @@ Chunk logic removed to focus on non-chunked performance.
 | EncryptedMemoryStreamWrite | 512        | 26.53 us | 0.116 us | 0.108 us |                                                                                                                                                                                                     
 | EncryptedMemoryStreamWrite | 1024       | 26.92 us | 0.128 us | 0.113 us |
 | EncryptedMemoryStreamWrite | 2048       | 28.03 us | 0.141 us | 0.125 us |
+
+### Rework Encryption Logic to include length in the message headers
+
+| Method                     | BufferSize |     Mean |    Error |   StdDev |
+|----------------------------|------------|---------:|---------:|---------:|
+| EncryptedMemoryStreamWrite | 512        | 26.71 us | 0.163 us | 0.152 us |                                                                                                                                                                                                     
+| EncryptedMemoryStreamWrite | 1024       | 27.11 us | 0.128 us | 0.114 us |
+| EncryptedMemoryStreamWrite | 2048       | 28.16 us | 0.208 us | 0.195 us |

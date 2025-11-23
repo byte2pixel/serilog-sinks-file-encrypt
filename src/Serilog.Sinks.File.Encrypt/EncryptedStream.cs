@@ -12,6 +12,7 @@ public class EncryptedStream : Stream
 
     private bool _isDisposed;
     private bool _needsNewChunk = true;
+    private MemoryStream? _bufferStream;
     private CryptoStream? _currentCryptoStream;
 
     public EncryptedStream(Stream underlyingStream, RSA rsaPublicKey)
@@ -38,9 +39,10 @@ public class EncryptedStream : Stream
 
     private void StartNewEncryptionChunk()
     {
-        _underlyingStream.Write(ChunkMarker, 0, ChunkMarker.Length);
+        // Create a memory buffer to hold the encrypted content
+        _bufferStream = new MemoryStream();
         _currentCryptoStream = new CryptoStream(
-            _underlyingStream,
+            _bufferStream,
             _currentCryptoTransform,
             CryptoStreamMode.Write,
             leaveOpen: true
@@ -49,11 +51,24 @@ public class EncryptedStream : Stream
 
     public override void Flush()
     {
-        if (_currentCryptoStream != null)
+        if (_currentCryptoStream != null && _bufferStream != null)
         {
+            // Finalize the encryption
             _currentCryptoStream.FlushFinalBlock();
             _currentCryptoStream.Dispose();
             _currentCryptoStream = null;
+
+            // Get the encrypted data from the buffer
+            byte[] encryptedData = _bufferStream.ToArray();
+            _bufferStream.Dispose();
+            _bufferStream = null;
+
+            // Write the complete chunk: [MARKER][LENGTH][ENCRYPTED_DATA]
+            _underlyingStream.Write(ChunkMarker, 0, ChunkMarker.Length);
+            byte[] lengthBytes = BitConverter.GetBytes(encryptedData.Length);
+            _underlyingStream.Write(lengthBytes, 0, sizeof(int));
+            _underlyingStream.Write(encryptedData, 0, encryptedData.Length);
+
             _needsNewChunk = true;
         }
         _underlyingStream.Flush();
@@ -117,11 +132,21 @@ public class EncryptedStream : Stream
 
         if (disposing)
         {
-            if (_currentCryptoStream != null)
+            // Flush any remaining data before disposing
+            if (_currentCryptoStream != null || _bufferStream != null)
             {
-                _currentCryptoStream.FlushFinalBlock();
-                _currentCryptoStream.Dispose();
+                try
+                {
+                    Flush();
+                }
+                catch
+                {
+                    // Ignore errors during disposal
+                }
             }
+
+            _currentCryptoStream?.Dispose();
+            _bufferStream?.Dispose();
             _underlyingStream.Dispose();
             _currentCryptoTransform.Dispose();
             _aes.Dispose();

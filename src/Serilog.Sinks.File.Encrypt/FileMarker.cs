@@ -1,12 +1,6 @@
 namespace Serilog.Sinks.File.Encrypt;
 
-internal enum MarkerType
-{
-    LogHead,
-    LogBody,
-}
-
-internal sealed class FileMarker
+internal static class FileMarker
 {
     // csharpier-ignore-start
     internal static readonly byte[] LogHeadMarker = [0xFF, 0xFE, 0x4C, 0x4F, 0x47, 0x48, 0x44, 0x00, 0x01];
@@ -20,10 +14,11 @@ internal sealed class FileMarker
 
     /// <summary>
     /// Validates that a potential header marker is followed by reasonable key/IV length values
-    /// stream position will be modified during this check.
+    /// Stream position will be restored to the original position after validation.
     /// </summary>
     public static bool IsValidHeaderMarker(FileStream stream, long markerPosition)
     {
+        long originalPosition = stream.Position;
         try
         {
             stream.Position = markerPosition + MarkerLength;
@@ -37,15 +32,17 @@ internal sealed class FileMarker
             int keyLength = BitConverter.ToInt32(keyLengthBytes, 0);
             int ivLength = BitConverter.ToInt32(ivLengthBytes, 0);
 
-            stream.Position += keyLength + ivLength;
+            // Validate the lengths are reasonable for RSA encrypted AES keys/IVs
             return keyLength is >= MinKeyIvLength and <= MaxKeyIvLength && ivLength is >= MinKeyIvLength and <= MaxKeyIvLength;
         }
         catch
         {
             return false;
         }
+        finally
+        {
+            // Restore original position so calling code can read the header data
+            stream.Position = originalPosition;
+        }
     }
-
-    public MarkerType Type { get; init; }
-    public long Offset { get; init; }
 }
