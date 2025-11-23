@@ -25,84 +25,103 @@ public static class EncryptionUtils
     /// This method decrypts the log files in which each log message is encrypted separately.
     /// Each log entry is encrypted with its own AES key and IV, which are then encrypted with RSA.
     /// This allows for secure storage of log files while still enabling decryption of individual log entries.
-    /// Each message is prefixed with a marker "LOGCHUNK" followed by the lengths and encrypted AES key and IV.
     /// </summary>
-    /// <param name="encryptedFilePath"></param>
-    /// <param name="rsaPrivateKey"></param>
+    /// <param name="encryptedFilePath">Path to the encrypted file</param>
+    /// <param name="rsaPrivateKey">The XML representation of the RSA private key used for decryption</param>
     /// <returns></returns>
     public static string DecryptLogFile(string encryptedFilePath, string rsaPrivateKey)
     {
         using RSA rsa = RSA.Create();
         rsa.FromXmlString(rsaPrivateKey);
         using FileStream fileStream = System.IO.File.OpenRead(encryptedFilePath);
-        List<int> chunkOffsets = [];
+        List<FileMarker> markers = [];
         StringBuilder result = new();
-        byte[] chunkMarker = "LOGCHUNK"u8.ToArray();
-        // Read through the file to find all chunk offsets
+
+        // Read through the file to find all markers
         while (fileStream.Position < fileStream.Length)
         {
-            byte[] buffer = new byte[chunkMarker.Length];
+            byte[] buffer = new byte[FileMarker.MarkerLength];
             int bytesRead = fileStream.Read(buffer, 0, buffer.Length);
             if (bytesRead != buffer.Length)
                 break; // End of file reached
-            if (buffer.SequenceEqual(chunkMarker))
+            if (buffer.SequenceEqual(FileMarker.LogHeadMarker))
             {
-                chunkOffsets.Add((int)fileStream.Position - buffer.Length);
+                long markerPosition = fileStream.Position - buffer.Length;
+
+                // Validate this is a real header marker by checking the following data
+                if (FileMarker.IsValidHeaderMarker(fileStream, markerPosition))
+                {
+                    markers.Add(
+                        new FileMarker { Type = MarkerType.LogHead, Offset = markerPosition }
+                    );
+                }
+                else
+                {
+                    // False positive - continue scanning
+                    fileStream.Position -= buffer.Length - 1;
+                }
+            }
+            else if (buffer.SequenceEqual(FileMarker.LogBodyMarker))
+            {
+                markers.Add(
+                    new FileMarker
+                    {
+                        Type = MarkerType.LogBody,
+                        Offset = fileStream.Position - buffer.Length,
+                    }
+                );
+                fileStream.Position += buffer.Length;
+            }
+            else
+            {
+                // no marker so it is the log message, keep looking for more markers
+                fileStream.Position -= buffer.Length - 1;
             }
         }
 
+        byte[] key = [];
+        byte[] iv = [];
+
         // Now decrypt each chunk
-        for (int i = 0; i < chunkOffsets.Count; i++)
+        for (int i = 0; i < markers.Count; i++)
         {
             try
             {
-                fileStream.Position = chunkOffsets[i];
+                if (markers[i].Type == MarkerType.LogHead)
+                {
+                    // Skip marker
+                    fileStream.Position = markers[i].Offset + FileMarker.MarkerLength;
 
-                // Read chunk header
-                byte[] marker = new byte[8];
-                fileStream.ReadExactly(marker, 0, 8);
+                    // Read encrypted key/IV lengths and data
+                    byte[] keyLengthBytes = new byte[4];
+                    byte[] ivLengthBytes = new byte[4];
+                    fileStream.ReadExactly(keyLengthBytes, 0, 4);
+                    fileStream.ReadExactly(ivLengthBytes, 0, 4);
+                    int keyLength = BitConverter.ToInt32(keyLengthBytes, 0);
+                    int ivLength = BitConverter.ToInt32(ivLengthBytes, 0);
+                    byte[] encryptedKey = new byte[keyLength];
+                    byte[] encryptedIv = new byte[ivLength];
+                    fileStream.ReadExactly(encryptedKey, 0, keyLength);
+                    fileStream.ReadExactly(encryptedIv, 0, ivLength);
 
-                // Read encrypted key/IV lengths and data
-                byte[] keyLengthBytes = new byte[4];
-                byte[] ivLengthBytes = new byte[4];
-                fileStream.ReadExactly(keyLengthBytes, 0, 4);
-                fileStream.ReadExactly(ivLengthBytes, 0, 4);
-                int keyLength = BitConverter.ToInt32(keyLengthBytes, 0);
-                int ivLength = BitConverter.ToInt32(ivLengthBytes, 0);
-                byte[] encryptedKey = new byte[keyLength];
-                byte[] encryptedIv = new byte[ivLength];
-                fileStream.ReadExactly(encryptedKey, 0, keyLength);
-                fileStream.ReadExactly(encryptedIv, 0, ivLength);
+                    // Decrypt AES key/IV
+                    key = rsa.Decrypt(encryptedKey, RSAEncryptionPadding.OaepSHA256);
+                    iv = rsa.Decrypt(encryptedIv, RSAEncryptionPadding.OaepSHA256);
+                }
+                else
+                {
+                    // Skip marker
+                    fileStream.Position = markers[i].Offset + FileMarker.MarkerLength;
 
-                // Decrypt AES key/IV
-                byte[] key = rsa.Decrypt(encryptedKey, RSAEncryptionPadding.OaepSHA256);
-                byte[] iv = rsa.Decrypt(encryptedIv, RSAEncryptionPadding.OaepSHA256);
+                    // Determine length of encrypted data
+                    long dataLength =
+                        i + 1 < markers.Count
+                            ? markers[i + 1].Offset - fileStream.Position
+                            : fileStream.Length - fileStream.Position;
 
-                // Read encrypted data
-                int dataLength =
-                    (i + 1 < chunkOffsets.Count)
-                        ? chunkOffsets[i + 1] - (int)fileStream.Position
-                        : (int)(fileStream.Length - fileStream.Position);
-
-                byte[] encryptedData = new byte[dataLength];
-                fileStream.ReadExactly(encryptedData, 0, dataLength);
-
-                // Decrypt the data
-                using Aes aes = Aes.Create();
-                aes.Key = key;
-                aes.IV = iv;
-                aes.Padding = PaddingMode.PKCS7;
-                using ICryptoTransform decryptor = aes.CreateDecryptor();
-                using MemoryStream memoryStream = new();
-                using CryptoStream cryptoStream = new(
-                    memoryStream,
-                    decryptor,
-                    CryptoStreamMode.Write
-                );
-                cryptoStream.Write(encryptedData, 0, encryptedData.Length);
-                cryptoStream.FlushFinalBlock();
-                string decryptedText = Encoding.UTF8.GetString(memoryStream.ToArray());
-                result.Append(decryptedText);
+                    string decryptedText = DecryptedText(dataLength, fileStream, key, iv);
+                    result.Append(decryptedText);
+                }
             }
             catch (Exception ex)
             {
@@ -110,6 +129,47 @@ public static class EncryptionUtils
             }
         }
         return result.ToString();
+    }
+
+    private static string DecryptedText(
+        long dataLength,
+        FileStream fileStream,
+        byte[] key,
+        byte[] iv
+    )
+    {
+        // Check if data length exceeds int.MaxValue (required by ReadExactly)
+        if (dataLength > int.MaxValue)
+        {
+            throw new InvalidOperationException(
+                $"Log message size ({dataLength} bytes) exceeds maximum supported size ({int.MaxValue} bytes). This indicates a corrupted file or invalid marker positions."
+            );
+        }
+
+        // Sanity check for unexpectedly large single log messages
+        const long maxLogMessageSize = 10_000_000; // 10 MB should be more than enough for any single log message
+        if (dataLength > maxLogMessageSize)
+        {
+            throw new InvalidOperationException(
+                $"Log message size ({dataLength} bytes) is unexpectedly large (>{maxLogMessageSize} bytes). This may indicate file corruption."
+            );
+        }
+
+        int dataSize = (int)dataLength;
+        byte[] encryptedData = new byte[dataSize];
+        fileStream.ReadExactly(encryptedData, 0, dataSize);
+
+        // Decrypt the data
+        using Aes aes = Aes.Create();
+        aes.Key = key;
+        aes.IV = iv;
+        aes.Padding = PaddingMode.PKCS7;
+        using ICryptoTransform decryptor = aes.CreateDecryptor();
+        using MemoryStream memoryStream = new();
+        using CryptoStream cryptoStream = new(memoryStream, decryptor, CryptoStreamMode.Write);
+        cryptoStream.Write(encryptedData, 0, encryptedData.Length);
+        cryptoStream.FlushFinalBlock();
+        return Encoding.UTF8.GetString(memoryStream.ToArray());
     }
 
     public static void DecryptLogFileToFile(

@@ -4,17 +4,14 @@ namespace Serilog.Sinks.File.Encrypt;
 
 public class EncryptedStream : Stream
 {
-    private static readonly byte[] ChunkMarker = "LOGCHUNK"u8.ToArray();
+    private static readonly byte[] HeaderMarker = { 0xFF, 0xFE, 0x4C, 0x4F, 0x47, 0x48, 0x44, 0x00, 0x01 }; // LOGHD with validation
+    private static readonly byte[] ChunkMarker = { 0xFF, 0xFE, 0x4C, 0x4F, 0x47, 0x42, 0x44, 0x00, 0x02 }; // LOGBD with validation
     private readonly Stream _underlyingStream;
     private readonly ICryptoTransform _currentCryptoTransform;
     private readonly Aes _aes;
-    private readonly byte[] _encryptedKey;
-    private readonly byte[] _encryptedKeyLength;
-    private readonly byte[] _encryptedIv;
-    private readonly byte[] _encryptedIvLength;
 
     private bool _isDisposed;
-    private bool _needsNewChunk;
+    private bool _needsNewChunk = true;
     private CryptoStream? _currentCryptoStream;
 
     public EncryptedStream(Stream underlyingStream, RSA rsaPublicKey)
@@ -28,23 +25,20 @@ public class EncryptedStream : Stream
         _aes.Padding = PaddingMode.PKCS7;
         _currentCryptoTransform = _aes.CreateEncryptor(currentKey, currentIv);
 
-        _encryptedKey = rsaPublicKey.Encrypt(currentKey, RSAEncryptionPadding.OaepSHA256);
-        _encryptedKeyLength = BitConverter.GetBytes(_encryptedKey.Length);
-        _encryptedIv = rsaPublicKey.Encrypt(currentIv, RSAEncryptionPadding.OaepSHA256);
-        _encryptedIvLength = BitConverter.GetBytes(_encryptedIv.Length);
-
-        StartNewEncryptionChunk();
+        byte[] encryptedKey = rsaPublicKey.Encrypt(currentKey, RSAEncryptionPadding.OaepSHA256);
+        byte[] encryptedKeyLength = BitConverter.GetBytes(encryptedKey.Length);
+        byte[] encryptedIv = rsaPublicKey.Encrypt(currentIv, RSAEncryptionPadding.OaepSHA256);
+        byte[] encryptedIvLength = BitConverter.GetBytes(encryptedIv.Length);
+        _underlyingStream.Write(HeaderMarker, 0, HeaderMarker.Length);
+        _underlyingStream.Write(encryptedKeyLength, 0, sizeof(int));
+        _underlyingStream.Write(encryptedIvLength, 0, sizeof(int));
+        _underlyingStream.Write(encryptedKey, 0, encryptedKey.Length);
+        _underlyingStream.Write(encryptedIv, 0, encryptedIv.Length);
     }
 
     private void StartNewEncryptionChunk()
     {
-        // Write chunk marker
         _underlyingStream.Write(ChunkMarker, 0, ChunkMarker.Length);
-        _underlyingStream.Write(_encryptedKeyLength, 0, sizeof(int));
-        _underlyingStream.Write(_encryptedIvLength, 0, sizeof(int));
-        _underlyingStream.Write(_encryptedKey, 0, _encryptedKey.Length);
-        _underlyingStream.Write(_encryptedIv, 0, _encryptedIv.Length);
-
         _currentCryptoStream = new CryptoStream(
             _underlyingStream,
             _currentCryptoTransform,
