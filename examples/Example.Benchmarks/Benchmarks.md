@@ -59,3 +59,12 @@ Removing MemoryStreamWrite.
 | EncryptedChunkMemoryStreamWrite | 1024       | 27.81 us | 0.518 us | 0.433 us |
 | EncryptedMemoryStreamWrite      | 2048       | 28.81 us | 0.567 us | 0.607 us |
 | EncryptedChunkMemoryStreamWrite | 2048       | 29.19 us | 0.355 us | 0.332 us |
+
+### No Optimizations but slight refactor in marker logic
+Chunk logic removed to focus on non-chunked performance.
+
+| Method                     | BufferSize |     Mean |    Error |   StdDev |
+|----------------------------|------------|---------:|---------:|---------:|
+| EncryptedMemoryStreamWrite | 512        | 26.53 us | 0.116 us | 0.108 us |                                                                                                                                                                                                     
+| EncryptedMemoryStreamWrite | 1024       | 26.92 us | 0.128 us | 0.113 us |
+| EncryptedMemoryStreamWrite | 2048       | 28.03 us | 0.141 us | 0.125 us |
