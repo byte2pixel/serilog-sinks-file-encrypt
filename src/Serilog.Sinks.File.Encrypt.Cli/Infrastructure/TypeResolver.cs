@@ -1,6 +1,6 @@
 ﻿using Spectre.Console.Cli;
 
-namespace Serilog.Sinks.Field.Encrypt.Cli.Infrastructure;
+namespace Serilog.Sinks.File.Encrypt.Cli.Infrastructure;
 
 /// <summary>
 /// Resolves types using an IServiceProvider.

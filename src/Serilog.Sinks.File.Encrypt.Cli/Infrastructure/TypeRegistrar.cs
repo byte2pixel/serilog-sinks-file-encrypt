@@ -1,7 +1,7 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
 using Spectre.Console.Cli;
 
-namespace Serilog.Sinks.Field.Encrypt.Cli.Infrastructure;
+namespace Serilog.Sinks.File.Encrypt.Cli.Infrastructure;
 
 /// <summary>
 /// The type registrar for Spectre.Console.Cli using Microsoft.Extensions.DependencyInjection.
