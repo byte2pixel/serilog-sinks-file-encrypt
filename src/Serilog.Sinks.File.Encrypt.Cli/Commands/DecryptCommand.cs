@@ -1,4 +1,5 @@
 ﻿using System.ComponentModel;
+using System.Diagnostics.CodeAnalysis;
 using System.IO.Abstractions;
 using Spectre.Console;
 using Spectre.Console.Cli;
@@ -10,6 +11,7 @@ namespace Serilog.Sinks.File.Encrypt.Cli.Commands;
 /// </summary>
 /// <param name="console">The ANSI console</param>
 /// <param name="fileSystem">The file system</param>
+[SuppressMessage("ReSharper", "ClassNeverInstantiated.Global")]
 public sealed class DecryptCommand(IAnsiConsole console, IFileSystem fileSystem)
     : Command<DecryptCommand.Settings>
 {

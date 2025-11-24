@@ -1,4 +1,4 @@
-﻿using Example.Console.Logging;
+﻿using Example.Console;
 using Serilog;
 using Serilog.Core;
 using Serilog.Sinks.File.Encrypt;
