@@ -71,15 +71,10 @@ serilog-encrypt decrypt --key ./keys/private_key.xml --file ./logs/app.log --out
 
 ## Integration with Serilog
 
-This tool works with log files encrypted by the Serilog.Sinks.File.Encrypt package. Configure your Serilog file sink to use encryption:
-
-```csharp
-Log.Logger = new LoggerConfiguration()
-    .WriteTo.File("logs/app.log", hooks: new EncryptHooks("path/to/public_key.xml"))
-    .CreateLogger();
-```
+This tool works with log files encrypted by the Serilog.Sinks.File.Encrypt package. For detailed information on how to configure Serilog with encryption, please see the [Serilog.Sinks.File.Encrypt package documentation](https://www.nuget.org/packages/Serilog.Sinks.File.Encrypt).
 
 ## Requirements
 
 - .NET 8.0 or higher
-- RSA key pair (generated using this tool or compatible format)
+- Logs written with Serilog.Sinks.File
+  - Configured with `EncryptHooks` from Serilog.Sinks.File.Encrypt
