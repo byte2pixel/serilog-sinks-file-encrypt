@@ -13,7 +13,7 @@ This repository contains two packages:
 
 - **Hybrid Encryption**: Uses RSA encryption for key exchange and AES for efficient data encryption
 - **Seamless Integration**: Plugs directly into Serilog's file sink using lifecycle hooks
-- **Individual Message Encryption**: Each log entry is encrypted separately with its own AES key and IV
+- **Individual Open Encryption**: Each time the log file is opened, a new AES key and IV are generated and encrypted with RSA
 - **CLI Tool Integration**: Companion CLI tool for key generation and log decryption
 - **High Performance**: Optimized encryption with chunked processing
 
