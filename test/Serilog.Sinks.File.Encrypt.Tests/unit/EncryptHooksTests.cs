@@ -1,13 +1,13 @@
 namespace Serilog.Sinks.File.Encrypt.Tests.unit;
 
-public class DeviceEncryptHooksTests
+public class EncryptHooksTests
 {
     [Fact]
     public void OnFileOpened_ReturnsEncryptedStream()
     {
         // Arrange
         (string publicKey, string _) = EncryptionUtils.GenerateRsaKeyPair();
-        DeviceEncryptHooks hooks = new(publicKey);
+        EncryptHooks hooks = new(publicKey);
         using MemoryStream memoryStream = new();
         Encoding encoding = Encoding.UTF8;
 

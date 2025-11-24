@@ -24,7 +24,7 @@ public static class EncryptionUtils
     /// This method decrypts the log files in which each log message is encrypted separately.
     /// Each log entry is encrypted with its own AES key and IV, which are then encrypted with RSA.
     /// This allows for secure storage of log files while still enabling decryption of individual log entries.
-    /// Format: [HEADER][key_len][iv_len][encrypted_key][encrypted_iv][BODY_MARKER][msg_len][encrypted_message]...
+    /// Format: [HEADER][key_len][iv_len][encrypted_key][encrypted_iv][BODY_MARKER][msg_len][encrypted_message]
     /// </summary>
     /// <param name="encryptedFilePath">Path to the encrypted file</param>
     /// <param name="rsaPrivateKey">The XML representation of the RSA private key used for decryption</param>

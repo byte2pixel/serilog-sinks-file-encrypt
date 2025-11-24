@@ -1,0 +1,58 @@
+<Project>
+  <PropertyGroup Label="Settings">
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Deterministic>true</Deterministic>
+    <LangVersion>14</LangVersion>
+    <DebugSymbols>true</DebugSymbols>
+    <DebugType>embedded</DebugType>
+    <PublishRepositoryUrl>true</PublishRepositoryUrl>
+    <EmbedUntrackedSources>true</EmbedUntrackedSources>
+    <MinVerSkip Condition="'$(Configuration)' == 'Debug'">true</MinVerSkip>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <IsPackable>false</IsPackable>
+    <Nullable>enable</Nullable>
+    <SignAssembly>true</SignAssembly>
+    <AssemblyOriginatorKeyFile>$(MSBuildThisFileDirectory)\..\resources\serilog-sinks-file-encrypt.snk</AssemblyOriginatorKeyFile>
+    <PublicKey>002400000480000094000000060200000024000052534131000400000100010079191158ce9497cb05c4581937bef2beb23d31739dda1847fdc44b1c3c0b82a9f5cd8a8a263e24752c4b1590cd8de774ee889e18fbbfb9dbabc4822113a6fd80b5af9a9db9a8374573b6e62c6536d24c3e843236cc3cd2d265f6d9b0f7dab95dea8c1266103ae223d6870de7d78241405fce37d29cbb4693db99ed525b834ca5</PublicKey>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(GITHUB_ACTIONS)' == 'true'">
+    <ContinuousIntegrationBuild>true</ContinuousIntegrationBuild>
+  </PropertyGroup>
+
+  <ItemGroup Condition="$(IsPackable)">
+    <None Include="$(MSBuildThisFileDirectory)../resources/nuget/logo.png">
+      <Pack>true</Pack>
+      <PackagePath>\</PackagePath>
+      <Link>Properties/Package/Logo.png</Link>
+    </None>
+    <None Include="$(MSBuildThisFileDirectory)../resources/nuget/$(AssemblyName).md">
+      <Pack>true</Pack>
+      <PackagePath>\README.md</PackagePath>
+      <Link>Properties/Package/README.md</Link>
+    </None>
+  </ItemGroup>
+
+  <PropertyGroup>
+    <Description>A Serilog File Sink hook that writes encrypted log events.</Description>
+    <Copyright>Byte2Pixel</Copyright>
+    <Authors>Mel Dommer</Authors>
+    <RepositoryType>git</RepositoryType>
+    <RepositoryUrl>https://github.com/byte2pixel/serilog-sinks-file-encrypt</RepositoryUrl>
+    <PackageIcon>logo.png</PackageIcon>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageRequireLicenseAcceptance>False</PackageRequireLicenseAcceptance>
+    <PackageProjectUrl>https://github.com/byte2pixel/serilog-sinks-file-encrypt</PackageProjectUrl>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageReleaseNotes>https://github.com/byte2pixel/serilog-sinks-file-encrypt/releases</PackageReleaseNotes>
+    <PackageTags>serilog;logging;encryption;sink</PackageTags>
+  </PropertyGroup>
+
+  <ItemGroup Condition="'$(UseBuildTimeTools)' != 'false'">
+    <PackageReference Include="MinVer" PrivateAssets="All" />
+<!--    <PackageReference Include="Microsoft.SourceLink.GitHub" PrivateAssets="All" />-->
+    <PackageReference Include="Roslynator.Analyzers">
+      <PrivateAssets>All</PrivateAssets>
+    </PackageReference>
+  </ItemGroup>
+</Project>

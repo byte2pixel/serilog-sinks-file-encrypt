@@ -40,7 +40,7 @@ internal sealed class EncryptedFileReader : IDisposable
                 HandleError(ex);
             }
         }
-        
+
         return _result.ToString();
     }
 
@@ -50,7 +50,8 @@ internal sealed class EncryptedFileReader : IDisposable
     private void ProcessNextSection()
     {
         byte[]? markerBuffer = ReadMarkerBuffer();
-        if (markerBuffer == null) return;
+        if (markerBuffer == null)
+            return;
 
         if (IsHeaderMarker(markerBuffer))
         {
@@ -72,10 +73,10 @@ internal sealed class EncryptedFileReader : IDisposable
     private void ProcessHeaderSection(byte[] markerBuffer)
     {
         long markerPosition = _fileStream.Position - markerBuffer.Length;
-        
-        if (!FileMarker.IsValidHeaderMarker(_fileStream, markerPosition))
+
+        if (!FileMarker.IsValidHeader(_fileStream, markerPosition))
         {
-            SkipInvalidMarker(markerBuffer);
+            SkipUnknownData(markerBuffer);
             return;
         }
 
@@ -88,9 +89,10 @@ internal sealed class EncryptedFileReader : IDisposable
     /// </summary>
     private void ProcessBodySection()
     {
-        if (!_context.HasKeys) return;
+        if (!_context.HasKeys)
+            return;
 
-        var body = ReadBodySection();
+        MessageSection body = ReadMessageSection();
         string decryptedText = DecryptMessageContent(body.MessageLength);
         _result.Append(decryptedText);
     }
@@ -101,19 +103,19 @@ internal sealed class EncryptedFileReader : IDisposable
     private HeaderSection ReadHeaderSection(long markerPosition)
     {
         _fileStream.Position = markerPosition + FileMarker.MarkerLength;
-        
+
         // Read key and IV lengths
-        var keyLengthBytes = new byte[4];
-        var ivLengthBytes = new byte[4];
+        byte[] keyLengthBytes = new byte[4];
+        byte[] ivLengthBytes = new byte[4];
         _fileStream.ReadExactly(keyLengthBytes, 0, 4);
         _fileStream.ReadExactly(ivLengthBytes, 0, 4);
-        
+
         int keyLength = BitConverter.ToInt32(keyLengthBytes, 0);
         int ivLength = BitConverter.ToInt32(ivLengthBytes, 0);
-        
+
         // Read encrypted key and IV
-        var encryptedKey = new byte[keyLength];
-        var encryptedIv = new byte[ivLength];
+        byte[] encryptedKey = new byte[keyLength];
+        byte[] encryptedIv = new byte[ivLength];
         _fileStream.ReadExactly(encryptedKey, 0, keyLength);
         _fileStream.ReadExactly(encryptedIv, 0, ivLength);
 
@@ -123,9 +125,9 @@ internal sealed class EncryptedFileReader : IDisposable
     /// <summary>
     /// Reads body section metadata from the file stream
     /// </summary>
-    private MessageSection ReadBodySection()
+    private MessageSection ReadMessageSection()
     {
-        var lengthBytes = new byte[4];
+        byte[] lengthBytes = new byte[4];
         _fileStream.ReadExactly(lengthBytes, 0, 4);
         int messageLength = BitConverter.ToInt32(lengthBytes, 0);
         return new MessageSection(messageLength);
@@ -147,7 +149,7 @@ internal sealed class EncryptedFileReader : IDisposable
     private string DecryptMessageContent(int dataLength)
     {
         ValidateMessageSize(dataLength);
-        
+
         byte[] encryptedData = new byte[dataLength];
         _fileStream.ReadExactly(encryptedData, 0, dataLength);
 
@@ -177,14 +179,14 @@ internal sealed class EncryptedFileReader : IDisposable
         aes.Key = key;
         aes.IV = iv;
         aes.Padding = PaddingMode.PKCS7;
-        
+
         using ICryptoTransform decryptor = aes.CreateDecryptor();
         using MemoryStream memoryStream = new();
         using CryptoStream cryptoStream = new(memoryStream, decryptor, CryptoStreamMode.Write);
-        
+
         cryptoStream.Write(encryptedData, 0, encryptedData.Length);
         cryptoStream.FlushFinalBlock();
-        
+
         return Encoding.UTF8.GetString(memoryStream.ToArray());
     }
 
@@ -197,17 +199,14 @@ internal sealed class EncryptedFileReader : IDisposable
     }
 
     private bool IsEndOfFile() => _fileStream.Position >= _fileStream.Length;
-    
-    private static bool IsHeaderMarker(byte[] markerBuffer) => 
-        markerBuffer.SequenceEqual(FileMarker.LogHeadMarker);
-    
-    private static bool IsBodyMarker(byte[] markerBuffer) => 
-        markerBuffer.SequenceEqual(FileMarker.LogBodyMarker);
 
-    private void SkipUnknownData(byte[] markerBuffer) => 
-        _fileStream.Position -= markerBuffer.Length - 1;
+    private static bool IsHeaderMarker(byte[] markerBuffer) =>
+        markerBuffer.SequenceEqual(FileMarker.Header);
 
-    private void SkipInvalidMarker(byte[] markerBuffer) => 
+    private static bool IsBodyMarker(byte[] markerBuffer) =>
+        markerBuffer.SequenceEqual(FileMarker.Message);
+
+    private void SkipUnknownData(byte[] markerBuffer) =>
         _fileStream.Position -= markerBuffer.Length - 1;
 
     private void HandleError(Exception ex)
@@ -224,15 +223,15 @@ internal sealed class EncryptedFileReader : IDisposable
 
     private void Dispose(bool disposing)
     {
-        if (!_disposed)
+        if (_disposed)
+            return;
+
+        if (disposing)
         {
-            if (disposing)
-            {
-                _fileStream.Dispose();
-                _rsa.Dispose();
-            }
-            _disposed = true;
+            _fileStream.Dispose();
+            _rsa.Dispose();
         }
+        _disposed = true;
     }
 
     public void Dispose()
