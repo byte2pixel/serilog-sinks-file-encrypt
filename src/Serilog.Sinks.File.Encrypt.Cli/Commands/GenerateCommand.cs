@@ -26,6 +26,14 @@ public sealed class GenerateCommand(IAnsiConsole console, IFileSystem fileSystem
         [CommandOption("-o|--output <OUTPUT>", isRequired: true)]
         [Description("The output path to write the public/private key pair in XML format")]
         public string OutputPath { get; set; } = string.Empty;
+
+        /// <summary>
+        /// The size of the RSA key in bits.
+        /// </summary>
+        [CommandOption("-k|--key-size <KEY_SIZE>")]
+        [Description("The size of the RSA key in bits (default: 2048)")]
+        [DefaultValue(2048)]
+        public int KeySize { get; set; } = 2048;
     }
 
     /// <summary>
@@ -48,7 +56,9 @@ public sealed class GenerateCommand(IAnsiConsole console, IFileSystem fileSystem
             }
 
             // Generate the RSA key pair
-            (string publicKey, string privateKey) keyPair = EncryptionUtils.GenerateRsaKeyPair();
+            (string publicKey, string privateKey) keyPair = EncryptionUtils.GenerateRsaKeyPair(
+                settings.KeySize
+            );
 
             // Define file paths
             string privateKeyPath = fileSystem.Path.Combine(settings.OutputPath, "private_key.xml");
