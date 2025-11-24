@@ -1,7 +1,7 @@
 using System.IO.Abstractions;
 using Microsoft.Extensions.DependencyInjection;
-using Serilog.Sinks.Field.Encrypt.Cli.Commands;
-using Serilog.Sinks.Field.Encrypt.Cli.Infrastructure;
+using Serilog.Sinks.File.Encrypt.Cli.Commands;
+using Serilog.Sinks.File.Encrypt.Cli.Infrastructure;
 using Spectre.Console;
 using Spectre.Console.Cli;
 
@@ -16,8 +16,12 @@ CommandApp app = new(registrar);
 
 app.Configure(c =>
 {
-    c.AddCommand<GenerateCommand>("generate");
-    c.AddCommand<DecryptCommand>("decrypt");
+    c.SetApplicationName("serilog-encrypt");
+    c.AddCommand<GenerateCommand>("generate")
+        .WithDescription("Generate a new RSA key pair for log encryption");
+    c.AddCommand<DecryptCommand>("decrypt")
+        .WithDescription("Decrypt encrypted log files using an RSA private key");
+    c.ValidateExamples();
 });
 
 return await app.RunAsync(args);

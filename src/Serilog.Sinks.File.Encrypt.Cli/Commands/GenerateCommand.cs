@@ -1,10 +1,9 @@
 ﻿using System.ComponentModel;
 using System.IO.Abstractions;
-using Serilog.Sinks.File.Encrypt;
 using Spectre.Console;
 using Spectre.Console.Cli;
 
-namespace Serilog.Sinks.Field.Encrypt.Cli.Commands;
+namespace Serilog.Sinks.File.Encrypt.Cli.Commands;
 
 /// <summary>
 /// Generates a new RSA public/private key pair and saves them to the specified output path.
@@ -35,14 +34,42 @@ public sealed class GenerateCommand(IAnsiConsole console, IFileSystem fileSystem
     /// <returns></returns>
     public override int Execute(CommandContext context, Settings settings)
     {
-        (string publicKey, string privateKey) keyPair = EncryptionUtils.GenerateRsaKeyPair();
-        string privateKeyPath = fileSystem.Path.Combine(settings.OutputPath, "private_key.xml");
-        string publicKeyPath = fileSystem.Path.Combine(settings.OutputPath, "public_key.xml");
-        fileSystem.File.WriteAllText(privateKeyPath, keyPair.privateKey);
-        fileSystem.File.WriteAllText(publicKeyPath, keyPair.publicKey);
-        console.MarkupLine("[green]Generated RSA key pair:[/]");
-        console.MarkupLineInterpolated($"[red]Private Key:[/] {privateKeyPath}");
-        console.MarkupLineInterpolated($"[yellow]Public Key:[/] {publicKeyPath}");
-        return 0;
+        try
+        {
+            // Ensure output directory exists
+            if (!fileSystem.Directory.Exists(settings.OutputPath))
+            {
+                fileSystem.Directory.CreateDirectory(settings.OutputPath);
+                console.MarkupLineInterpolated(
+                    $"[yellow]Created directory:[/] {settings.OutputPath}"
+                );
+            }
+
+            // Generate the RSA key pair
+            (string publicKey, string privateKey) keyPair = EncryptionUtils.GenerateRsaKeyPair();
+
+            // Define file paths
+            string privateKeyPath = fileSystem.Path.Combine(settings.OutputPath, "private_key.xml");
+            string publicKeyPath = fileSystem.Path.Combine(settings.OutputPath, "public_key.xml");
+
+            // Write keys to files
+            fileSystem.File.WriteAllText(privateKeyPath, keyPair.privateKey);
+            fileSystem.File.WriteAllText(publicKeyPath, keyPair.publicKey);
+
+            // Output success message
+            console.MarkupLine("[green]✓ Successfully generated RSA key pair![/]");
+            console.WriteLine();
+            console.MarkupLineInterpolated($"[red]Private Key:[/] {privateKeyPath}");
+            console.MarkupLineInterpolated($"[yellow]Public Key:[/] {publicKeyPath}");
+            console.WriteLine();
+            console.MarkupLine("[yellow]⚠️  Keep your private key secure and never share it![/]");
+
+            return 0;
+        }
+        catch (Exception ex)
+        {
+            console.MarkupLineInterpolated($"[red]Error generating key pair: {ex.Message}[/]");
+            return 1;
+        }
     }
 }
