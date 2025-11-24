@@ -2,10 +2,16 @@ using System.Security.Cryptography;
 
 namespace Serilog.Sinks.File.Encrypt;
 
+/// <summary>
+/// Encrypts data written to the underlying stream using AES encryption.
+/// </summary>
 public class EncryptedStream : Stream
 {
-    private static readonly byte[] HeaderMarker = { 0xFF, 0xFE, 0x4C, 0x4F, 0x47, 0x48, 0x44, 0x00, 0x01 }; // LOGHD with validation
-    private static readonly byte[] ChunkMarker = { 0xFF, 0xFE, 0x4C, 0x4F, 0x47, 0x42, 0x44, 0x00, 0x02 }; // LOGBD with validation
+    // csharpier-ignore-start
+    private static readonly byte[] HeaderMarker = [ 0xFF, 0xFE, 0x4C, 0x4F, 0x47, 0x48, 0x44, 0x00, 0x01 ];
+    private static readonly byte[] ChunkMarker =  [ 0xFF, 0xFE, 0x4C, 0x4F, 0x47, 0x42, 0x44, 0x00, 0x02 ];
+    // csharpier-ignore-end
+
     private readonly Stream _underlyingStream;
     private readonly ICryptoTransform _currentCryptoTransform;
     private readonly Aes _aes;
@@ -15,6 +21,11 @@ public class EncryptedStream : Stream
     private MemoryStream? _bufferStream;
     private CryptoStream? _currentCryptoStream;
 
+    /// <summary>
+    /// Creates a new instance of <see cref="EncryptedStream"/> that encrypts data written to the underlying stream.
+    /// </summary>
+    /// <param name="underlyingStream">The stream to write encrypted data to.</param>
+    /// <param name="rsaPublicKey">The RSA public key used to encrypt the AES key and IV.</param>
     public EncryptedStream(Stream underlyingStream, RSA rsaPublicKey)
     {
         _underlyingStream = underlyingStream;
@@ -49,6 +60,7 @@ public class EncryptedStream : Stream
         );
     }
 
+    /// <inheritdoc/>
     public override void Flush()
     {
         if (_currentCryptoStream != null && _bufferStream != null)
@@ -74,21 +86,42 @@ public class EncryptedStream : Stream
         _underlyingStream.Flush();
     }
 
+    /// <summary>
+    /// This stream does not support reading.
+    /// </summary>
+    /// <param name="buffer"></param>
+    /// <param name="offset"></param>
+    /// <param name="count"></param>
+    /// <returns></returns>
+    /// <exception cref="NotSupportedException"></exception>
     public override int Read(byte[] buffer, int offset, int count)
     {
         throw new NotSupportedException();
     }
 
+    /// <summary>
+    /// This stream does not support seeking.
+    /// </summary>
+    /// <param name="offset"></param>
+    /// <param name="origin"></param>
+    /// <returns></returns>
+    /// <exception cref="NotSupportedException"></exception>
     public override long Seek(long offset, SeekOrigin origin)
     {
         throw new NotSupportedException();
     }
 
+    /// <summary>
+    /// This stream does not support setting length.
+    /// </summary>
+    /// <param name="value"></param>
+    /// <exception cref="NotSupportedException"></exception>
     public override void SetLength(long value)
     {
         throw new NotSupportedException();
     }
 
+    /// <inheritdoc/>
     public override void Write(byte[] buffer, int offset, int count)
     {
         ObjectDisposedException.ThrowIf(_isDisposed, this);
@@ -101,6 +134,7 @@ public class EncryptedStream : Stream
         _currentCryptoStream?.Write(buffer, offset, count);
     }
 
+    /// <inheritdoc/>
     public override void Write(ReadOnlySpan<byte> buffer)
     {
         ObjectDisposedException.ThrowIf(_isDisposed, this);
@@ -113,16 +147,25 @@ public class EncryptedStream : Stream
         _currentCryptoStream?.Write(buffer);
     }
 
+    /// <inheritdoc/>
     public override bool CanRead => false;
+    /// <inheritdoc/>
     public override bool CanSeek => false;
+    /// <inheritdoc/>
     public override bool CanWrite => true;
+    /// <inheritdoc/>
     public override long Length => throw new NotSupportedException();
+    /// <summary>
+    /// This stream does not support getting or setting the position.
+    /// </summary>
+    /// <exception cref="NotSupportedException"></exception>
     public override long Position
     {
         get => throw new NotSupportedException();
         set => throw new NotSupportedException();
     }
 
+    /// <inheritdoc/>
     protected override void Dispose(bool disposing)
     {
         if (_isDisposed)

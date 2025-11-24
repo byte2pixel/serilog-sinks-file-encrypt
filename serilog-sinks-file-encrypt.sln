@@ -6,6 +6,7 @@ MinimumVisualStudioVersion = 10.0.40219.1
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{827E0CD3-B72D-47B6-A68D-7590B98EB39B}"
 	ProjectSection(SolutionItems) = preProject
 		src\Directory.Packages.props = src\Directory.Packages.props
+		src\Directory.Build.props = src\Directory.Build.props
 	EndProjectSection
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Serilog.Sinks.File.Encrypt", "src\Serilog.Sinks.File.Encrypt\Serilog.Sinks.File.Encrypt.csproj", "{0386137F-0A12-41D9-921F-E47229BC9F92}"
@@ -24,6 +25,7 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "examples", "examples", "{66
 		examples\Directory.Packages.props = examples\Directory.Packages.props
 		examples\private_key.xml = examples\private_key.xml
 		examples\public_key.xml = examples\public_key.xml
+		examples\Directory.Build.props = examples\Directory.Build.props
 	EndProjectSection
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Example.Console", "examples\Example.Console\Example.Console.csproj", "{810C95A0-AAFE-4932-A645-45BFF7744D5F}"

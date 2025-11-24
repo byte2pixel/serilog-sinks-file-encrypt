@@ -61,7 +61,7 @@ public sealed class FileSinkIntegrationTests : IDisposable
 
         // Act - Configure and create a logger that writes encrypted logs
         Logger logger = new LoggerConfiguration()
-            .WriteTo.File(path: _logFilePath, hooks: new DeviceEncryptHooks(_rsaKeyPair.publicKey))
+            .WriteTo.File(path: _logFilePath, hooks: new EncryptHooks(_rsaKeyPair.publicKey))
             .CreateLogger();
 
         // Write a test message
@@ -86,7 +86,7 @@ public sealed class FileSinkIntegrationTests : IDisposable
 
         // Create a logger that writes encrypted logs
         Logger logger = new LoggerConfiguration()
-            .WriteTo.File(path: _logFilePath, hooks: new DeviceEncryptHooks(_rsaKeyPair.publicKey))
+            .WriteTo.File(path: _logFilePath, hooks: new EncryptHooks(_rsaKeyPair.publicKey))
             .CreateLogger();
 
         // Write a test message
@@ -96,7 +96,7 @@ public sealed class FileSinkIntegrationTests : IDisposable
         logger.Dispose();
 
         logger = new LoggerConfiguration()
-            .WriteTo.File(path: _logFilePath, hooks: new DeviceEncryptHooks(_rsaKeyPair.publicKey))
+            .WriteTo.File(path: _logFilePath, hooks: new EncryptHooks(_rsaKeyPair.publicKey))
             .CreateLogger();
         logger.Information("This is a second log message");
         logger.Dispose();
@@ -119,7 +119,7 @@ public sealed class FileSinkIntegrationTests : IDisposable
         string decryptedFilePath = Path.Combine(_testDirectory, "decrypted.log");
         // Create a logger that writes encrypted logs
         Logger logger = new LoggerConfiguration()
-            .WriteTo.File(path: _logFilePath, hooks: new DeviceEncryptHooks(_rsaKeyPair.publicKey))
+            .WriteTo.File(path: _logFilePath, hooks: new EncryptHooks(_rsaKeyPair.publicKey))
             .CreateLogger();
         // Write a test message
         logger.Information(logMessage);
@@ -127,7 +127,7 @@ public sealed class FileSinkIntegrationTests : IDisposable
         logger.Dispose();
 
         logger = new LoggerConfiguration()
-            .WriteTo.File(path: _logFilePath, hooks: new DeviceEncryptHooks(_rsaKeyPair.publicKey))
+            .WriteTo.File(path: _logFilePath, hooks: new EncryptHooks(_rsaKeyPair.publicKey))
             .CreateLogger();
 
         logger.Information("This is a second log message");
@@ -148,7 +148,7 @@ public sealed class FileSinkIntegrationTests : IDisposable
     {
         // Arrange
         Logger logger = new LoggerConfiguration()
-            .WriteTo.File(path: _logFilePath, hooks: new DeviceEncryptHooks(_rsaKeyPair.publicKey))
+            .WriteTo.File(path: _logFilePath, hooks: new EncryptHooks(_rsaKeyPair.publicKey))
             .CreateLogger();
 
         logger.Information("Secret data");
@@ -168,7 +168,7 @@ public sealed class FileSinkIntegrationTests : IDisposable
     {
         // Arrange
         Logger logger = new LoggerConfiguration()
-            .WriteTo.File(path: _logFilePath, hooks: new DeviceEncryptHooks(_rsaKeyPair.publicKey))
+            .WriteTo.File(path: _logFilePath, hooks: new EncryptHooks(_rsaKeyPair.publicKey))
             .CreateLogger();
 
         // Act - Write multiple messages
@@ -204,7 +204,7 @@ public sealed class FileSinkIntegrationTests : IDisposable
         Logger logger = new LoggerConfiguration()
             .WriteTo.File(
                 path: _logFilePath,
-                hooks: new DeviceEncryptHooks(_rsaKeyPair.publicKey),
+                hooks: new EncryptHooks(_rsaKeyPair.publicKey),
                 rollingInterval: RollingInterval.Infinite
             )
             .CreateLogger();
@@ -214,7 +214,7 @@ public sealed class FileSinkIntegrationTests : IDisposable
         logger = new LoggerConfiguration()
             .WriteTo.File(
                 path: _logFilePath,
-                hooks: new DeviceEncryptHooks(_rsaKeyPair.publicKey),
+                hooks: new EncryptHooks(_rsaKeyPair.publicKey),
                 rollingInterval: RollingInterval.Infinite
             )
             .CreateLogger();
@@ -242,7 +242,7 @@ public sealed class FileSinkIntegrationTests : IDisposable
             .WriteTo.File(
                 new JsonFormatter(),
                 logFilePath,
-                hooks: new DeviceEncryptHooks(_rsaKeyPair.publicKey)
+                hooks: new EncryptHooks(_rsaKeyPair.publicKey)
             )
             .CreateLogger();
 
@@ -272,7 +272,7 @@ public sealed class FileSinkIntegrationTests : IDisposable
             .WriteTo.File(
                 path: fileNamePattern,
                 rollingInterval: RollingInterval.Day,
-                hooks: new DeviceEncryptHooks(_rsaKeyPair.publicKey)
+                hooks: new EncryptHooks(_rsaKeyPair.publicKey)
             )
             .CreateLogger();
 
@@ -303,11 +303,11 @@ public sealed class FileSinkIntegrationTests : IDisposable
 
         // Act - Create two loggers with different encryption keys
         Logger logger1 = new LoggerConfiguration()
-            .WriteTo.File(path: logFile1, hooks: new DeviceEncryptHooks(_rsaKeyPair.publicKey))
+            .WriteTo.File(path: logFile1, hooks: new EncryptHooks(_rsaKeyPair.publicKey))
             .CreateLogger();
 
         Logger logger2 = new LoggerConfiguration()
-            .WriteTo.File(path: logFile2, hooks: new DeviceEncryptHooks(secondKeyPair.publicKey))
+            .WriteTo.File(path: logFile2, hooks: new EncryptHooks(secondKeyPair.publicKey))
             .CreateLogger();
 
         // Write to both logs
