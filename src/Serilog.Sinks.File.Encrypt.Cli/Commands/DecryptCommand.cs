@@ -1,15 +1,17 @@
 ﻿using System.ComponentModel;
 using System.IO.Abstractions;
-using Serilog.Sinks.File.Encrypt;
+using Spectre.Console;
 using Spectre.Console.Cli;
 
-namespace Serilog.Sinks.Field.Encrypt.Cli.Commands;
+namespace Serilog.Sinks.File.Encrypt.Cli.Commands;
 
 /// <summary>
 /// Command to decrypt an encrypted log file using an RSA private key
 /// </summary>
+/// <param name="console">The ANSI console</param>
 /// <param name="fileSystem">The file system</param>
-public sealed class DecryptCommand(IFileSystem fileSystem) : Command<DecryptCommand.Settings>
+public sealed class DecryptCommand(IAnsiConsole console, IFileSystem fileSystem)
+    : Command<DecryptCommand.Settings>
 {
     /// <summary>
     /// The settings for the DecryptCommand
@@ -42,31 +44,56 @@ public sealed class DecryptCommand(IFileSystem fileSystem) : Command<DecryptComm
     /// Decrypts the specified encrypted log file using the provided RSA private key and writes the decrypted content to the output file.
     /// </summary>
     /// <param name="context">The command context.</param>
-    /// <param name="settings">The decypt settings</param>
+    /// <param name="settings">The decrypt settings</param>
     /// <returns></returns>
     public override int Execute(CommandContext context, Settings settings)
     {
-        // Read the RSA private key from the specified file
-        if (!fileSystem.File.Exists(settings.KeyFile))
+        try
         {
-            Console.Error.WriteLine($"Error: Key file '{settings.KeyFile}' does not exist.");
-            return 1;
-        }
-        string rsaPrivateKey = fileSystem.File.ReadAllText(settings.KeyFile);
-        if (!fileSystem.File.Exists(settings.EncryptedFile))
-        {
-            Console.Error.WriteLine(
-                $"Error: Encrypted file '{settings.EncryptedFile}' does not exist."
-            );
-            return 1;
-        }
+            // Validate input files exist
+            if (!fileSystem.File.Exists(settings.KeyFile))
+            {
+                console.MarkupLineInterpolated(
+                    $"[red]✗ Error: Key file '{settings.KeyFile}' does not exist.[/]"
+                );
+                return 1;
+            }
 
-        EncryptionUtils.DecryptLogFileToFile(
-            settings.EncryptedFile,
-            rsaPrivateKey,
-            settings.OutputFile
-        );
-        Console.WriteLine($"Decrypted log written to '{settings.OutputFile}'.");
-        return 0;
+            if (!fileSystem.File.Exists(settings.EncryptedFile))
+            {
+                console.MarkupLineInterpolated(
+                    $"[red]✗ Error: Encrypted file '{settings.EncryptedFile}' does not exist.[/]"
+                );
+                return 1;
+            }
+
+            console.MarkupLineInterpolated(
+                $"[blue]Reading private key from:[/] {settings.KeyFile}"
+            );
+            string rsaPrivateKey = fileSystem.File.ReadAllText(settings.KeyFile);
+
+            console.MarkupLineInterpolated(
+                $"[blue]Decrypting log file:[/] {settings.EncryptedFile}"
+            );
+
+            // Perform the decryption
+            EncryptionUtils.DecryptLogFileToFile(
+                settings.EncryptedFile,
+                rsaPrivateKey,
+                settings.OutputFile
+            );
+
+            console.MarkupLine("[green]✓ Successfully decrypted log file![/]");
+            console.MarkupLineInterpolated(
+                $"[yellow]Decrypted content written to:[/] {settings.OutputFile}"
+            );
+
+            return 0;
+        }
+        catch (Exception ex)
+        {
+            console.MarkupLineInterpolated($"[red]✗ Error during decryption: {ex.Message}[/]");
+            return 1;
+        }
     }
 }
