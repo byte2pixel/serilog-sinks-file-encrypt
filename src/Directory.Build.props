@@ -34,7 +34,6 @@
   </ItemGroup>
 
   <PropertyGroup>
-    <Description>A Serilog File Sink hook that writes encrypted log events.</Description>
     <Copyright>Byte2Pixel</Copyright>
     <Authors>Mel Dommer</Authors>
     <RepositoryType>git</RepositoryType>
