@@ -86,6 +86,40 @@ public class EncryptedStream : Stream
         _underlyingStream.Flush();
     }
 
+    /// <inheritdoc/>
+    public override async Task FlushAsync(CancellationToken cancellationToken)
+    {
+        if (_currentCryptoStream != null && _bufferStream != null)
+        {
+            // Finalize the encryption
+            await _currentCryptoStream
+                .FlushFinalBlockAsync(cancellationToken)
+                .ConfigureAwait(false);
+            await _currentCryptoStream.DisposeAsync().ConfigureAwait(false);
+            _currentCryptoStream = null;
+
+            // Get the encrypted data from the buffer
+            byte[] encryptedData = _bufferStream.ToArray();
+            await _bufferStream.DisposeAsync().ConfigureAwait(false);
+            _bufferStream = null;
+
+            // Write the complete chunk: [MARKER][LENGTH][ENCRYPTED_DATA]
+            await _underlyingStream
+                .WriteAsync(ChunkMarker, cancellationToken)
+                .ConfigureAwait(false);
+            byte[] lengthBytes = BitConverter.GetBytes(encryptedData.Length);
+            await _underlyingStream
+                .WriteAsync(lengthBytes.AsMemory(0, sizeof(int)), cancellationToken)
+                .ConfigureAwait(false);
+            await _underlyingStream
+                .WriteAsync(encryptedData, cancellationToken)
+                .ConfigureAwait(false);
+
+            _needsNewChunk = true;
+        }
+        await _underlyingStream.FlushAsync(cancellationToken).ConfigureAwait(false);
+    }
+
     /// <summary>
     /// This stream does not support reading.
     /// </summary>
@@ -148,13 +182,36 @@ public class EncryptedStream : Stream
     }
 
     /// <inheritdoc/>
+    public override async ValueTask WriteAsync(
+        ReadOnlyMemory<byte> buffer,
+        CancellationToken cancellationToken = default
+    )
+    {
+        ObjectDisposedException.ThrowIf(_isDisposed, this);
+        if (_needsNewChunk || _currentCryptoStream == null)
+        {
+            StartNewEncryptionChunk();
+            _needsNewChunk = false;
+        }
+
+        if (_currentCryptoStream != null)
+        {
+            await _currentCryptoStream.WriteAsync(buffer, cancellationToken).ConfigureAwait(false);
+        }
+    }
+
+    /// <inheritdoc/>
     public override bool CanRead => false;
+
     /// <inheritdoc/>
     public override bool CanSeek => false;
+
     /// <inheritdoc/>
     public override bool CanWrite => true;
+
     /// <inheritdoc/>
     public override long Length => throw new NotSupportedException();
+
     /// <summary>
     /// This stream does not support getting or setting the position.
     /// </summary>
