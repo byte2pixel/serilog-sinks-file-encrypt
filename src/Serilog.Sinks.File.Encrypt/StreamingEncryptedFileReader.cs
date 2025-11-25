@@ -44,7 +44,7 @@ internal sealed class StreamingEncryptedFileReader : IDisposable, IAsyncDisposab
     )
     {
         // Create a bounded channel for producer-consumer pattern
-        var channel = Channel.CreateBounded<DecryptionChunk>(
+        var channel = Channel.CreateBounded<IDecryptionChunk>(
             new BoundedChannelOptions(_options.QueueDepth)
             {
                 FullMode = BoundedChannelFullMode.Wait,
@@ -69,7 +69,7 @@ internal sealed class StreamingEncryptedFileReader : IDisposable, IAsyncDisposab
     /// Producer task that reads and decrypts sections from the input stream
     /// </summary>
     private async Task ProduceDecryptionChunksAsync(
-        ChannelWriter<DecryptionChunk> writer,
+        ChannelWriter<IDecryptionChunk> writer,
         CancellationToken cancellationToken
     )
     {
@@ -107,12 +107,12 @@ internal sealed class StreamingEncryptedFileReader : IDisposable, IAsyncDisposab
     /// Consumer task that writes decrypted chunks to the output stream
     /// </summary>
     private static async Task ConsumeDecryptionChunksAsync(
-        ChannelReader<DecryptionChunk> reader,
+        ChannelReader<IDecryptionChunk> reader,
         Stream outputStream,
         CancellationToken cancellationToken
     )
     {
-        await foreach (DecryptionChunk chunk in reader.ReadAllAsync(cancellationToken))
+        await foreach (IDecryptionChunk chunk in reader.ReadAllAsync(cancellationToken))
         {
             switch (chunk)
             {
@@ -139,7 +139,7 @@ internal sealed class StreamingEncryptedFileReader : IDisposable, IAsyncDisposab
     /// Processes the next section in the file (header or body)
     /// </summary>
     private async Task ProcessNextSectionAsync(
-        ChannelWriter<DecryptionChunk> writer,
+        ChannelWriter<IDecryptionChunk> writer,
         CancellationToken cancellationToken
     )
     {
@@ -185,7 +185,7 @@ internal sealed class StreamingEncryptedFileReader : IDisposable, IAsyncDisposab
     /// Processes a body section to decrypt and queue message content
     /// </summary>
     private async Task ProcessBodySectionAsync(
-        ChannelWriter<DecryptionChunk> writer,
+        ChannelWriter<IDecryptionChunk> writer,
         CancellationToken cancellationToken
     )
     {
@@ -296,7 +296,11 @@ internal sealed class StreamingEncryptedFileReader : IDisposable, IAsyncDisposab
 
         using ICryptoTransform decryptor = aes.CreateDecryptor();
         using MemoryStream memoryStream = new();
-        using CryptoStream cryptoStream = new(memoryStream, decryptor, CryptoStreamMode.Write);
+        await using CryptoStream cryptoStream = new(
+            memoryStream,
+            decryptor,
+            CryptoStreamMode.Write
+        );
 
         await cryptoStream.WriteAsync(encryptedData, cancellationToken);
         await cryptoStream.FlushFinalBlockAsync(cancellationToken);
@@ -324,7 +328,7 @@ internal sealed class StreamingEncryptedFileReader : IDisposable, IAsyncDisposab
         _inputStream.Position -= markerBuffer.Length - 1;
 
     private async Task HandleErrorAsync(
-        ChannelWriter<DecryptionChunk> writer,
+        ChannelWriter<IDecryptionChunk> writer,
         Exception ex,
         CancellationToken cancellationToken
     )

@@ -10,6 +10,14 @@ A Serilog sink that encrypts log files using RSA and AES encryption. This packag
 - **CLI Tool Integration**: Companion CLI tool for key generation and log decryption
 - **High Performance**: Optimized encryption with chunked processing
 
+## Use Cases
+
+- Secure logging of sensitive application data especially in desktop applications.
+- Compliance with data protection regulations by encrypting log files.
+- Protection against unauthorized access to log files in shared or cloud environments.
+
+There is overhead due to encryption; suitable for scenarios where security is prioritized over raw performance.
+
 ## Installation
 
 Install the package via NuGet:
