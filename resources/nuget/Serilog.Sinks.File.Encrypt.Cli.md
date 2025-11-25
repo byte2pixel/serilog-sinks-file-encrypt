@@ -12,8 +12,6 @@ dotnet tool install --global Serilog.Sinks.File.Encrypt.Cli
 
 ## Usage
 
-The tool provides two main commands: `generate` for creating RSA key pairs and `decrypt` for decrypting encrypted log files.
-
 ### Generate RSA Key Pair
 
 Generate a new RSA public/private key pair for encrypting log files:
@@ -25,8 +23,8 @@ serilog-encrypt generate --output /path/to/keys
 **Options:**
 - `-o|--output <OUTPUT>` (required): The directory where the key files will be saved
 
-This command creates two files:
-- `private_key.xml`: The private key used for decryption
+This creates two files:
+- `private_key.xml`: The private key used for decryption (keep secure)
 - `public_key.xml`: The public key used for encryption
 
 ### Decrypt Log Files
@@ -42,6 +40,11 @@ serilog-encrypt decrypt --key private_key.xml --file log.encrypted.txt --output 
 - `-f|--file <FILE>`: Path to the encrypted log file (default: `log.encrypted.txt`)
 - `-o|--output <OUTPUT>`: Path for the decrypted output file (default: `log.decrypted.txt`)
 
+**Features:**
+- Memory-optimized for large log files
+- Continues processing through file corruption
+- Fixed memory usage regardless of log file size
+
 ## Examples
 
 ### Basic Key Generation
@@ -55,10 +58,7 @@ serilog-encrypt generate --output ./keys
 
 ### Basic Log Decryption
 ```bash
-# Decrypt using default file names
-serilog-encrypt decrypt
-
-# Decrypt with specific files
+# Decrypt
 serilog-encrypt decrypt --key ./keys/private_key.xml --file ./logs/app.log --output ./logs/app-decrypted.log
 ```
 
@@ -67,14 +67,13 @@ serilog-encrypt decrypt --key ./keys/private_key.xml --file ./logs/app.log --out
 - Keep your private key secure and never share it
 - The private key is required to decrypt log files
 - Store keys separately from your application code
-- Consider using secure key management systems in production environments
+- Consider using secure key management systems in production
 
 ## Integration with Serilog
 
-This tool works with log files encrypted by the Serilog.Sinks.File.Encrypt package. For detailed information on how to configure Serilog with encryption, please see the [Serilog.Sinks.File.Encrypt package documentation](https://www.nuget.org/packages/Serilog.Sinks.File.Encrypt).
+This tool works with log files encrypted by the Serilog.Sinks.File.Encrypt package. For detailed information on how to configure Serilog with encryption, see the [main package documentation](https://www.nuget.org/packages/Serilog.Sinks.File.Encrypt).
 
 ## Requirements
 
 - .NET 8.0 or higher
-- Logs written with Serilog.Sinks.File
-  - Configured with `EncryptHooks` from Serilog.Sinks.File.Encrypt
+- Logs created with Serilog.Sinks.File.Encrypt

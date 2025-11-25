@@ -1,4 +1,4 @@
-﻿using System.ComponentModel;
+using System.ComponentModel;
 using System.Diagnostics.CodeAnalysis;
 using System.IO.Abstractions;
 using Spectre.Console;
@@ -13,7 +13,7 @@ namespace Serilog.Sinks.File.Encrypt.Cli.Commands;
 /// <param name="fileSystem">The file system</param>
 [SuppressMessage("ReSharper", "ClassNeverInstantiated.Global")]
 public sealed class DecryptCommand(IAnsiConsole console, IFileSystem fileSystem)
-    : Command<DecryptCommand.Settings>
+    : AsyncCommand<DecryptCommand.Settings>
 {
     /// <summary>
     /// The settings for the DecryptCommand
@@ -48,7 +48,7 @@ public sealed class DecryptCommand(IAnsiConsole console, IFileSystem fileSystem)
     /// <param name="context">The command context.</param>
     /// <param name="settings">The decrypt settings</param>
     /// <returns></returns>
-    public override int Execute(CommandContext context, Settings settings)
+    public override async Task<int> ExecuteAsync(CommandContext context, Settings settings)
     {
         try
         {
@@ -72,17 +72,17 @@ public sealed class DecryptCommand(IAnsiConsole console, IFileSystem fileSystem)
             console.MarkupLineInterpolated(
                 $"[blue]Reading private key from:[/] {settings.KeyFile}"
             );
-            string rsaPrivateKey = fileSystem.File.ReadAllText(settings.KeyFile);
+            string rsaPrivateKey = await fileSystem.File.ReadAllTextAsync(settings.KeyFile);
 
             console.MarkupLineInterpolated(
                 $"[blue]Decrypting log file:[/] {settings.EncryptedFile}"
             );
 
-            // Perform the decryption
-            EncryptionUtils.DecryptLogFileToFile(
+            // Perform the decryption using streaming API for better memory efficiency
+            await EncryptionUtils.DecryptLogFileToFileAsync(
                 settings.EncryptedFile,
-                rsaPrivateKey,
-                settings.OutputFile
+                settings.OutputFile,
+                rsaPrivateKey
             );
 
             console.MarkupLine("[green]✓ Successfully decrypted log file![/]");

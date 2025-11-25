@@ -1,4 +1,4 @@
-﻿namespace Serilog.Sinks.File.Encrypt.Tests;
+namespace Serilog.Sinks.File.Encrypt.Tests;
 
 public sealed class FileSinkIntegrationTests : IDisposable
 {
@@ -79,7 +79,7 @@ public sealed class FileSinkIntegrationTests : IDisposable
     }
 
     [Fact]
-    public void CanDecryptLogFileWithPrivateKey()
+    public async Task CanDecryptLogFileWithPrivateKey()
     {
         // Arrange
         const string logMessage = "This is a secret log message";
@@ -93,26 +93,35 @@ public sealed class FileSinkIntegrationTests : IDisposable
         logger.Information(logMessage);
 
         // Dispose to ensure the log is written and file handle is released
-        logger.Dispose();
+        await logger.DisposeAsync();
 
         logger = new LoggerConfiguration()
             .WriteTo.File(path: _logFilePath, hooks: new EncryptHooks(_rsaKeyPair.publicKey))
             .CreateLogger();
         logger.Information("This is a second log message");
-        logger.Dispose();
+        await logger.DisposeAsync();
 
         // Act - Decrypt the log file
-        string decryptedContent = EncryptionUtils.DecryptLogFile(
-            _logFilePath,
-            _rsaKeyPair.privateKey
+        await using FileStream inputStream = System.IO.File.OpenRead(_logFilePath);
+        using MemoryStream outputStream = new();
+        await EncryptionUtils.DecryptLogFileAsync(
+            inputStream,
+            outputStream,
+            _rsaKeyPair.privateKey,
+            cancellationToken: TestContext.Current.CancellationToken
         );
 
         // Assert
+        outputStream.Position = 0;
+        using StreamReader reader = new(outputStream);
+        string decryptedContent = await reader.ReadToEndAsync(
+            TestContext.Current.CancellationToken
+        );
         decryptedContent.ShouldContain(logMessage);
     }
 
     [Fact]
-    public void CanDecryptLogFileToFile_WithPrivateKey()
+    public async Task CanDecryptLogFileToFile_WithPrivateKey()
     {
         // Arrange
         const string logMessage = "This is a secret log message";
@@ -124,27 +133,31 @@ public sealed class FileSinkIntegrationTests : IDisposable
         // Write a test message
         logger.Information(logMessage);
         // Dispose to ensure the log is written and file handle is released
-        logger.Dispose();
+        await logger.DisposeAsync();
 
         logger = new LoggerConfiguration()
             .WriteTo.File(path: _logFilePath, hooks: new EncryptHooks(_rsaKeyPair.publicKey))
             .CreateLogger();
 
         logger.Information("This is a second log message");
-        logger.Dispose();
+        await logger.DisposeAsync();
         // Act - Decrypt the log file to a specified file
-        EncryptionUtils.DecryptLogFileToFile(
+        await EncryptionUtils.DecryptLogFileToFileAsync(
             _logFilePath,
+            decryptedFilePath,
             _rsaKeyPair.privateKey,
-            decryptedFilePath
+            cancellationToken: TestContext.Current.CancellationToken
         );
         // Assert
-        string decryptedContent = System.IO.File.ReadAllText(decryptedFilePath);
+        string decryptedContent = await System.IO.File.ReadAllTextAsync(
+            decryptedFilePath,
+            TestContext.Current.CancellationToken
+        );
         decryptedContent.ShouldContain(logMessage);
     }
 
     [Fact]
-    public void DecryptionFailsWithWrongKey()
+    public async Task DecryptionFailsWithWrongKey()
     {
         // Arrange
         Logger logger = new LoggerConfiguration()
@@ -152,19 +165,30 @@ public sealed class FileSinkIntegrationTests : IDisposable
             .CreateLogger();
 
         logger.Information("Secret data");
-        logger.Dispose();
+        await logger.DisposeAsync();
 
         // Generate a different key pair
         (string publicKey, string privateKey) differentKeyPair =
             EncryptionUtils.GenerateRsaKeyPair();
 
         // Act & Assert
-        string result = EncryptionUtils.DecryptLogFile(_logFilePath, differentKeyPair.privateKey);
+        await using FileStream inputStream = System.IO.File.OpenRead(_logFilePath);
+        using MemoryStream outputStream = new();
+        await EncryptionUtils.DecryptLogFileAsync(
+            inputStream,
+            outputStream,
+            differentKeyPair.privateKey,
+            cancellationToken: TestContext.Current.CancellationToken
+        );
+
+        outputStream.Position = 0;
+        using StreamReader reader = new(outputStream);
+        string result = await reader.ReadToEndAsync(TestContext.Current.CancellationToken);
         result.ShouldNotContain("Secret data");
     }
 
     [Fact]
-    public void CanWriteMultipleLogMessages()
+    public async Task CanWriteMultipleLogMessages()
     {
         // Arrange
         Logger logger = new LoggerConfiguration()
@@ -178,15 +202,25 @@ public sealed class FileSinkIntegrationTests : IDisposable
         }
 
         // Dispose to ensure logs are written
-        logger.Dispose();
+        await logger.DisposeAsync();
 
         // Decrypt and verify
-        string decryptedContent = EncryptionUtils.DecryptLogFile(
-            _logFilePath,
-            _rsaKeyPair.privateKey
+        await using FileStream inputStream = System.IO.File.OpenRead(_logFilePath);
+        using MemoryStream outputStream = new();
+        await EncryptionUtils.DecryptLogFileAsync(
+            inputStream,
+            outputStream,
+            _rsaKeyPair.privateKey,
+            cancellationToken: TestContext.Current.CancellationToken
         );
 
         // Assert - Check that all messages are present
+        outputStream.Position = 0;
+        using StreamReader reader = new(outputStream);
+        string decryptedContent = await reader.ReadToEndAsync(
+            TestContext.Current.CancellationToken
+        );
+
         for (int i = 1; i <= 10; i++)
         {
             decryptedContent.ShouldContain($"Log message {i}");
@@ -194,7 +228,7 @@ public sealed class FileSinkIntegrationTests : IDisposable
     }
 
     [Fact]
-    public void CanAppendToEncryptedLogFile()
+    public async Task CanAppendToEncryptedLogFile()
     {
         // Arrange
         const string firstMessage = "First log entry";
@@ -209,7 +243,7 @@ public sealed class FileSinkIntegrationTests : IDisposable
             )
             .CreateLogger();
         logger.Information(firstMessage);
-        logger.Dispose();
+        await logger.DisposeAsync();
         // Recreate logger to append second message
         logger = new LoggerConfiguration()
             .WriteTo.File(
@@ -219,19 +253,29 @@ public sealed class FileSinkIntegrationTests : IDisposable
             )
             .CreateLogger();
         logger.Information(secondMessage);
-        logger.Dispose();
+        await logger.DisposeAsync();
         // Act - Decrypt the log file
-        string decryptedContent = EncryptionUtils.DecryptLogFile(
-            _logFilePath,
-            _rsaKeyPair.privateKey
+        await using FileStream inputStream = System.IO.File.OpenRead(_logFilePath);
+        using MemoryStream outputStream = new();
+        await EncryptionUtils.DecryptLogFileAsync(
+            inputStream,
+            outputStream,
+            _rsaKeyPair.privateKey,
+            cancellationToken: TestContext.Current.CancellationToken
         );
+
         // Assert
+        outputStream.Position = 0;
+        using StreamReader reader = new(outputStream);
+        string decryptedContent = await reader.ReadToEndAsync(
+            TestContext.Current.CancellationToken
+        );
         decryptedContent.ShouldContain(firstMessage);
         decryptedContent.ShouldContain(secondMessage);
     }
 
     [Fact]
-    public void EncryptionWorksWithJsonFormatter()
+    public async Task EncryptionWorksWithJsonFormatter()
     {
         // Arrange
         string logFilePath = Path.Combine(_testDirectory, "json.log");
@@ -248,12 +292,22 @@ public sealed class FileSinkIntegrationTests : IDisposable
 
         // Log message with properties
         logger.Information("Message with {Property}", testValue);
-        logger.Dispose();
+        await logger.DisposeAsync();
 
         // Assert
-        string decryptedContent = EncryptionUtils.DecryptLogFile(
-            logFilePath,
-            _rsaKeyPair.privateKey
+        await using FileStream inputStream = System.IO.File.OpenRead(logFilePath);
+        using MemoryStream outputStream = new();
+        await EncryptionUtils.DecryptLogFileAsync(
+            inputStream,
+            outputStream,
+            _rsaKeyPair.privateKey,
+            cancellationToken: TestContext.Current.CancellationToken
+        );
+
+        outputStream.Position = 0;
+        using StreamReader reader = new(outputStream);
+        string decryptedContent = await reader.ReadToEndAsync(
+            TestContext.Current.CancellationToken
         );
         decryptedContent.ShouldContain(testValue);
         decryptedContent.ShouldContain("Property");
@@ -261,7 +315,7 @@ public sealed class FileSinkIntegrationTests : IDisposable
     }
 
     [Fact]
-    public void EncryptionWorksWithRollingFiles()
+    public async Task EncryptionWorksWithRollingFiles()
     {
         // Arrange
         string fileNamePattern = Path.Combine(_testDirectory, "rolling-{Date}.log");
@@ -277,22 +331,32 @@ public sealed class FileSinkIntegrationTests : IDisposable
             .CreateLogger();
 
         logger.Information(logMessage);
-        logger.Dispose();
+        await logger.DisposeAsync();
 
         // Assert - Find the log file that was created
         string[] logFiles = Directory.GetFiles(_testDirectory);
         logFiles.ShouldNotBeEmpty();
 
         // Verify it's encrypted
-        string decryptedContent = EncryptionUtils.DecryptLogFile(
-            logFiles[0],
-            _rsaKeyPair.privateKey
+        await using FileStream inputStream = System.IO.File.OpenRead(logFiles[0]);
+        using MemoryStream outputStream = new();
+        await EncryptionUtils.DecryptLogFileAsync(
+            inputStream,
+            outputStream,
+            _rsaKeyPair.privateKey,
+            cancellationToken: TestContext.Current.CancellationToken
+        );
+
+        outputStream.Position = 0;
+        using StreamReader reader = new(outputStream);
+        string decryptedContent = await reader.ReadToEndAsync(
+            TestContext.Current.CancellationToken
         );
         decryptedContent.ShouldContain(logMessage);
     }
 
     [Fact]
-    public void CanEncryptFilesWithDifferentPublicKeys_ButNot_CrossDecrypt()
+    public async Task CanEncryptFilesWithDifferentPublicKeys_ButNot_CrossDecrypt()
     {
         // Arrange
         string logFile1 = Path.Combine(_testDirectory, "log1.log");
@@ -315,19 +379,66 @@ public sealed class FileSinkIntegrationTests : IDisposable
         logger2.Information("Message for log 2");
 
         // Dispose both loggers
-        logger1.Dispose();
-        logger2.Dispose();
+        await logger1.DisposeAsync();
+        await logger2.DisposeAsync();
 
         // Assert - Decrypt with corresponding private keys
-        string content1 = EncryptionUtils.DecryptLogFile(logFile1, _rsaKeyPair.privateKey);
-        string content2 = EncryptionUtils.DecryptLogFile(logFile2, secondKeyPair.privateKey);
+        await using FileStream inputStream1 = System.IO.File.OpenRead(logFile1);
+        using MemoryStream outputStream1 = new();
+        await EncryptionUtils.DecryptLogFileAsync(
+            inputStream1,
+            outputStream1,
+            _rsaKeyPair.privateKey,
+            cancellationToken: TestContext.Current.CancellationToken
+        );
+
+        await using FileStream inputStream2 = System.IO.File.OpenRead(logFile2);
+        using MemoryStream outputStream2 = new();
+        await EncryptionUtils.DecryptLogFileAsync(
+            inputStream2,
+            outputStream2,
+            secondKeyPair.privateKey,
+            cancellationToken: TestContext.Current.CancellationToken
+        );
+
+        outputStream1.Position = 0;
+        using StreamReader reader1 = new(outputStream1);
+        string content1 = await reader1.ReadToEndAsync(TestContext.Current.CancellationToken);
+
+        outputStream2.Position = 0;
+        using StreamReader reader2 = new(outputStream2);
+        string content2 = await reader2.ReadToEndAsync(TestContext.Current.CancellationToken);
 
         content1.ShouldContain("Message for log 1");
         content2.ShouldContain("Message for log 2");
 
         // Verify cross-decryption fails
-        string result1 = EncryptionUtils.DecryptLogFile(logFile1, secondKeyPair.privateKey);
-        string result2 = EncryptionUtils.DecryptLogFile(logFile2, _rsaKeyPair.privateKey);
+        await using FileStream crossInputStream1 = System.IO.File.OpenRead(logFile1);
+        using MemoryStream crossOutputStream1 = new();
+        await EncryptionUtils.DecryptLogFileAsync(
+            crossInputStream1,
+            crossOutputStream1,
+            secondKeyPair.privateKey,
+            cancellationToken: TestContext.Current.CancellationToken
+        );
+
+        await using FileStream crossInputStream2 = System.IO.File.OpenRead(logFile2);
+        using MemoryStream crossOutputStream2 = new();
+        await EncryptionUtils.DecryptLogFileAsync(
+            crossInputStream2,
+            crossOutputStream2,
+            _rsaKeyPair.privateKey,
+            cancellationToken: TestContext.Current.CancellationToken
+        );
+
+        crossOutputStream1.Position = 0;
+        using StreamReader crossReader1 = new(crossOutputStream1);
+        string result1 = await crossReader1.ReadToEndAsync(TestContext.Current.CancellationToken);
+
+        crossOutputStream2.Position = 0;
+        using StreamReader crossReader2 = new(crossOutputStream2);
+        string result2 = await crossReader2.ReadToEndAsync(TestContext.Current.CancellationToken);
+
         result1.ShouldContain("[Decryption error at position");
         result2.ShouldContain("[Decryption error at position");
     }

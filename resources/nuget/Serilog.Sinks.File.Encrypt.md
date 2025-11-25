@@ -6,7 +6,7 @@ A Serilog sink that encrypts log files using RSA and AES encryption. This packag
 
 - **Hybrid Encryption**: Uses RSA encryption for key exchange and AES for efficient data encryption
 - **Seamless Integration**: Plugs directly into Serilog's file sink using lifecycle hooks
-- **Individual Open Encryption**: Each time the log file is opened, a new AES key and IV are generated and encrypted with RSA
+- **Memory-Optimized**: Producer-consumer architecture for efficient processing of large files
 - **CLI Tool Integration**: Companion CLI tool for key generation and log decryption
 - **High Performance**: Optimized encryption with chunked processing
 
@@ -28,13 +28,13 @@ dotnet tool install --global Serilog.Sinks.File.Encrypt.Cli
 
 ### 1. Generate RSA Key Pair
 
-First, generate an RSA key pair using the CLI tool:
+Generate an RSA key pair using the CLI tool:
 
 ```bash
 serilog-encrypt generate --output ./keys
 ```
 
-This creates two files:
+This creates:
 - `public_key.xml`: Used for encryption (safe to include with your application)
 - `private_key.xml`: Used for decryption (keep secure, do not distribute)
 
@@ -44,7 +44,7 @@ This creates two files:
 using Serilog;
 using Serilog.Sinks.File.Encrypt;
 
-// Load your public key (this example reads from a file)
+// Load your public key
 string publicKeyXml = File.ReadAllText("./keys/public_key.xml");
 
 // Configure Serilog with encryption
@@ -71,8 +71,6 @@ serilog-encrypt decrypt --key ./keys/private_key.xml --file logs/app.log --outpu
 
 ### Programmatic Key Generation
 
-You can generate keys programmatically using the `EncryptionUtils` class:
-
 ```csharp
 using Serilog.Sinks.File.Encrypt;
 
@@ -82,116 +80,36 @@ var (publicKey, privateKey) = EncryptionUtils.GenerateRsaKeyPair(2048);
 // Save keys to files
 File.WriteAllText("public_key.xml", publicKey);
 File.WriteAllText("private_key.xml", privateKey);
-
-// Use the public key for encryption
-Log.Logger = new LoggerConfiguration()
-    .WriteTo.File("logs/app.log", hooks: new EncryptHooks(publicKey))
-    .CreateLogger();
 ```
 
 ### Programmatic Decryption
 
-Decrypt log files programmatically:
+For large files, use the memory-optimized streaming API:
 
 ```csharp
 using Serilog.Sinks.File.Encrypt;
 
+// File-to-file decryption
 string privateKeyXml = File.ReadAllText("private_key.xml");
-string decryptedContent = EncryptionUtils.DecryptLogFile("logs/app.log", privateKeyXml);
-Console.WriteLine(decryptedContent);
+await EncryptionUtils.DecryptLogFileToFileAsync(
+    "logs/app.log", 
+    "logs/decrypted.log", 
+    privateKeyXml);
 
-// Or decrypt directly to a file
-EncryptionUtils.DecryptLogFileToFile("logs/app.log", privateKeyXml, "logs/decrypted.log");
-```
-
-### Integration with Configuration
-
-You can integrate encryption with Serilog configuration files:
-
-```csharp
-// Load public key from configuration, environment, or secure storage
-var configuration = new ConfigurationBuilder()
-    .AddJsonFile("appsettings.json")
-    .Build();
-
-string publicKeyXml = configuration["Logging:PublicKey"];
-
-Log.Logger = new LoggerConfiguration()
-    .ReadFrom.Configuration(configuration)
-    .WriteTo.File(
-        path: "logs/app.log",
-        hooks: new EncryptHooks(publicKeyXml))
-    .CreateLogger();
-```
-
-## File Format
-
-The encrypted log files use a custom format:
-
-```
-[HEADER_MARKER][key_length][iv_length][encrypted_aes_key][encrypted_aes_iv]
-[CHUNK_MARKER][data_length][encrypted_log_data]
-[CHUNK_MARKER][data_length][encrypted_log_data]
-...
-```
-
-Each log chunk is encrypted with AES using a unique key and IV that are encrypted with RSA. This format allows for secure storage while maintaining the ability to decrypt individual log entries.
-
-## Security Considerations
-
-- **Key Management**: Keep private keys secure and never include them in your application deployment
-- **Key Size**: Default RSA key size is 2048 bits. For enhanced security, use 4096 bits
-- **Storage**: Store private keys in secure key management systems in production
-- **Access Control**: Restrict access to encrypted log files and private keys
-- **Rotation**: Consider implementing key rotation strategies for long-term deployments
-
-## Performance
-
-The encryption process is optimized for logging scenarios:
-- Minimal overhead during log writing
-- Chunked encryption for better performance
-- Efficient memory usage with streaming
-- [ ] Compatible with Serilog's async logging (TODO)
-
-## Examples
-
-### Basic Console Application
-
-```csharp
-using Serilog;
-using Serilog.Sinks.File.Encrypt;
-
-class Program
+// Stream-to-stream decryption with custom options
+var options = new StreamingOptions 
 {
-    static void Main()
-    {
-        // Generate keys (do this once, store securely)
-        var (publicKey, privateKey) = EncryptionUtils.GenerateRsaKeyPair();
-        
-        // Configure encrypted logging
-        Log.Logger = new LoggerConfiguration()
-            .WriteTo.Console()
-            .WriteTo.File(
-                path: "logs/app-.log",
-                rollingInterval: RollingInterval.Day,
-                hooks: new EncryptHooks(publicKey))
-            .CreateLogger();
+    BufferSize = 64 * 1024,  // 64KB chunks
+    QueueDepth = 20,         // Queue depth
+    ContinueOnError = true   // Continue on corruption
+};
 
-        Log.Information("Application started");
-        Log.Warning("This is a warning");
-        Log.Error("This is an error");
-        
-        Log.CloseAndFlush();
-        
-        // Later, decrypt the logs
-        string decrypted = EncryptionUtils.DecryptLogFile("logs/app-20231123.log", privateKey);
-        Console.WriteLine("Decrypted content:");
-        Console.WriteLine(decrypted);
-    }
-}
+using var input = File.OpenRead("large-log.encrypted");
+using var output = File.Create("large-log.decrypted");
+await EncryptionUtils.DecryptLogFileAsync(input, output, privateKeyXml, options);
 ```
 
-### Web Application
+### Web Application Example
 
 ```csharp
 var builder = WebApplication.CreateBuilder(args);
@@ -205,31 +123,54 @@ builder.Host.UseSerilog((context, configuration) =>
         .WriteTo.File(
             path: "logs/webapp-.log",
             rollingInterval: RollingInterval.Day,
-            retainedFileCountLimit: 30,
             hooks: new EncryptHooks(publicKeyXml)));
 
 var app = builder.Build();
-
-app.MapGet("/", (ILogger<Program> logger) =>
-{
-    logger.LogInformation("Home page accessed at {Timestamp}", DateTime.UtcNow);
-    return "Hello World!";
-});
-
 app.Run();
 ```
 
-## CLI Tool
+## API Reference
 
-The companion CLI tool (`Serilog.Sinks.File.Encrypt.Cli`) provides key management and decryption capabilities:
-
-### Generate Keys
-```bash
-serilog-encrypt generate --output /path/to/keys
+### Key Management
+```csharp
+(string publicKey, string privateKey) EncryptionUtils.GenerateRsaKeyPair(int keySize = 2048)
 ```
 
-### Decrypt Logs
+### Decryption
+```csharp
+// File-to-file async decryption
+Task EncryptionUtils.DecryptLogFileToFileAsync(string encryptedFilePath, string outputFilePath, string rsaPrivateKey, StreamingOptions? options = null, CancellationToken cancellationToken = default)
+
+// Stream-to-stream async decryption  
+Task EncryptionUtils.DecryptLogFileAsync(Stream inputStream, Stream outputStream, string rsaPrivateKey, StreamingOptions? options = null, CancellationToken cancellationToken = default)
+```
+
+### StreamingOptions
+```csharp
+public class StreamingOptions
+{
+    public int BufferSize { get; init; } = 16 * 1024;     // 16KB default
+    public int QueueDepth { get; init; } = 10;            // Queue depth
+    public bool ContinueOnError { get; init; } = true;    // Error handling
+}
+```
+
+## Security Considerations
+
+- Keep private keys secure and never include them in your application deployment
+- Store private keys in secure key management systems in production
+- Use 2048-bit RSA keys minimum (4096-bit for enhanced security)
+- Restrict access to encrypted log files and private keys
+
+## CLI Tool
+
+The companion CLI tool provides key management and decryption:
+
 ```bash
+# Generate keys
+serilog-encrypt generate --output /path/to/keys
+
+# Decrypt logs
 serilog-encrypt decrypt --key private_key.xml --file log.txt --output decrypted.txt
 ```
 
@@ -239,12 +180,3 @@ For detailed CLI documentation, see the [CLI tool documentation](https://www.nug
 
 - .NET 8.0 or higher
 - Serilog.Sinks.File package
-- RSA key pair for encryption/decryption in XML format
-
-## License
-
-This project is licensed under the MIT License. See the LICENSE file for details.
-
-## Contributing
-
-Contributions are welcome! Please feel free to submit issues, feature requests, or pull requests.

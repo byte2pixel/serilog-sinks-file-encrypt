@@ -3,6 +3,7 @@
   <PropertyGroup>
     <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
     <IsPackable>true</IsPackable>
+    <Description>A Serilog File Sink hook that writes encrypted log events.</Description>
   </PropertyGroup>
     
   <ItemGroup>

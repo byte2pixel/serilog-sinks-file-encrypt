@@ -1,4 +1,5 @@
-﻿using System.Security.Cryptography;
+using System.Security.Cryptography;
+using Serilog.Sinks.File.Encrypt.Models;
 
 namespace Serilog.Sinks.File.Encrypt;
 
@@ -21,33 +22,58 @@ public static class EncryptionUtils
     }
 
     /// <summary>
-    /// This method decrypts the log files in which each log message is encrypted separately.
-    /// Each log entry is encrypted with its own AES key and IV, which are then encrypted with RSA.
-    /// This allows for secure storage of log files while still enabling decryption of individual log entries.
-    /// Format: [HEADER][key_len][iv_len][encrypted_key][encrypted_iv][BODY_MARKER][msg_len][encrypted_message]
+    /// Decrypts an encrypted log file asynchronously and writes the decrypted content to an output stream
     /// </summary>
-    /// <param name="encryptedFilePath">Path to the encrypted file</param>
+    /// <param name="inputStream">Stream containing the encrypted log data</param>
+    /// <param name="outputStream">Stream where the decrypted content will be written</param>
     /// <param name="rsaPrivateKey">The XML representation of the RSA private key used for decryption</param>
-    /// <returns>Decrypted log content</returns>
-    public static string DecryptLogFile(string encryptedFilePath, string rsaPrivateKey)
+    /// <param name="options">Streaming options for the decryption process</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>Task representing the async operation</returns>
+    public static async Task DecryptLogFileAsync(
+        Stream inputStream,
+        Stream outputStream,
+        string rsaPrivateKey,
+        StreamingOptions? options = null,
+        CancellationToken cancellationToken = default
+    )
     {
-        using EncryptedFileReader reader = new(encryptedFilePath, rsaPrivateKey);
-        return reader.ReadAll();
+        options ??= StreamingOptions.Default;
+
+        using StreamingEncryptedFileReader reader = new StreamingEncryptedFileReader(
+            inputStream,
+            rsaPrivateKey,
+            options
+        );
+        await reader.DecryptToStreamAsync(outputStream, cancellationToken);
     }
 
     /// <summary>
-    /// Decrypts an encrypted log file and writes the decrypted content to an output file
+    /// Decrypts an encrypted log file asynchronously and writes the decrypted content to an output file
     /// </summary>
     /// <param name="encryptedFilePath">Path to the encrypted file</param>
-    /// <param name="rsaPrivateKey">The XML representation of the RSA private key used for decryption</param>
     /// <param name="outputFilePath">Path where the decrypted content will be written</param>
-    public static void DecryptLogFileToFile(
+    /// <param name="rsaPrivateKey">The XML representation of the RSA private key used for decryption</param>
+    /// <param name="options">Streaming options for the decryption process</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>Task representing the async operation</returns>
+    public static async Task DecryptLogFileToFileAsync(
         string encryptedFilePath,
+        string outputFilePath,
         string rsaPrivateKey,
-        string outputFilePath
+        StreamingOptions? options = null,
+        CancellationToken cancellationToken = default
     )
     {
-        string decryptedContent = DecryptLogFile(encryptedFilePath, rsaPrivateKey);
-        System.IO.File.WriteAllText(outputFilePath, decryptedContent);
+        using FileStream inputStream = System.IO.File.OpenRead(encryptedFilePath);
+        using FileStream outputStream = System.IO.File.Create(outputFilePath);
+
+        await DecryptLogFileAsync(
+            inputStream,
+            outputStream,
+            rsaPrivateKey,
+            options,
+            cancellationToken
+        );
     }
 }
