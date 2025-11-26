@@ -1,15 +1,23 @@
 # yaml-language-server: $schema=https://json.schemastore.org/github-workflow.json
 name: Pull Request
-on: pull_request
+on: 
+  pull_request:
+  push:
+    branches: [main]
 
 env:
   DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
 
 jobs:
 
   build:
-    name: Build
+    name: Build & Test
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      checks: write
+      pull-requests: write
     steps:
       - name: Checkout
         uses: actions/checkout@v5
@@ -23,8 +31,24 @@ jobs:
             8.0.x
             10.0.x
 
-      - name: Build
-        shell: bash
-        run: |
-          dotnet tool restore
-          dotnet make
+      - name: Restore tools
+        run: dotnet tool restore
+
+      - name: Build and Test
+        run: dotnet make
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          files: ./.coverage/**/coverage.cobertura.xml
+          fail_ci_if_error: false
+          token: ${{ secrets.CODECOV_TOKEN }}
+
+      - name: Publish test results
+        uses: EnricoMi/publish-unit-test-result-action@v2
+        if: always()
+        with:
+          files: |
+            ./.coverage/*.trx
+          check_name: Test Results
+          comment_title: Test Results

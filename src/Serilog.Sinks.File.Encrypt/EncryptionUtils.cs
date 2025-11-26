@@ -40,11 +40,7 @@ public static class EncryptionUtils
     {
         options ??= StreamingOptions.Default;
 
-        using StreamingEncryptedFileReader reader = new StreamingEncryptedFileReader(
-            inputStream,
-            rsaPrivateKey,
-            options
-        );
+        await using StreamingEncryptedFileReader reader = new(inputStream, rsaPrivateKey, options);
         await reader.DecryptToStreamAsync(outputStream, cancellationToken);
     }
 
@@ -65,8 +61,8 @@ public static class EncryptionUtils
         CancellationToken cancellationToken = default
     )
     {
-        using FileStream inputStream = System.IO.File.OpenRead(encryptedFilePath);
-        using FileStream outputStream = System.IO.File.Create(outputFilePath);
+        await using FileStream inputStream = System.IO.File.OpenRead(encryptedFilePath);
+        await using FileStream outputStream = System.IO.File.Create(outputFilePath);
 
         await DecryptLogFileAsync(
             inputStream,

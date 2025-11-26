@@ -3,22 +3,22 @@ namespace Serilog.Sinks.File.Encrypt.Models;
 /// <summary>
 /// Represents a chunk of data to be processed by the consumer
 /// </summary>
-internal abstract record DecryptionChunk;
+internal interface IDecryptionChunk;
 
 /// <summary>
 /// A successfully decrypted message chunk
 /// </summary>
-internal record DecryptedMessageChunk(string Content) : DecryptionChunk;
+internal record DecryptedMessageChunk(string Content) : IDecryptionChunk;
 
 /// <summary>
 /// An error that occurred during decryption
 /// </summary>
-internal record DecryptionErrorChunk(string ErrorMessage, long Position) : DecryptionChunk;
+internal record DecryptionErrorChunk(string ErrorMessage, long Position) : IDecryptionChunk;
 
 /// <summary>
 /// Indicates the end of the decryption stream
 /// </summary>
-internal record EndOfStreamChunk : DecryptionChunk
+internal record EndOfStreamChunk : IDecryptionChunk
 {
     public static readonly EndOfStreamChunk Instance = new();
 }
