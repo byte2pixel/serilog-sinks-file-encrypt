@@ -13,27 +13,29 @@ public class GenerateCommandTests
         TestConsole testConsole = new();
 
         GenerateCommand command = new(testConsole, fileSystem);
-        GenerateCommand.Settings settings = new() { OutputPath = @"C:\test-keys", KeySize = 2048 };
+        string outputPath = Path.Combine("test-keys");
+        GenerateCommand.Settings settings = new() { OutputPath = outputPath, KeySize = 2048 };
 
-        // Assert
+        // Act
         int result = command.Execute(
             new CommandContext(Arguments, Remaining, "generate", null),
             settings,
             CancellationToken.None
         );
 
+        // Assert
         result.ShouldBe(0); // Success
 
-        fileSystem.Directory.Exists(@"C:\test-keys").ShouldBeTrue();
+        fileSystem.Directory.Exists(outputPath).ShouldBeTrue();
 
-        const string privateKeyPath = @"C:\test-keys\private_key.xml";
+        string privateKeyPath = Path.Combine(outputPath, "private_key.xml");
         fileSystem.File.Exists(privateKeyPath).ShouldBeTrue();
         string privateKey = fileSystem.File.ReadAllText(privateKeyPath);
         privateKey.ShouldNotBeNullOrEmpty();
         privateKey.ShouldContain("<RSAKeyValue>");
         privateKey.ShouldContain("<D>"); // Private key should contain private parameters
 
-        const string publicKeyPath = @"C:\test-keys\public_key.xml";
+        string publicKeyPath = Path.Combine(outputPath, "public_key.xml");
         fileSystem.File.Exists(publicKeyPath).ShouldBeTrue();
         string publicKey = fileSystem.File.ReadAllText(publicKeyPath);
         publicKey.ShouldNotBeNullOrEmpty();

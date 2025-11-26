@@ -91,7 +91,7 @@ public class DecryptCommandTests
         // Arrange
         MockFileSystem fileSystem = new();
         fileSystem.AddFile(
-            @"C:\keys\private_key.xml",
+            Path.Combine("keys", "private_key.xml"),
             new MockFileData("<RSAKeyValue>test</RSAKeyValue>")
         );
 
@@ -99,9 +99,9 @@ public class DecryptCommandTests
         DecryptCommand command = new(testConsole, fileSystem);
         DecryptCommand.Settings settings = new()
         {
-            KeyFile = @"C:\keys\private_key.xml",
-            EncryptedFile = @"C:\logs\missing.log",
-            OutputFile = @"C:\logs\decrypted.log",
+            KeyFile = Path.Combine("keys", "private_key.xml"),
+            EncryptedFile = Path.Combine("logs", "missing.log"),
+            OutputFile = Path.Combine("logs", "decrypted.log"),
         };
 
         // Act
