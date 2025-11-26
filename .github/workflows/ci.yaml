@@ -49,6 +49,6 @@ jobs:
         if: always()
         with:
           files: |
-            **/test-results.trx
+            ./.coverage/test-results.trx
           check_name: Test Results
           comment_title: Test Results
