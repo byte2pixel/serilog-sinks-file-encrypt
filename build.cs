@@ -1,7 +1,11 @@
 #:sdk Cake.Sdk@6.0.0
 
 var solution = "./serilog-sinks-file-encrypt.sln";
-var testProject = "./test/Serilog.Sinks.File.Encrypt.Tests/Serilog.Sinks.File.Encrypt.Tests.csproj";
+var testProjects = new[]
+{
+    "./tests/Serilog.Sinks.File.Encrypt.Tests/Serilog.Sinks.File.Encrypt.Tests.csproj",
+    "./tests/Serilog.Sinks.File.Encrypt.Cli.Tests/Serilog.Sinks.File.Encrypt.Cli.Tests.csproj",
+};
 
 ////////////////////////////////////////////////////////////////
 // Arguments
@@ -36,6 +40,7 @@ Task("Build")
                 Configuration = configuration,
                 Verbosity = DotNetVerbosity.Minimal,
                 NoLogo = true,
+                NoRestore = true,
                 NoIncremental = ctx.HasArgument("rebuild"),
                 MSBuildSettings = new DotNetMSBuildSettings().TreatAllWarningsAs(
                     MSBuildTreatAllWarningsAs.Error
@@ -49,23 +54,39 @@ Task("Test")
     .Does(ctx =>
     {
         var collectCoverage = Argument<bool>("collect-coverage", true);
-        var settings = new DotNetTestSettings
-        {
-            Configuration = configuration,
-            Verbosity = DotNetVerbosity.Minimal,
-            NoLogo = true,
-            NoRestore = true,
-            NoBuild = true,
-        };
+        var coverageDir = "./.coverage";
+        var testResultsDir = "./.test-results";
 
         if (collectCoverage)
         {
-            settings.Collectors = new[] { "XPlat Code Coverage" };
-            settings.ResultsDirectory = "./.coverage";
-            settings.Loggers = new[] { "trx" };
+            ctx.CleanDirectory(coverageDir);
+            ctx.CleanDirectory(testResultsDir);
         }
 
-        ctx.DotNetTest(testProject, settings);
+        foreach (var testProject in testProjects)
+        {
+            var projectName = System.IO.Path.GetFileNameWithoutExtension(testProject);
+            var settings = new DotNetTestSettings
+            {
+                Configuration = configuration,
+                Verbosity = DotNetVerbosity.Minimal,
+                NoLogo = true,
+                NoRestore = true,
+                NoBuild = true,
+            };
+
+            if (collectCoverage)
+            {
+                // Create a unique directory for each test project's results
+                var projectResultsDir = System.IO.Path.Combine(coverageDir, projectName);
+                settings.Collectors = new[] { "XPlat Code Coverage" };
+                settings.ResultsDirectory = projectResultsDir;
+                settings.Loggers = new[] { "trx" };
+            }
+
+            ctx.Information($"Running tests for {projectName}...");
+            ctx.DotNetTest(testProject, settings);
+        }
     });
 
 Task("Package")
