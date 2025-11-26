@@ -41,8 +41,13 @@ public sealed class GenerateCommand(IAnsiConsole console, IFileSystem fileSystem
     /// </summary>
     /// <param name="context">The command context.</param>
     /// <param name="settings">The generate settings.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns></returns>
-    public override int Execute(CommandContext context, Settings settings)
+    public override int Execute(
+        CommandContext context,
+        Settings settings,
+        CancellationToken cancellationToken
+    )
     {
         try
         {

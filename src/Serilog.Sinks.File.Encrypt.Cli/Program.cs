@@ -1,15 +1,12 @@
-using System.IO.Abstractions;
 using Microsoft.Extensions.DependencyInjection;
 using Serilog.Sinks.File.Encrypt.Cli.Commands;
 using Serilog.Sinks.File.Encrypt.Cli.Infrastructure;
-using Spectre.Console;
 using Spectre.Console.Cli;
 
 ServiceCollection registrations = new();
 
 // DI Registrations
-registrations.AddTransient<IFileSystem>(_ => new FileSystem());
-registrations.AddSingleton(AnsiConsole.Console);
+registrations.AddCliServices();
 
 TypeRegistrar registrar = new(registrations);
 CommandApp app = new(registrar);
