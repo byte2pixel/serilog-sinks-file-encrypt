@@ -68,11 +68,16 @@ public sealed class FileSinkIntegrationTests : IDisposable
             .WriteTo.File(path: _logFilePath, hooks: new EncryptHooks(_rsaKeyPair.publicKey))
             .CreateLogger();
 
-        // Write a test message
-        logger.Information(logMessage);
-
-        // Dispose to ensure the log is written and file handle is released
-        logger.Dispose();
+        try
+        {
+            // Write a test message
+            logger.Information(logMessage);
+        }
+        finally
+        {
+            // Dispose to ensure the log is written and file handle is released
+            logger.Dispose();
+        }
 
         // Assert
         System.IO.File.Exists(_logFilePath).ShouldBeTrue();
