@@ -46,9 +46,14 @@ public sealed class DecryptCommand(IAnsiConsole console, IFileSystem fileSystem)
     /// Decrypts the specified encrypted log file using the provided RSA private key and writes the decrypted content to the output file.
     /// </summary>
     /// <param name="context">The command context.</param>
-    /// <param name="settings">The decrypt settings</param>
+    /// <param name="settings">The decrypt settings.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns></returns>
-    public override async Task<int> ExecuteAsync(CommandContext context, Settings settings)
+    public override async Task<int> ExecuteAsync(
+        CommandContext context,
+        Settings settings,
+        CancellationToken cancellationToken
+    )
     {
         try
         {
@@ -72,17 +77,25 @@ public sealed class DecryptCommand(IAnsiConsole console, IFileSystem fileSystem)
             console.MarkupLineInterpolated(
                 $"[blue]Reading private key from:[/] {settings.KeyFile}"
             );
-            string rsaPrivateKey = await fileSystem.File.ReadAllTextAsync(settings.KeyFile);
+            string rsaPrivateKey = await fileSystem.File.ReadAllTextAsync(
+                settings.KeyFile,
+                cancellationToken
+            );
 
             console.MarkupLineInterpolated(
                 $"[blue]Decrypting log file:[/] {settings.EncryptedFile}"
             );
 
             // Perform the decryption using streaming API for better memory efficiency
-            await EncryptionUtils.DecryptLogFileToFileAsync(
-                settings.EncryptedFile,
-                settings.OutputFile,
-                rsaPrivateKey
+            // Use IFileSystem to open streams so we can mock them in tests
+            await using var inputStream = fileSystem.File.OpenRead(settings.EncryptedFile);
+            await using var outputStream = fileSystem.File.Create(settings.OutputFile);
+
+            await EncryptionUtils.DecryptLogFileAsync(
+                inputStream,
+                outputStream,
+                rsaPrivateKey,
+                cancellationToken: cancellationToken
             );
 
             console.MarkupLine("[green]✓ Successfully decrypted log file![/]");

@@ -109,7 +109,7 @@ The example uses a `KeyService` class to load the public key and configures Seri
 ```csharp
 Logger logger = new LoggerConfiguration()
     .WriteTo.File(
-        path: Path.Combine(logDirectory, "log.txt"),
+        path: Path.Join(logDirectory, "log.txt"),
         rollingInterval: RollingInterval.Day,
         hooks: new EncryptHooks(keyService.PublicKey)
     )

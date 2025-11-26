@@ -41,8 +41,13 @@ public sealed class GenerateCommand(IAnsiConsole console, IFileSystem fileSystem
     /// </summary>
     /// <param name="context">The command context.</param>
     /// <param name="settings">The generate settings.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns></returns>
-    public override int Execute(CommandContext context, Settings settings)
+    public override int Execute(
+        CommandContext context,
+        Settings settings,
+        CancellationToken cancellationToken
+    )
     {
         try
         {
@@ -61,8 +66,8 @@ public sealed class GenerateCommand(IAnsiConsole console, IFileSystem fileSystem
             );
 
             // Define file paths
-            string privateKeyPath = fileSystem.Path.Combine(settings.OutputPath, "private_key.xml");
-            string publicKeyPath = fileSystem.Path.Combine(settings.OutputPath, "public_key.xml");
+            string privateKeyPath = fileSystem.Path.Join(settings.OutputPath, "private_key.xml");
+            string publicKeyPath = fileSystem.Path.Join(settings.OutputPath, "public_key.xml");
 
             // Write keys to files
             fileSystem.File.WriteAllText(privateKeyPath, keyPair.privateKey);
