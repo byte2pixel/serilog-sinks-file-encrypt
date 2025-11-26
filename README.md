@@ -1,6 +1,14 @@
 # Serilog.Sinks.File.Encrypt
 
+[![Build Status](https://github.com/byte2pixel/serilog-sinks-file-encrypt/actions/workflows/ci.yaml/badge.svg)](https://github.com/byte2pixel/serilog-sinks-file-encrypt/actions/workflows/ci.yaml)
+[![CodeQL](https://github.com/byte2pixel/serilog-sinks-file-encrypt/actions/workflows/codeql-analysis.yaml/badge.svg)](https://github.com/byte2pixel/serilog-sinks-file-encrypt/actions/workflows/codeql-analysis.yaml)
+[![NuGet](https://img.shields.io/nuget/v/Serilog.Sinks.File.Encrypt.svg)](https://www.nuget.org/packages/Serilog.Sinks.File.Encrypt)
+[![NuGet Downloads](https://img.shields.io/nuget/dt/Serilog.Sinks.File.Encrypt.svg)](https://www.nuget.org/packages/Serilog.Sinks.File.Encrypt)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE.md)
+
 A Serilog sink that encrypts log files using RSA and AES encryption. This package provides secure logging by encrypting log data before writing to disk, ensuring sensitive information remains protected.
+
+> **⚠️ Pre-release Software**: This library is currently in pre-release (0.x.x versions). APIs may change before the 1.0 release. See [SECURITY.md](SECURITY.md) for security considerations and best practices.
 
 ## 📦 Packages
 
@@ -18,6 +26,12 @@ This repository contains two packages:
 - **High Performance**: Optimized encryption with chunked processing
 
 ## 🚀 Quick Start
+
+### 🔧 Requirements
+
+- .NET 8.0 or higher
+- Serilog.Sinks.File package
+- RSA key pair for encryption/decryption in XML format
 
 ### 1. Install the packages
 
@@ -84,36 +98,26 @@ dotnet tool restore
 dotnet make
 ```
 
-## 📁 Repository Structure
-
-```
-├── src/
-│   ├── Serilog.Sinks.File.Encrypt/          # Main encryption sink
-│   └── Serilog.Sinks.File.Encrypt.Cli/      # CLI tool
-├── test/
-│   └── Serilog.Sinks.File.Encrypt.Tests/    # Unit tests
-├── examples/
-│   ├── Example.Console/                     # Console application example
-│   └── Example.Benchmarks/                  # Performance benchmarks
-└── resources/
-    └── nuget/                               # NuGet package documentation
-```
-
-## 🔧 Requirements
-
-- .NET 8.0 or higher
-- Serilog.Sinks.File package
-- RSA key pair for encryption/decryption in XML format
-
-## 📄 License
-
-This project is licensed under the MIT License. See the [LICENSE.md](LICENSE.md) file for details.
-
 ## 🤝 Contributing
 
-Contributions are welcome! Please feel free to submit issues, feature requests, or pull requests.
+We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) for details on:
 
-## 📊 Performance
+- Setting up your development environment
+- Code style and conventions
+- Submitting pull requests
+- Running tests
 
-Encrypting log files introduces some overhead due to the encryption process. However, the use of hybrid encryption (RSA + AES) ensures that the performance impact is minimized. AES is used for encrypting the actual log messages.
-For performance benchmarks, refer to the [Example.Benchmarks](./examples/Example.Benchmarks) project in the repository.
+Please also read our [Code of Conduct](CODE_OF_CONDUCT.md) before contributing.
+
+## 📝 License
+
+This project is licensed under the MIT License - see the [LICENSE.md](LICENSE.md) file for details.
+
+## 🔒 Security
+
+For security concerns and vulnerability reporting, please see our [Security Policy](SECURITY.md).
+
+## 📋 Changelog
+
+See [CHANGELOG.md](CHANGELOG.md) for a list of changes in each release.
+

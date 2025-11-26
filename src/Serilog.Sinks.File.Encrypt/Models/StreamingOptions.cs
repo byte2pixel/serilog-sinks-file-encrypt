@@ -8,12 +8,12 @@ public sealed class StreamingOptions
     /// <summary>
     /// Default buffer size for decryption chunks (16KB)
     /// </summary>
-    public const int DefaultBufferSize = 16 * 1024;
+    private const int DefaultBufferSize = 16 * 1024;
 
     /// <summary>
     /// Default queue depth for producer-consumer pattern
     /// </summary>
-    public const int DefaultQueueDepth = 10;
+    private const int DefaultQueueDepth = 10;
 
     /// <summary>
     /// Buffer size for processing chunks in bytes
