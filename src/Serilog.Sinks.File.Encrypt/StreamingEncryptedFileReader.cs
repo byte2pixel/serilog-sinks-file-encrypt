@@ -400,8 +400,24 @@ internal sealed class StreamingEncryptedFileReader : IDisposable, IAsyncDisposab
             return keyLength is >= minKeyIvLength and <= maxKeyIvLength
                 && ivLength is >= minKeyIvLength and <= maxKeyIvLength;
         }
-        catch
+        catch (IOException)
         {
+            // Stream read error - invalid header
+            return false;
+        }
+        catch (NotSupportedException)
+        {
+            // Stream doesn't support seeking/positioning - invalid header
+            return false;
+        }
+        catch (ObjectDisposedException)
+        {
+            // Stream was disposed - invalid header
+            return false;
+        }
+        catch (ArgumentException)
+        {
+            // Invalid position or BitConverter argument - invalid header
             return false;
         }
         finally
@@ -427,10 +443,7 @@ internal sealed class StreamingEncryptedFileReader : IDisposable, IAsyncDisposab
 
         _rsa.Dispose();
 
-        if (_inputStream is IAsyncDisposable asyncDisposable)
-            await asyncDisposable.DisposeAsync();
-        else
-            await _inputStream.DisposeAsync();
+        await _inputStream.DisposeAsync();
 
         _disposed = true;
     }

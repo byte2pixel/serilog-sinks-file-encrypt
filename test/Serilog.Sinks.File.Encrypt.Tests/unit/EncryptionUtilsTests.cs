@@ -75,8 +75,13 @@ public class EncryptionUtilsTests
             {
                 System.IO.File.Delete(tempFile);
             }
-            catch
-            { /* Ignore cleanup errors */
+            catch (IOException)
+            {
+                // Directory may be locked by another process - acceptable in test cleanup
+            }
+            catch (UnauthorizedAccessException)
+            {
+                // May not have permissions - acceptable in test cleanup
             }
         }
     }
@@ -135,8 +140,13 @@ public class EncryptionUtilsTests
             {
                 System.IO.File.Delete(tempFile);
             }
-            catch
-            { /* Ignore cleanup errors */
+            catch (IOException)
+            {
+                // Directory may be locked by another process - acceptable in test cleanup
+            }
+            catch (UnauthorizedAccessException)
+            {
+                // May not have permissions - acceptable in test cleanup
             }
         }
     }

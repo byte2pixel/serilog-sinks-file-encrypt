@@ -92,9 +92,26 @@ public sealed class DecryptCommand(IAnsiConsole console, IFileSystem fileSystem)
 
             return 0;
         }
-        catch (Exception ex)
+        catch (IOException ex)
         {
-            console.MarkupLineInterpolated($"[red]✗ Error during decryption: {ex.Message}[/]");
+            console.MarkupLineInterpolated(
+                $"[red]✗ Error reading or writing files: {ex.Message}[/]"
+            );
+            return 1;
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            console.MarkupLineInterpolated($"[red]✗ Access denied: {ex.Message}[/]");
+            return 1;
+        }
+        catch (System.Security.Cryptography.CryptographicException ex)
+        {
+            console.MarkupLineInterpolated($"[red]✗ Decryption failed: {ex.Message}[/]");
+            return 1;
+        }
+        catch (FormatException ex)
+        {
+            console.MarkupLineInterpolated($"[red]✗ Invalid key or file format: {ex.Message}[/]");
             return 1;
         }
     }
