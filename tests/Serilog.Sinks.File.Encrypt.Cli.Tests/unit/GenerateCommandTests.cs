@@ -1,19 +1,13 @@
 ﻿namespace Serilog.Sinks.File.Encrypt.Cli.Tests.unit;
 
-public class GenerateCommandTests
+public class GenerateCommandTests : CommandTestBase
 {
-    private static readonly string[] Arguments = [];
-    private static readonly IRemainingArguments Remaining = Substitute.For<IRemainingArguments>();
-
     [Fact]
     public void Execute_WithDefaultSettings_GeneratesKeyPairSuccessfully()
     {
         // Arrange
-        MockFileSystem fileSystem = new();
-        TestConsole testConsole = new();
-
-        GenerateCommand command = new(testConsole, fileSystem);
-        string outputPath = Path.Combine("test-keys");
+        GenerateCommand command = new(TestConsole, FileSystem);
+        string outputPath = Path.Join("test-keys");
         GenerateCommand.Settings settings = new() { OutputPath = outputPath, KeySize = 2048 };
 
         // Act
@@ -26,25 +20,25 @@ public class GenerateCommandTests
         // Assert
         result.ShouldBe(0); // Success
 
-        fileSystem.Directory.Exists(outputPath).ShouldBeTrue();
+        FileSystem.Directory.Exists(outputPath).ShouldBeTrue();
 
-        string privateKeyPath = Path.Combine(outputPath, "private_key.xml");
-        fileSystem.File.Exists(privateKeyPath).ShouldBeTrue();
-        string privateKey = fileSystem.File.ReadAllText(privateKeyPath);
+        string privateKeyPath = Path.Join(outputPath, "private_key.xml");
+        FileSystem.File.Exists(privateKeyPath).ShouldBeTrue();
+        string privateKey = FileSystem.File.ReadAllText(privateKeyPath);
         privateKey.ShouldNotBeNullOrEmpty();
         privateKey.ShouldContain("<RSAKeyValue>");
         privateKey.ShouldContain("<D>"); // Private key should contain private parameters
 
-        string publicKeyPath = Path.Combine(outputPath, "public_key.xml");
-        fileSystem.File.Exists(publicKeyPath).ShouldBeTrue();
-        string publicKey = fileSystem.File.ReadAllText(publicKeyPath);
+        string publicKeyPath = Path.Join(outputPath, "public_key.xml");
+        FileSystem.File.Exists(publicKeyPath).ShouldBeTrue();
+        string publicKey = FileSystem.File.ReadAllText(publicKeyPath);
         publicKey.ShouldNotBeNullOrEmpty();
         publicKey.ShouldContain("<RSAKeyValue>");
         publicKey.ShouldNotContain("<D>"); // Public key should not contain private parameters
 
-        testConsole.Output.ShouldContain("Successfully generated RSA key pair!");
-        testConsole.Output.ShouldContain("Private Key:");
-        testConsole.Output.ShouldContain("Public Key:");
-        testConsole.Output.ShouldContain("Keep your private key secure");
+        TestConsole.Output.ShouldContain("Successfully generated RSA key pair!");
+        TestConsole.Output.ShouldContain("Private Key:");
+        TestConsole.Output.ShouldContain("Public Key:");
+        TestConsole.Output.ShouldContain("Keep your private key secure");
     }
 }

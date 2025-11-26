@@ -66,8 +66,8 @@ public sealed class GenerateCommand(IAnsiConsole console, IFileSystem fileSystem
             );
 
             // Define file paths
-            string privateKeyPath = fileSystem.Path.Combine(settings.OutputPath, "private_key.xml");
-            string publicKeyPath = fileSystem.Path.Combine(settings.OutputPath, "public_key.xml");
+            string privateKeyPath = fileSystem.Path.Join(settings.OutputPath, "private_key.xml");
+            string publicKeyPath = fileSystem.Path.Join(settings.OutputPath, "public_key.xml");
 
             // Write keys to files
             fileSystem.File.WriteAllText(privateKeyPath, keyPair.privateKey);

@@ -1,30 +1,25 @@
 namespace Serilog.Sinks.File.Encrypt.Cli.Tests.unit;
 
-public class DecryptCommandTests
+public class DecryptCommandTests : CommandTestBase
 {
-    private static readonly string[] Arguments = [];
-    private static readonly IRemainingArguments Remaining = Substitute.For<IRemainingArguments>();
-
     [Fact]
     public async Task ExecuteAsync_WithValidEncryptedFile_DecryptsSuccessfully()
     {
         // Arrange
         const string testLogContent =
             "2024-11-26 14:00:00 [INF] Test log entry\n2024-11-26 14:00:01 [WRN] Warning message\n";
-        const string privateKeyPath = @"C:\keys\private_key.xml";
-        const string encryptedFilePath = @"C:\logs\encrypted.log";
-        const string decryptedFilePath = @"C:\logs\decrypted.log";
+        string privateKeyPath = Path.Join("keys", "private_key.xml");
+        string encryptedFilePath = Path.Join("logs", "encrypted.log");
+        string decryptedFilePath = Path.Join("logs", "decrypted.log");
 
         (string publicKey, string privateKey) = EncryptionUtils.GenerateRsaKeyPair();
 
         byte[] encryptedContent = CreateEncryptedLogFile(testLogContent, publicKey);
 
-        MockFileSystem fileSystem = new();
-        fileSystem.AddFile(privateKeyPath, new MockFileData(privateKey));
-        fileSystem.AddFile(encryptedFilePath, new MockFileData(encryptedContent));
+        FileSystem.AddFile(privateKeyPath, new MockFileData(privateKey));
+        FileSystem.AddFile(encryptedFilePath, new MockFileData(encryptedContent));
 
-        TestConsole testConsole = new();
-        DecryptCommand command = new(testConsole, fileSystem);
+        DecryptCommand command = new(TestConsole, FileSystem);
         DecryptCommand.Settings settings = new()
         {
             KeyFile = privateKeyPath,
@@ -42,34 +37,32 @@ public class DecryptCommandTests
         // Assert
         result.ShouldBe(0); // Success
 
-        fileSystem.File.Exists(decryptedFilePath).ShouldBeTrue();
+        FileSystem.File.Exists(decryptedFilePath).ShouldBeTrue();
 
-        string decryptedContent = await fileSystem.File.ReadAllTextAsync(
+        string decryptedContent = await FileSystem.File.ReadAllTextAsync(
             decryptedFilePath,
             TestContext.Current.CancellationToken
         );
         decryptedContent.ShouldBe(testLogContent);
 
-        testConsole.Output.ShouldContain("Successfully decrypted log file!");
-        testConsole.Output.ShouldContain("Reading private key from:");
-        testConsole.Output.ShouldContain("Decrypting log file:");
-        testConsole.Output.ShouldContain("Decrypted content written to:");
+        TestConsole.Output.ShouldContain("Successfully decrypted log file!");
+        TestConsole.Output.ShouldContain("Reading private key from:");
+        TestConsole.Output.ShouldContain("Decrypting log file:");
+        TestConsole.Output.ShouldContain("Decrypted content written to:");
     }
 
     [Fact]
     public async Task ExecuteAsync_WithMissingKeyFile_ReturnsError()
     {
         // Arrange
-        MockFileSystem fileSystem = new();
-        fileSystem.AddFile(@"C:\logs\encrypted.log", new MockFileData("dummy"));
+        FileSystem.AddFile(Path.Join("logs", "encrypted.log"), new MockFileData("dummy"));
 
-        TestConsole testConsole = new();
-        DecryptCommand command = new(testConsole, fileSystem);
+        DecryptCommand command = new(TestConsole, FileSystem);
         DecryptCommand.Settings settings = new()
         {
-            KeyFile = @"C:\keys\missing_key.xml",
-            EncryptedFile = @"C:\logs\encrypted.log",
-            OutputFile = @"C:\logs\decrypted.log",
+            KeyFile = Path.Join("keys", "missing_key.xml"),
+            EncryptedFile = Path.Join("logs", "encrypted.log"),
+            OutputFile = Path.Join("logs", "decrypted.log"),
         };
 
         // Act
@@ -81,27 +74,25 @@ public class DecryptCommandTests
 
         // Assert
         result.ShouldBe(1); // Error
-        testConsole.Output.ShouldContain("Error: Key file");
-        testConsole.Output.ShouldContain("does not exist");
+        TestConsole.Output.ShouldContain("Error: Key file");
+        TestConsole.Output.ShouldContain("does not exist");
     }
 
     [Fact]
     public async Task ExecuteAsync_WithMissingEncryptedFile_ReturnsError()
     {
         // Arrange
-        MockFileSystem fileSystem = new();
-        fileSystem.AddFile(
-            Path.Combine("keys", "private_key.xml"),
+        FileSystem.AddFile(
+            Path.Join("keys", "private_key.xml"),
             new MockFileData("<RSAKeyValue>test</RSAKeyValue>")
         );
 
-        TestConsole testConsole = new();
-        DecryptCommand command = new(testConsole, fileSystem);
+        DecryptCommand command = new(TestConsole, FileSystem);
         DecryptCommand.Settings settings = new()
         {
-            KeyFile = Path.Combine("keys", "private_key.xml"),
-            EncryptedFile = Path.Combine("logs", "missing.log"),
-            OutputFile = Path.Combine("logs", "decrypted.log"),
+            KeyFile = Path.Join("keys", "private_key.xml"),
+            EncryptedFile = Path.Join("logs", "missing.log"),
+            OutputFile = Path.Join("logs", "decrypted.log"),
         };
 
         // Act
@@ -113,8 +104,8 @@ public class DecryptCommandTests
 
         // Assert
         result.ShouldBe(1); // Error
-        testConsole.Output.ShouldContain("Error: Encrypted file");
-        testConsole.Output.ShouldContain("does not exist");
+        TestConsole.Output.ShouldContain("Error: Encrypted file");
+        TestConsole.Output.ShouldContain("does not exist");
     }
 
     /// <summary>
