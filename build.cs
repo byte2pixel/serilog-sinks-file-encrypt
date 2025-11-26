@@ -22,14 +22,7 @@ Task("Clean")
         ctx.CleanDirectory("./.artifacts");
     });
 
-Task("Restore")
-    .Does(ctx =>
-    {
-        ctx.DotNetRestore(solution);
-    });
-
 Task("Lint")
-    .IsDependentOn("Restore")
     .Does(ctx =>
     {
         ctx.DotNetFormatStyle(solution, new DotNetFormatSettings { VerifyNoChanges = true });
