@@ -62,7 +62,7 @@ Task("Test")
         {
             settings.Collectors = new[] { "XPlat Code Coverage" };
             settings.ResultsDirectory = "./.coverage";
-            settings.Loggers = new[] { "trx;LogFileName=test-results.trx" };
+            settings.Loggers = new[] { "trx" };
         }
 
         ctx.DotNetTest(testProject, settings);
