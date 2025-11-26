@@ -78,9 +78,19 @@ public sealed class GenerateCommand(IAnsiConsole console, IFileSystem fileSystem
 
             return 0;
         }
-        catch (Exception ex)
+        catch (IOException ex)
         {
-            console.MarkupLineInterpolated($"[red]Error generating key pair: {ex.Message}[/]");
+            console.MarkupLineInterpolated($"[red]Error writing key files: {ex.Message}[/]");
+            return 1;
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            console.MarkupLineInterpolated($"[red]Access denied to output path: {ex.Message}[/]");
+            return 1;
+        }
+        catch (System.Security.Cryptography.CryptographicException ex)
+        {
+            console.MarkupLineInterpolated($"[red]Error generating RSA key pair: {ex.Message}[/]");
             return 1;
         }
     }
