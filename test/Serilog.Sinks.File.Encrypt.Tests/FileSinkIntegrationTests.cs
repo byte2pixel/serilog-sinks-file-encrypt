@@ -10,13 +10,13 @@ public sealed class FileSinkIntegrationTests : IDisposable
     public FileSinkIntegrationTests()
     {
         // Create a unique test directory for each test
-        _testDirectory = Path.Combine(
+        _testDirectory = Path.Join(
             Path.GetTempPath(),
             "SerilogEncryptTests",
             Guid.NewGuid().ToString()
         );
         Directory.CreateDirectory(_testDirectory);
-        _logFilePath = Path.Combine(_testDirectory, "test.log");
+        _logFilePath = Path.Join(_testDirectory, "test.log");
 
         // Generate a key pair for testing
         _rsaKeyPair = EncryptionUtils.GenerateRsaKeyPair();
@@ -38,9 +38,13 @@ public sealed class FileSinkIntegrationTests : IDisposable
                     Directory.Delete(_testDirectory, true);
                 }
             }
-            catch
+            catch (IOException)
             {
-                // Ignore cleanup errors
+                // Directory may be locked by another process - acceptable in test cleanup
+            }
+            catch (UnauthorizedAccessException)
+            {
+                // May not have permissions - acceptable in test cleanup
             }
         }
 
@@ -125,7 +129,7 @@ public sealed class FileSinkIntegrationTests : IDisposable
     {
         // Arrange
         const string logMessage = "This is a secret log message";
-        string decryptedFilePath = Path.Combine(_testDirectory, "decrypted.log");
+        string decryptedFilePath = Path.Join(_testDirectory, "decrypted.log");
         // Create a logger that writes encrypted logs
         Logger logger = new LoggerConfiguration()
             .WriteTo.File(path: _logFilePath, hooks: new EncryptHooks(_rsaKeyPair.publicKey))
@@ -278,7 +282,7 @@ public sealed class FileSinkIntegrationTests : IDisposable
     public async Task EncryptionWorksWithJsonFormatter()
     {
         // Arrange
-        string logFilePath = Path.Combine(_testDirectory, "json.log");
+        string logFilePath = Path.Join(_testDirectory, "json.log");
         const string testValue = "test-value";
 
         // Act - Configure logger with JSON formatter
@@ -318,7 +322,7 @@ public sealed class FileSinkIntegrationTests : IDisposable
     public async Task EncryptionWorksWithRollingFiles()
     {
         // Arrange
-        string fileNamePattern = Path.Combine(_testDirectory, "rolling-{Date}.log");
+        string fileNamePattern = Path.Join(_testDirectory, "rolling-{Date}.log");
         const string logMessage = "This is a rolling file test";
 
         // Act - Configure logger with rolling files
@@ -359,8 +363,8 @@ public sealed class FileSinkIntegrationTests : IDisposable
     public async Task CanEncryptFilesWithDifferentPublicKeys_ButNot_CrossDecrypt()
     {
         // Arrange
-        string logFile1 = Path.Combine(_testDirectory, "log1.log");
-        string logFile2 = Path.Combine(_testDirectory, "log2.log");
+        string logFile1 = Path.Join(_testDirectory, "log1.log");
+        string logFile2 = Path.Join(_testDirectory, "log2.log");
 
         // Generate a second key pair
         (string publicKey, string privateKey) secondKeyPair = EncryptionUtils.GenerateRsaKeyPair();

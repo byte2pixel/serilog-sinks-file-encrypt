@@ -239,9 +239,17 @@ public class EncryptedStream : Stream
                 {
                     Flush();
                 }
-                catch
+                catch (ObjectDisposedException)
                 {
-                    // Ignore errors during disposal
+                    // Underlying stream already disposed - safe to ignore during disposal
+                }
+                catch (IOException)
+                {
+                    // I/O error during flush - safe to ignore during disposal
+                }
+                catch (CryptographicException)
+                {
+                    // Encryption finalization error - safe to ignore during disposal
                 }
             }
 

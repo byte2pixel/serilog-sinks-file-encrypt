@@ -10,7 +10,7 @@ public sealed class StreamingDecryptionTests : IDisposable
 
     public StreamingDecryptionTests()
     {
-        _testDirectory = Path.Combine(
+        _testDirectory = Path.Join(
             Path.GetTempPath(),
             "StreamingEncryptTests",
             Guid.NewGuid().ToString()
@@ -24,7 +24,7 @@ public sealed class StreamingDecryptionTests : IDisposable
     {
         // Arrange
         const string testMessage = "Test log message";
-        string encryptedFile = Path.Combine(_testDirectory, "encrypted.log");
+        string encryptedFile = Path.Join(_testDirectory, "encrypted.log");
 
         // Create encrypted file
         WriteEncryptedLogMessage(encryptedFile, testMessage, _rsaKeyPair.publicKey);
@@ -53,7 +53,7 @@ public sealed class StreamingDecryptionTests : IDisposable
     {
         // Arrange
         string[] messages = ["First message", "Second message", "Third message"];
-        string encryptedFile = Path.Combine(_testDirectory, "encrypted.log");
+        string encryptedFile = Path.Join(_testDirectory, "encrypted.log");
 
         // Create encrypted file with multiple messages
         WriteEncryptedLogMessages(encryptedFile, messages, _rsaKeyPair.publicKey);
@@ -83,7 +83,7 @@ public sealed class StreamingDecryptionTests : IDisposable
     {
         // Arrange
         const string testMessage = "Test message with custom options";
-        string encryptedFile = Path.Combine(_testDirectory, "encrypted.log");
+        string encryptedFile = Path.Join(_testDirectory, "encrypted.log");
         StreamingOptions customOptions = new()
         {
             BufferSize = 8 * 1024, // 8KB
@@ -118,8 +118,8 @@ public sealed class StreamingDecryptionTests : IDisposable
     {
         // Arrange
         const string testMessage = "Test message for utils";
-        string encryptedFile = Path.Combine(_testDirectory, "encrypted.log");
-        string outputFile = Path.Combine(_testDirectory, "decrypted.log");
+        string encryptedFile = Path.Join(_testDirectory, "encrypted.log");
+        string outputFile = Path.Join(_testDirectory, "decrypted.log");
 
         WriteEncryptedLogMessage(encryptedFile, testMessage, _rsaKeyPair.publicKey);
 
@@ -144,7 +144,7 @@ public sealed class StreamingDecryptionTests : IDisposable
     {
         // Arrange
         string[] messages = ["Good message 1", "Good message 2"];
-        string encryptedFile = Path.Combine(_testDirectory, "corrupted.log");
+        string encryptedFile = Path.Join(_testDirectory, "corrupted.log");
 
         WriteEncryptedLogMessages(encryptedFile, messages, _rsaKeyPair.publicKey);
 
@@ -196,10 +196,9 @@ public sealed class StreamingDecryptionTests : IDisposable
         using FileStream fileStream = System.IO.File.Create(filePath);
         using EncryptedStream encryptedStream = new(fileStream, rsa);
 
-        foreach (string message in messages)
+        foreach (byte[] message in messages.Select(m => Encoding.UTF8.GetBytes(m)))
         {
-            byte[] messageBytes = Encoding.UTF8.GetBytes(message);
-            encryptedStream.Write(messageBytes, 0, messageBytes.Length);
+            encryptedStream.Write(message, 0, message.Length);
             encryptedStream.Flush();
         }
     }
@@ -216,9 +215,13 @@ public sealed class StreamingDecryptionTests : IDisposable
                 Directory.Delete(_testDirectory, true);
             }
         }
-        catch
+        catch (IOException)
         {
-            // Ignore cleanup errors
+            // Directory may be locked by another process - acceptable in test cleanup
+        }
+        catch (UnauthorizedAccessException)
+        {
+            // May not have permissions - acceptable in test cleanup
         }
 
         _disposed = true;
