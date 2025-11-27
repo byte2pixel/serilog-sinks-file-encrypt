@@ -1,5 +1,6 @@
 using System.IO.Abstractions;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Spectre.Console;
 
 namespace Serilog.Sinks.File.Encrypt.Cli.Infrastructure;
@@ -13,11 +14,15 @@ public static class ServiceCollectionExtensions
     /// Adds the CLI services to the service collection
     /// </summary>
     /// <param name="services">The service collection</param>
+    /// <param name="fileSystem">Optional file system implementation. If null, uses the real file system.</param>
     /// <returns>The updated service collection</returns>
-    public static IServiceCollection AddCliServices(this IServiceCollection services)
+    public static IServiceCollection AddCliServices(
+        this IServiceCollection services,
+        IFileSystem? fileSystem = null
+    )
     {
-        services.AddTransient<IFileSystem>(_ => new FileSystem());
-        services.AddSingleton(AnsiConsole.Console);
+        services.TryAddTransient<IFileSystem>(_ => fileSystem ?? new FileSystem());
+        services.TryAddSingleton(AnsiConsole.Console);
         return services;
     }
 }
