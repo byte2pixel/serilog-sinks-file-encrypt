@@ -1,4 +1,3 @@
-using System.IO.Abstractions;
 using Serilog.Sinks.File.Encrypt.Cli.Infrastructure;
 using Spectre.Console.Cli.Testing;
 
@@ -7,24 +6,42 @@ namespace Serilog.Sinks.File.Encrypt.Cli.Tests.Integration;
 /// <summary>
 /// Example base class for CLI integration tests using CommandAppTester
 /// </summary>
-public class CliIntegrationTestBase
+public class CliIntegrationTestBase : IDisposable
 {
+    private readonly TestConsole _console;
+
     /// <summary>
-    /// Creates a CommandAppTester configured with the same settings as the actual application
+    /// Gets the CommandAppTester configured with the same settings as the actual application
+    /// </summary>
+    protected CommandAppTester Tester { get; }
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="CliIntegrationTestBase"/> class.
     /// </summary>
     /// <param name="fileSystem">Optional file system implementation for testing. If null, uses the real file system.</param>
-    /// <returns>A configured CommandAppTester instance</returns>
-    protected static CommandAppTester CreateCommandAppTester(IFileSystem? fileSystem = null)
+    protected CliIntegrationTestBase(IFileSystem? fileSystem = null)
     {
         TypeRegistrar registrar = CommandAppConfiguration.CreateRegistrar(
             fileSystem ?? new MockFileSystem()
         );
         CommandAppTesterSettings settings = new();
-        TestConsole console = new TestConsole().Width(int.MaxValue);
+        _console = new TestConsole().Width(int.MaxValue);
 
-        CommandAppTester tester = new(registrar, settings, console);
-        tester.Configure(CommandAppConfiguration.GetConfiguration());
+        Tester = new CommandAppTester(registrar, settings, _console);
+        Tester.Configure(CommandAppConfiguration.GetConfiguration());
+    }
 
-        return tester;
+    public void Dispose()
+    {
+        Dispose(true);
+        GC.SuppressFinalize(this);
+    }
+
+    protected virtual void Dispose(bool disposing)
+    {
+        if (disposing)
+        {
+            _console.Dispose();
+        }
     }
 }
