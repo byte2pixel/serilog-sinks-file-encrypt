@@ -8,7 +8,7 @@ namespace Serilog.Sinks.File.Encrypt.Cli.Tests.Integration;
 /// </summary>
 public class CliIntegrationTestBase : IDisposable
 {
-    private readonly TestConsole _console;
+    private readonly TestConsole _console = new();
 
     /// <summary>
     /// Gets the CommandAppTester configured with the same settings as the actual application
@@ -25,8 +25,6 @@ public class CliIntegrationTestBase : IDisposable
             fileSystem ?? new MockFileSystem()
         );
         CommandAppTesterSettings settings = new();
-        _console = new TestConsole().Width(int.MaxValue);
-
         Tester = new CommandAppTester(registrar, settings, _console);
         Tester.Configure(CommandAppConfiguration.GetConfiguration());
     }
