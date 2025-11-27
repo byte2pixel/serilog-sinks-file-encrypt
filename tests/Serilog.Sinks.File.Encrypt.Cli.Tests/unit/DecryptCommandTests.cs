@@ -108,6 +108,125 @@ public class DecryptCommandTests : CommandTestBase
         TestConsole.Output.ShouldContain("does not exist");
     }
 
+    [Fact]
+    public async Task ExecuteAsync_WithSkipErrorMode_DisplaysErrorModeConfiguration()
+    {
+        // Arrange
+        const string testLogContent = "2024-11-26 14:00:00 [INF] Test log entry\n";
+        string privateKeyPath = Path.Join("keys", "private_key.xml");
+        string encryptedFilePath = Path.Join("logs", "encrypted.log");
+        string decryptedFilePath = Path.Join("logs", "decrypted.log");
+
+        (string publicKey, string privateKey) = EncryptionUtils.GenerateRsaKeyPair();
+
+        byte[] encryptedContent = CreateEncryptedLogFile(testLogContent, publicKey);
+
+        FileSystem.AddFile(privateKeyPath, new MockFileData(privateKey));
+        FileSystem.AddFile(encryptedFilePath, new MockFileData(encryptedContent));
+
+        DecryptCommand command = new(TestConsole, FileSystem);
+        DecryptCommand.Settings settings = new()
+        {
+            KeyFile = privateKeyPath,
+            EncryptedFile = encryptedFilePath,
+            OutputFile = decryptedFilePath,
+            ErrorMode = ErrorHandlingMode.Skip,
+        };
+
+        // Act
+        int result = await command.ExecuteAsync(
+            new CommandContext(Arguments, Remaining, "decrypt", null),
+            settings,
+            CancellationToken.None
+        );
+
+        // Assert
+        result.ShouldBe(0);
+        TestConsole.Output.ShouldContain("Error handling mode:");
+        TestConsole.Output.ShouldContain("Skip");
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WithWriteToErrorLogMode_DisplaysErrorLogPath()
+    {
+        // Arrange
+        const string testLogContent = "2024-11-26 14:00:00 [INF] Test log entry\n";
+        string privateKeyPath = Path.Join("keys", "private_key.xml");
+        string encryptedFilePath = Path.Join("logs", "encrypted.log");
+        string decryptedFilePath = Path.Join("logs", "decrypted.log");
+        string errorLogPath = Path.Join("logs", "errors.log");
+
+        (string publicKey, string privateKey) = EncryptionUtils.GenerateRsaKeyPair();
+
+        byte[] encryptedContent = CreateEncryptedLogFile(testLogContent, publicKey);
+
+        FileSystem.AddFile(privateKeyPath, new MockFileData(privateKey));
+        FileSystem.AddFile(encryptedFilePath, new MockFileData(encryptedContent));
+
+        DecryptCommand command = new(TestConsole, FileSystem);
+        DecryptCommand.Settings settings = new()
+        {
+            KeyFile = privateKeyPath,
+            EncryptedFile = encryptedFilePath,
+            OutputFile = decryptedFilePath,
+            ErrorMode = ErrorHandlingMode.WriteToErrorLog,
+            ErrorLogPath = errorLogPath,
+        };
+
+        // Act
+        int result = await command.ExecuteAsync(
+            new CommandContext(Arguments, Remaining, "decrypt", null),
+            settings,
+            CancellationToken.None
+        );
+
+        // Assert
+        result.ShouldBe(0);
+        TestConsole.Output.ShouldContain("Error handling mode:");
+        TestConsole.Output.ShouldContain("WriteToErrorLog");
+        TestConsole.Output.ShouldContain("Error log path:");
+        TestConsole.Output.ShouldContain(errorLogPath);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WithThrowExceptionMode_DisplaysErrorModeConfiguration()
+    {
+        // Arrange
+        const string testLogContent = "2024-11-26 14:00:00 [INF] Test log entry\n";
+        string privateKeyPath = Path.Join("keys", "private_key.xml");
+        string encryptedFilePath = Path.Join("logs", "encrypted.log");
+        string decryptedFilePath = Path.Join("logs", "decrypted.log");
+
+        (string publicKey, string privateKey) = EncryptionUtils.GenerateRsaKeyPair();
+
+        byte[] encryptedContent = CreateEncryptedLogFile(testLogContent, publicKey);
+
+        FileSystem.AddFile(privateKeyPath, new MockFileData(privateKey));
+        FileSystem.AddFile(encryptedFilePath, new MockFileData(encryptedContent));
+
+        DecryptCommand command = new(TestConsole, FileSystem);
+        DecryptCommand.Settings settings = new()
+        {
+            KeyFile = privateKeyPath,
+            EncryptedFile = encryptedFilePath,
+            OutputFile = decryptedFilePath,
+            ErrorMode = ErrorHandlingMode.ThrowException,
+            ContinueOnError = false,
+        };
+
+        // Act
+        int result = await command.ExecuteAsync(
+            new CommandContext(Arguments, Remaining, "decrypt", null),
+            settings,
+            CancellationToken.None
+        );
+
+        // Assert
+        result.ShouldBe(0);
+        TestConsole.Output.ShouldContain("Error handling mode:");
+        TestConsole.Output.ShouldContain("ThrowException");
+    }
+
     /// <summary>
     /// Helper method to create an encrypted log file using EncryptedStream
     /// </summary>

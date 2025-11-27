@@ -20,6 +20,7 @@ internal sealed class StreamingEncryptedFileReader : IDisposable, IAsyncDisposab
     private readonly RSA _rsa;
     private readonly StreamingOptions _options;
     private DecryptionContext _context;
+    private StreamWriter? _errorLogWriter;
     private bool _disposed;
 
     public StreamingEncryptedFileReader(
@@ -73,6 +74,7 @@ internal sealed class StreamingEncryptedFileReader : IDisposable, IAsyncDisposab
         CancellationToken cancellationToken
     )
     {
+        bool completedSuccessfully = false;
         try
         {
             while (!IsEndOfStream() && !cancellationToken.IsCancellationRequested)
@@ -88,17 +90,34 @@ internal sealed class StreamingEncryptedFileReader : IDisposable, IAsyncDisposab
                 }
                 catch (Exception ex) when (!_options.ContinueOnError)
                 {
+                    // For ThrowException mode, throw immediately without writing to channel
+                    if (_options.ErrorHandlingMode == ErrorHandlingMode.ThrowException)
+                    {
+                        throw new CryptographicException(
+                            $"Decryption failed at position {_inputStream.Position}: {ex.Message}",
+                            ex
+                        );
+                    }
+
+                    // For other modes, write error chunk and let consumer handle it
                     await writer.WriteAsync(
                         new DecryptionErrorChunk(ex.Message, _inputStream.Position),
                         cancellationToken
                     );
+                    writer.Complete();
                     throw;
                 }
             }
+
+            completedSuccessfully = true;
         }
         finally
         {
-            await writer.WriteAsync(EndOfStreamChunk.Instance, cancellationToken);
+            if (completedSuccessfully)
+            {
+                await writer.WriteAsync(EndOfStreamChunk.Instance, cancellationToken);
+            }
+
             writer.Complete();
         }
     }
@@ -106,7 +125,7 @@ internal sealed class StreamingEncryptedFileReader : IDisposable, IAsyncDisposab
     /// <summary>
     /// Consumer task that writes decrypted chunks to the output stream
     /// </summary>
-    private static async Task ConsumeDecryptionChunksAsync(
+    private async Task ConsumeDecryptionChunksAsync(
         ChannelReader<IDecryptionChunk> reader,
         Stream outputStream,
         CancellationToken cancellationToken
@@ -122,10 +141,7 @@ internal sealed class StreamingEncryptedFileReader : IDisposable, IAsyncDisposab
                     break;
 
                 case DecryptionErrorChunk errorChunk:
-                    string errorMessage =
-                        $"[Decryption error at position {errorChunk.Position}: {errorChunk.ErrorMessage}]\n";
-                    byte[] errorBytes = Encoding.UTF8.GetBytes(errorMessage);
-                    await outputStream.WriteAsync(errorBytes, cancellationToken);
+                    await HandleErrorChunkAsync(errorChunk, outputStream, cancellationToken);
                     break;
 
                 case EndOfStreamChunk:
@@ -295,7 +311,7 @@ internal sealed class StreamingEncryptedFileReader : IDisposable, IAsyncDisposab
         aes.Padding = PaddingMode.PKCS7;
 
         using ICryptoTransform decryptor = aes.CreateDecryptor();
-        using MemoryStream memoryStream = new();
+        await using MemoryStream memoryStream = new();
         await using CryptoStream cryptoStream = new(
             memoryStream,
             decryptor,
@@ -306,6 +322,117 @@ internal sealed class StreamingEncryptedFileReader : IDisposable, IAsyncDisposab
         await cryptoStream.FlushFinalBlockAsync(cancellationToken);
 
         return Encoding.UTF8.GetString(memoryStream.ToArray());
+    }
+
+    /// <summary>
+    /// Handles an error chunk according to the configured error handling mode
+    /// </summary>
+    private async Task HandleErrorChunkAsync(
+        DecryptionErrorChunk errorChunk,
+        Stream outputStream,
+        CancellationToken cancellationToken
+    )
+    {
+        switch (_options.ErrorHandlingMode)
+        {
+            case ErrorHandlingMode.WriteInline:
+                string errorMessage =
+                    $"[Decryption error at position {errorChunk.Position}: {errorChunk.ErrorMessage}]\n";
+                byte[] errorBytes = Encoding.UTF8.GetBytes(errorMessage);
+                await outputStream.WriteAsync(errorBytes, cancellationToken);
+                break;
+
+            case ErrorHandlingMode.WriteToErrorLog:
+                await WriteToErrorLogAsync(errorChunk, cancellationToken);
+                break;
+
+            case ErrorHandlingMode.ThrowException:
+                throw new CryptographicException(
+                    $"Decryption failed at position {errorChunk.Position}: {errorChunk.ErrorMessage}"
+                );
+            case ErrorHandlingMode.Skip:
+            default:
+                break;
+        }
+    }
+
+    /// <summary>
+    /// Writes an error chunk to the error log file
+    /// </summary>
+    private async Task WriteToErrorLogAsync(
+        DecryptionErrorChunk errorChunk,
+        CancellationToken cancellationToken
+    )
+    {
+        _errorLogWriter ??= await CreateErrorLogWriterAsync(cancellationToken);
+
+        string timestamp = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss.fff");
+        string logEntry =
+            $"[{timestamp}] Decryption error at position {errorChunk.Position}: {errorChunk.ErrorMessage}";
+
+        await _errorLogWriter.WriteLineAsync(logEntry.AsMemory(), cancellationToken);
+        await _errorLogWriter.FlushAsync(cancellationToken);
+    }
+
+    /// <summary>
+    /// Creates a StreamWriter for the error log file
+    /// </summary>
+    private async Task<StreamWriter> CreateErrorLogWriterAsync(CancellationToken cancellationToken)
+    {
+        string errorLogPath = GetErrorLogPath();
+
+        // Ensure the directory exists
+        string? directory = Path.GetDirectoryName(errorLogPath);
+        if (!string.IsNullOrEmpty(directory))
+        {
+            Directory.CreateDirectory(directory);
+        }
+
+        // Create or append to the error log file
+        FileStream fileStream = new(
+            errorLogPath,
+            FileMode.Append,
+            FileAccess.Write,
+            FileShare.Read,
+            bufferSize: 4096,
+            useAsync: true
+        );
+
+        StreamWriter writer = new(fileStream, Encoding.UTF8)
+        {
+            AutoFlush = false, // We'll flush manually for better control
+        };
+
+        // Write header if file is new/empty
+        if (fileStream.Position == 0)
+        {
+            await writer.WriteLineAsync(
+                $"Decryption Error Log - Started at {DateTime.UtcNow:yyyy-MM-dd HH:mm:ss.fff} UTC".AsMemory(),
+                cancellationToken
+            );
+            await writer.WriteLineAsync(new string('-', 80).AsMemory(), cancellationToken);
+            await writer.FlushAsync(cancellationToken);
+        }
+
+        return writer;
+    }
+
+    /// <summary>
+    /// Gets the error log file path, using the configured path or generating a default one
+    /// </summary>
+    private string GetErrorLogPath()
+    {
+        if (!string.IsNullOrWhiteSpace(_options.ErrorLogPath))
+        {
+            return _options.ErrorLogPath;
+        }
+
+        // Generate a default error log path based on timestamp
+        string timestamp = DateTime.UtcNow.ToString("yyyyMMdd_HHmmss");
+        return Path.Combine(
+            Path.GetTempPath(),
+            $"decryption_errors_{timestamp}_{Guid.NewGuid():N}.log"
+        );
     }
 
     // Helper methods
@@ -433,6 +560,7 @@ internal sealed class StreamingEncryptedFileReader : IDisposable, IAsyncDisposab
             return;
 
         _rsa.Dispose();
+        _errorLogWriter?.Dispose();
         _disposed = true;
     }
 
@@ -442,6 +570,11 @@ internal sealed class StreamingEncryptedFileReader : IDisposable, IAsyncDisposab
             return;
 
         _rsa.Dispose();
+
+        if (_errorLogWriter != null)
+        {
+            await _errorLogWriter.DisposeAsync();
+        }
 
         await _inputStream.DisposeAsync();
 

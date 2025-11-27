@@ -3,6 +3,7 @@ global using System.Security.Cryptography;
 global using System.Text;
 global using NSubstitute;
 global using Serilog.Sinks.File.Encrypt.Cli.Commands;
+global using Serilog.Sinks.File.Encrypt.Models;
 global using Shouldly;
 global using Spectre.Console.Cli;
 global using Spectre.Console.Testing;

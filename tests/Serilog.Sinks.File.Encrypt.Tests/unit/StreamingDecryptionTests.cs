@@ -176,7 +176,255 @@ public sealed class StreamingDecryptionTests : IDisposable
         using StreamReader streamReader = new(outputStream);
         string result = await streamReader.ReadToEndAsync(TestContext.Current.CancellationToken);
 
-        Assert.Contains("[Decryption error", result);
+        result.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task DecryptLogFileAsync_WithSkipErrorMode_SilentlySkipsCorruptedData()
+    {
+        // Arrange
+        string[] messages = ["Good message 1", "Good message 2"];
+        string encryptedFile = Path.Join(_testDirectory, "corrupted_skip.log");
+        StreamingOptions skipErrorOptions = new()
+        {
+            ContinueOnError = true,
+            ErrorHandlingMode = ErrorHandlingMode.Skip,
+        };
+
+        WriteEncryptedLogMessages(encryptedFile, messages, _rsaKeyPair.publicKey);
+
+        // Corrupt part of the file
+        byte[] fileBytes = await System.IO.File.ReadAllBytesAsync(
+            encryptedFile,
+            TestContext.Current.CancellationToken
+        );
+        fileBytes[fileBytes.Length / 2] ^= 0xFF; // Flip some bits
+        await System.IO.File.WriteAllBytesAsync(
+            encryptedFile,
+            fileBytes,
+            TestContext.Current.CancellationToken
+        );
+
+        // Act
+        await using FileStream inputStream = System.IO.File.OpenRead(encryptedFile);
+        using MemoryStream outputStream = new();
+
+        await EncryptionUtils.DecryptLogFileAsync(
+            inputStream,
+            outputStream,
+            _rsaKeyPair.privateKey,
+            skipErrorOptions,
+            TestContext.Current.CancellationToken
+        );
+
+        // Assert - should NOT contain error markers, only successfully decrypted content
+        outputStream.Position = 0;
+        using StreamReader streamReader = new(outputStream);
+        string result = await streamReader.ReadToEndAsync(TestContext.Current.CancellationToken);
+
+        Assert.DoesNotContain("[Decryption error", result);
+        Assert.DoesNotContain("error", result, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task DecryptLogFileAsync_WithWriteToErrorLogMode_WritesErrorsToSeparateFile()
+    {
+        // Arrange
+        string[] messages = ["Good message 1", "Good message 2"];
+        string encryptedFile = Path.Join(_testDirectory, "corrupted_errorlog.log");
+        string errorLogFile = Path.Join(_testDirectory, "decryption_errors.log");
+        StreamingOptions errorLogOptions = new()
+        {
+            ContinueOnError = true,
+            ErrorHandlingMode = ErrorHandlingMode.WriteToErrorLog,
+            ErrorLogPath = errorLogFile,
+        };
+
+        WriteEncryptedLogMessages(encryptedFile, messages, _rsaKeyPair.publicKey);
+
+        // Corrupt part of the file
+        byte[] fileBytes = await System.IO.File.ReadAllBytesAsync(
+            encryptedFile,
+            TestContext.Current.CancellationToken
+        );
+        fileBytes[fileBytes.Length / 2] ^= 0xFF; // Flip some bits
+        await System.IO.File.WriteAllBytesAsync(
+            encryptedFile,
+            fileBytes,
+            TestContext.Current.CancellationToken
+        );
+
+        // Act
+        await using FileStream inputStream = System.IO.File.OpenRead(encryptedFile);
+        using MemoryStream outputStream = new();
+
+        await EncryptionUtils.DecryptLogFileAsync(
+            inputStream,
+            outputStream,
+            _rsaKeyPair.privateKey,
+            errorLogOptions,
+            TestContext.Current.CancellationToken
+        );
+
+        // Assert - decrypted output should NOT contain error markers
+        outputStream.Position = 0;
+        using StreamReader streamReader = new(outputStream);
+        string result = await streamReader.ReadToEndAsync(TestContext.Current.CancellationToken);
+
+        Assert.DoesNotContain("[Decryption error", result);
+
+        // Assert - error log file should exist and contain error information
+        Assert.True(System.IO.File.Exists(errorLogFile), "Error log file should be created");
+        string errorLogContent = await System.IO.File.ReadAllTextAsync(
+            errorLogFile,
+            TestContext.Current.CancellationToken
+        );
+        Assert.Contains("Decryption error", errorLogContent);
+        Assert.Contains("position", errorLogContent, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task DecryptLogFileAsync_WithWriteToErrorLogMode_GeneratesDefaultErrorLogPath()
+    {
+        // Arrange
+        string[] messages = ["Good message"];
+        string encryptedFile = Path.Join(_testDirectory, "test.log");
+        StreamingOptions errorLogOptions = new()
+        {
+            ContinueOnError = true,
+            ErrorHandlingMode = ErrorHandlingMode.WriteToErrorLog,
+            ErrorLogPath = null, // Let it generate a default path
+        };
+
+        WriteEncryptedLogMessages(encryptedFile, messages, _rsaKeyPair.publicKey);
+
+        // Corrupt the file
+        byte[] fileBytes = await System.IO.File.ReadAllBytesAsync(
+            encryptedFile,
+            TestContext.Current.CancellationToken
+        );
+        fileBytes[fileBytes.Length / 2] ^= 0xFF;
+        await System.IO.File.WriteAllBytesAsync(
+            encryptedFile,
+            fileBytes,
+            TestContext.Current.CancellationToken
+        );
+
+        // Act
+        await using FileStream inputStream = System.IO.File.OpenRead(encryptedFile);
+        using MemoryStream outputStream = new();
+
+        await EncryptionUtils.DecryptLogFileAsync(
+            inputStream,
+            outputStream,
+            _rsaKeyPair.privateKey,
+            errorLogOptions,
+            TestContext.Current.CancellationToken
+        );
+
+        // Assert - decrypted output should NOT contain error markers
+        outputStream.Position = 0;
+        using StreamReader streamReader = new(outputStream);
+        string result = await streamReader.ReadToEndAsync(TestContext.Current.CancellationToken);
+
+        Assert.DoesNotContain("[Decryption error", result);
+
+        // Assert - an error log file should be created in the temp directory
+        string tempPath = Path.GetTempPath();
+        string[] errorLogFiles = Directory.GetFiles(tempPath, "decryption_errors_*.log");
+        Assert.NotEmpty(errorLogFiles);
+
+        // Clean up the generated error log file
+        foreach (string errorLogFile in errorLogFiles)
+        {
+            try
+            {
+                System.IO.File.Delete(errorLogFile);
+            }
+            catch
+            {
+                // Ignore cleanup errors
+            }
+        }
+    }
+
+    [Fact]
+    public async Task DecryptLogFileAsync_WithThrowExceptionMode_ThrowsOnFirstError()
+    {
+        // Arrange
+        string[] messages = ["Good message 1", "Good message 2"];
+        string encryptedFile = Path.Join(_testDirectory, "corrupted_throw.log");
+        StreamingOptions throwExceptionOptions = new()
+        {
+            ContinueOnError = false,
+            ErrorHandlingMode = ErrorHandlingMode.ThrowException,
+        };
+
+        WriteEncryptedLogMessages(encryptedFile, messages, _rsaKeyPair.publicKey);
+
+        // Corrupt part of the file
+        byte[] fileBytes = await System.IO.File.ReadAllBytesAsync(
+            encryptedFile,
+            TestContext.Current.CancellationToken
+        );
+        fileBytes[fileBytes.Length / 2] ^= 0xFF; // Flip some bits
+        await System.IO.File.WriteAllBytesAsync(
+            encryptedFile,
+            fileBytes,
+            TestContext.Current.CancellationToken
+        );
+
+        // Act & Assert
+        await using FileStream inputStream = System.IO.File.OpenRead(encryptedFile);
+        using MemoryStream outputStream = new();
+
+        CryptographicException exception = await Assert.ThrowsAsync<CryptographicException>(
+            async () =>
+                await EncryptionUtils.DecryptLogFileAsync(
+                    inputStream,
+                    outputStream,
+                    _rsaKeyPair.privateKey,
+                    throwExceptionOptions,
+                    TestContext.Current.CancellationToken
+                )
+        );
+
+        Assert.Contains("Decryption failed", exception.Message);
+    }
+
+    [Fact]
+    public async Task DecryptLogFileAsync_WithThrowExceptionModeAndNoErrors_SucceedsNormally()
+    {
+        // Arrange
+        string[] messages = ["Good message 1", "Good message 2"];
+        string encryptedFile = Path.Join(_testDirectory, "valid_throw.log");
+        StreamingOptions throwExceptionOptions = new()
+        {
+            ContinueOnError = false,
+            ErrorHandlingMode = ErrorHandlingMode.ThrowException,
+        };
+
+        WriteEncryptedLogMessages(encryptedFile, messages, _rsaKeyPair.publicKey);
+
+        // Act - should succeed without throwing
+        await using FileStream inputStream = System.IO.File.OpenRead(encryptedFile);
+        using MemoryStream outputStream = new();
+
+        await EncryptionUtils.DecryptLogFileAsync(
+            inputStream,
+            outputStream,
+            _rsaKeyPair.privateKey,
+            throwExceptionOptions,
+            TestContext.Current.CancellationToken
+        );
+
+        // Assert
+        outputStream.Position = 0;
+        using StreamReader streamReader = new(outputStream);
+        string result = await streamReader.ReadToEndAsync(TestContext.Current.CancellationToken);
+
+        string expected = string.Join("", messages);
+        Assert.Equal(expected, result);
     }
 
     private static void WriteEncryptedLogMessage(string filePath, string message, string publicKey)
