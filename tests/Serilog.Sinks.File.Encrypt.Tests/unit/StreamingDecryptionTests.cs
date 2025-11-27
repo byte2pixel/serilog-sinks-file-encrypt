@@ -289,11 +289,12 @@ public sealed class StreamingDecryptionTests : IDisposable
         // Arrange
         string[] messages = ["Good message"];
         string encryptedFile = Path.Join(_testDirectory, "test.log");
+        string errorLogPath = Path.Join(_testDirectory, "generated_errors.log");
         StreamingOptions errorLogOptions = new()
         {
             ContinueOnError = true,
             ErrorHandlingMode = ErrorHandlingMode.WriteToErrorLog,
-            ErrorLogPath = null, // Let it generate a default path
+            ErrorLogPath = errorLogPath, // Use test directory so Dispose handles cleanup
         };
 
         WriteEncryptedLogMessages(encryptedFile, messages, _rsaKeyPair.publicKey);
@@ -329,23 +330,14 @@ public sealed class StreamingDecryptionTests : IDisposable
 
         Assert.DoesNotContain("[Decryption error", result);
 
-        // Assert - an error log file should be created in the temp directory
-        string tempPath = Path.GetTempPath();
-        string[] errorLogFiles = Directory.GetFiles(tempPath, "decryption_errors_*.log");
-        Assert.NotEmpty(errorLogFiles);
-
-        // Clean up the generated error log file
-        foreach (string errorLogFile in errorLogFiles)
-        {
-            try
-            {
-                System.IO.File.Delete(errorLogFile);
-            }
-            catch
-            {
-                // Ignore cleanup errors
-            }
-        }
+        // Assert - error log file should be created
+        Assert.True(System.IO.File.Exists(errorLogPath), "Error log file should be created");
+        string errorLogContent = await System.IO.File.ReadAllTextAsync(
+            errorLogPath,
+            TestContext.Current.CancellationToken
+        );
+        Assert.Contains("Decryption error", errorLogContent);
+        Assert.Contains("position", errorLogContent, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]

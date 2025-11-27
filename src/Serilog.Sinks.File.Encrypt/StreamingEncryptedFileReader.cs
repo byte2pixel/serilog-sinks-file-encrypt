@@ -429,7 +429,7 @@ internal sealed class StreamingEncryptedFileReader : IDisposable, IAsyncDisposab
 
         // Generate a default error log path based on timestamp
         string timestamp = DateTime.UtcNow.ToString("yyyyMMdd_HHmmss");
-        return Path.Combine(
+        return Path.Join(
             Path.GetTempPath(),
             $"decryption_errors_{timestamp}_{Guid.NewGuid():N}.log"
         );
