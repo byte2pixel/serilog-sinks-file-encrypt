@@ -9,7 +9,7 @@
 
 A Serilog sink that encrypts log files using RSA and AES encryption. This package provides secure logging by encrypting log data before writing to disk, ensuring sensitive information remains protected.
 
-> **⚠️ Pre-release Software**: This library is currently in pre-release (0.x.x versions). APIs may change before the 1.0 release. See [SECURITY.md](SECURITY.md) for security considerations and best practices.
+> **⚠️ Pre-release Software**: This library is currently in pre-release. APIs may change before the 1.0 release. See [SECURITY.md](SECURITY.md) for security considerations and best practices.
 
 ## 📦 Packages
 
@@ -117,8 +117,3 @@ This project is licensed under the MIT License - see the [LICENSE.md](LICENSE.md
 ## 🔒 Security
 
 For security concerns and vulnerability reporting, please see our [Security Policy](SECURITY.md).
-
-## 📋 Changelog
-
-See [CHANGELOG.md](CHANGELOG.md) for a list of changes in each release.
-
