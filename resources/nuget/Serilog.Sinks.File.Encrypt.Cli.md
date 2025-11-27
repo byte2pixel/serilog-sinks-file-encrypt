@@ -44,11 +44,19 @@ serilog-encrypt decrypt --key private_key.xml --file log.encrypted.txt --output 
 - `-k|--key <KEY>`: Path to the RSA private key file (default: `privateKey.xml`)
 - `-f|--file <FILE>`: Path to the encrypted log file (default: `log.encrypted.txt`)
 - `-o|--output <OUTPUT>`: Path for the decrypted output file (default: `log.decrypted.txt`)
+- `-e|--error-mode <MODE>`: Error handling mode (default: `WriteInline`)
+  - `Skip`: Silently skip corrupted sections
+  - `WriteInline`: Write error messages inline (default)
+  - `WriteToErrorLog`: Write errors to a separate log file
+  - `ThrowException`: Stop immediately on first error
+- `--error-log <PATH>`: Path for error log file (only used with `WriteToErrorLog` mode)
+- `--continue-on-error`: Continue decryption even when errors are encountered (default: `true`)
 
 **Features:**
 - Memory-optimized for large log files
-- Continues processing through file corruption
+- Flexible error handling for corrupted data
 - Fixed memory usage regardless of log file size
+- Support for structured logging formats (JSON, etc.)
 
 ## Examples
 
@@ -63,8 +71,37 @@ serilog-encrypt generate --output ./keys
 
 ### Basic Log Decryption
 ```bash
-# Decrypt
+# Decrypt with default settings (errors skipped silently)
 serilog-encrypt decrypt --key ./keys/private_key.xml --file ./logs/app.log --output ./logs/app-decrypted.log
+
+# Write errors inline (for human-readable logs only)
+serilog-encrypt decrypt --key ./keys/private_key.xml --file ./logs/app.log --output ./logs/app-decrypted.log --error-mode WriteInline
+
+# Write errors to a separate log file
+serilog-encrypt decrypt --key ./keys/private_key.xml --file ./logs/app.log --output ./logs/app-decrypted.log --error-mode WriteToErrorLog --error-log ./logs/errors.log
+
+# Stop on first error (strict validation)
+serilog-encrypt decrypt --key ./keys/private_key.xml --file ./logs/app.log --output ./logs/app-decrypted.log --error-mode ThrowException --continue-on-error false
+```
+
+### Error Handling Scenarios
+
+**For Structured Logging (JSON, Compact JSON):**
+Use `Skip` mode to avoid corrupting the log format:
+```bash
+serilog-encrypt decrypt -k key.xml -f app.json.log -o decrypted.json.log -e Skip
+```
+
+**For Troubleshooting:**
+Use `WriteToErrorLog` mode to track decryption issues:
+```bash
+serilog-encrypt decrypt -k key.xml -f app.log -o decrypted.log -e WriteToErrorLog --error-log issues.log
+```
+
+**For Data Integrity Validation:**
+Use `ThrowException` mode to ensure no data loss:
+```bash
+serilog-encrypt decrypt -k key.xml -f app.log -o decrypted.log -e ThrowException --continue-on-error false
 ```
 
 ## Security Notes

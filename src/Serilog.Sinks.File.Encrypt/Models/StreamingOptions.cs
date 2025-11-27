@@ -31,6 +31,17 @@ public sealed class StreamingOptions
     public bool ContinueOnError { get; init; } = true;
 
     /// <summary>
+    /// Defines how decryption errors should be handled
+    /// </summary>
+    public ErrorHandlingMode ErrorHandlingMode { get; init; } = ErrorHandlingMode.Skip;
+
+    /// <summary>
+    /// Path to write error log file when ErrorHandlingMode is WriteToErrorLog.
+    /// If null, a default path will be generated based on the input file name.
+    /// </summary>
+    public string? ErrorLogPath { get; init; }
+
+    /// <summary>
     /// Creates default streaming options
     /// </summary>
     public static StreamingOptions Default => new();
