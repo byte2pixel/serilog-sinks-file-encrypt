@@ -174,5 +174,10 @@ public sealed class DecryptCommand(IAnsiConsole console, IFileSystem fileSystem)
             console.MarkupLineInterpolated($"[red]✗ Invalid key or file format: {ex.Message}[/]");
             return 1;
         }
+        catch (InvalidOperationException ex)
+        {
+            console.MarkupLineInterpolated($"[red]✗ Invalid file: {ex.Message}[/]");
+            return 1;
+        }
     }
 }

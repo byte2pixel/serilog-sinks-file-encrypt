@@ -1,3 +1,4 @@
+global using System.IO.Abstractions;
 global using System.IO.Abstractions.TestingHelpers;
 global using System.Security.Cryptography;
 global using System.Text;

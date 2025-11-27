@@ -22,6 +22,7 @@ internal sealed class StreamingEncryptedFileReader : IDisposable, IAsyncDisposab
     private DecryptionContext _context;
     private StreamWriter? _errorLogWriter;
     private bool _disposed;
+    private bool _hasFoundValidHeader;
 
     public StreamingEncryptedFileReader(
         Stream inputStream,
@@ -34,6 +35,7 @@ internal sealed class StreamingEncryptedFileReader : IDisposable, IAsyncDisposab
         _rsa.FromXmlString(rsaPrivateKey);
         _options = options;
         _context = DecryptionContext.Empty;
+        _hasFoundValidHeader = false;
     }
 
     /// <summary>
@@ -107,6 +109,15 @@ internal sealed class StreamingEncryptedFileReader : IDisposable, IAsyncDisposab
                     writer.Complete();
                     throw;
                 }
+            }
+
+            // Validate that we found at least one valid encryption header
+            if (!_hasFoundValidHeader)
+            {
+                throw new InvalidOperationException(
+                    "The file does not contain valid encryption markers. "
+                        + "This may not be an encrypted log file or the file is corrupted."
+                );
             }
 
             completedSuccessfully = true;
@@ -194,6 +205,12 @@ internal sealed class StreamingEncryptedFileReader : IDisposable, IAsyncDisposab
         }
 
         HeaderSection header = await ReadHeaderSectionAsync(markerPosition, cancellationToken);
+
+        // Mark that we found a valid header marker (before attempting decryption)
+        // This way, if decryption fails with wrong key, we get a proper crypto error
+        // rather than "no valid markers" error
+        _hasFoundValidHeader = true;
+
         _context = DecryptKeys(header);
     }
 
