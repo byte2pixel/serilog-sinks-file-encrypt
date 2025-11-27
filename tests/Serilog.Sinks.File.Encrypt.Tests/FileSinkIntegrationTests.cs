@@ -1,3 +1,5 @@
+using Serilog.Sinks.File.Encrypt.Models;
+
 namespace Serilog.Sinks.File.Encrypt.Tests;
 
 public sealed class FileSinkIntegrationTests : IDisposable
@@ -448,7 +450,7 @@ public sealed class FileSinkIntegrationTests : IDisposable
         using StreamReader crossReader2 = new(crossOutputStream2);
         string result2 = await crossReader2.ReadToEndAsync(TestContext.Current.CancellationToken);
 
-        result1.ShouldContain("[Decryption error at position");
-        result2.ShouldContain("[Decryption error at position");
+        result1.ShouldBeEmpty();
+        result2.ShouldBeEmpty();
     }
 }

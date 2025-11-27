@@ -1,6 +1,7 @@
 using System.ComponentModel;
 using System.Diagnostics.CodeAnalysis;
 using System.IO.Abstractions;
+using Serilog.Sinks.File.Encrypt.Models;
 using Spectre.Console;
 using Spectre.Console.Cli;
 
@@ -40,6 +41,30 @@ public sealed class DecryptCommand(IAnsiConsole console, IFileSystem fileSystem)
         [CommandOption("-o|--output <OUTPUT>")]
         [Description("The output file for the decrypted log content")]
         public string OutputFile { get; set; } = "log.decrypted.txt";
+
+        /// <summary>
+        /// How to handle decryption errors (Skip, WriteInline, WriteToErrorLog, ThrowException).
+        /// </summary>
+        [CommandOption("-e|--error-mode <MODE>")]
+        [Description(
+            "Error handling mode: Skip (default, clean output), WriteInline (errors inline), WriteToErrorLog (separate file), ThrowException (fail fast)"
+        )]
+        public ErrorHandlingMode ErrorMode { get; set; } = ErrorHandlingMode.Skip;
+
+        /// <summary>
+        /// Path to write error log when using WriteToErrorLog mode. Auto-generated if not specified.
+        /// </summary>
+        [CommandOption("--error-log <PATH>")]
+        [Description("Path for error log file (only used with WriteToErrorLog mode)")]
+        public string? ErrorLogPath { get; set; }
+
+        /// <summary>
+        /// Whether to continue processing after encountering errors (only applies when not using ThrowException mode).
+        /// </summary>
+        [CommandOption("--continue-on-error")]
+        [Description("Continue decryption even when errors are encountered (default: true)")]
+        [DefaultValue(true)]
+        public bool ContinueOnError { get; set; } = true;
     }
 
     /// <summary>
@@ -86,16 +111,38 @@ public sealed class DecryptCommand(IAnsiConsole console, IFileSystem fileSystem)
                 $"[blue]Decrypting log file:[/] {settings.EncryptedFile}"
             );
 
+            // Configure streaming options based on user settings
+            StreamingOptions streamingOptions = new()
+            {
+                ErrorHandlingMode = settings.ErrorMode,
+                ErrorLogPath = settings.ErrorLogPath,
+                ContinueOnError = settings.ContinueOnError,
+            };
+
+            // Display error handling configuration
+            console.MarkupLineInterpolated($"[dim]Error handling mode:[/] {settings.ErrorMode}");
+
+            if (
+                settings.ErrorMode == ErrorHandlingMode.WriteToErrorLog
+                && !string.IsNullOrWhiteSpace(settings.ErrorLogPath)
+            )
+            {
+                console.MarkupLineInterpolated($"[dim]Error log path:[/] {settings.ErrorLogPath}");
+            }
+
             // Perform the decryption using streaming API for better memory efficiency
             // Use IFileSystem to open streams so we can mock them in tests
-            await using var inputStream = fileSystem.File.OpenRead(settings.EncryptedFile);
-            await using var outputStream = fileSystem.File.Create(settings.OutputFile);
+            await using FileSystemStream inputStream = fileSystem.File.OpenRead(
+                settings.EncryptedFile
+            );
+            await using FileSystemStream outputStream = fileSystem.File.Create(settings.OutputFile);
 
             await EncryptionUtils.DecryptLogFileAsync(
                 inputStream,
                 outputStream,
                 rsaPrivateKey,
-                cancellationToken: cancellationToken
+                streamingOptions,
+                cancellationToken
             );
 
             console.MarkupLine("[green]✓ Successfully decrypted log file![/]");
@@ -125,6 +172,11 @@ public sealed class DecryptCommand(IAnsiConsole console, IFileSystem fileSystem)
         catch (FormatException ex)
         {
             console.MarkupLineInterpolated($"[red]✗ Invalid key or file format: {ex.Message}[/]");
+            return 1;
+        }
+        catch (InvalidOperationException ex)
+        {
+            console.MarkupLineInterpolated($"[red]✗ Invalid file: {ex.Message}[/]");
             return 1;
         }
     }

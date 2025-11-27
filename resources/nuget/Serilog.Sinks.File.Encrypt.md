@@ -119,7 +119,82 @@ var options = new StreamingOptions
 
 using var input = File.OpenRead("large-log.encrypted");
 using var output = File.Create("large-log.decrypted");
-await EncryptionUtils.DecryptLogFileAsync(input, output, privateKeyXml, options);
+await EncryptionUtils.DecryptLogFileAsync(input, output, privateKey, options);
+```
+
+### Error Handling Modes
+
+Choose how to handle decryption errors:
+
+```csharp
+using Serilog.Sinks.File.Encrypt.Models;
+
+// Skip corrupted sections silently (DEFAULT - ideal for JSON/structured logs)
+var skipOptions = new StreamingOptions 
+{
+    ErrorHandlingMode = ErrorHandlingMode.Skip  // This is the default
+};
+
+// Write error messages inline to output (use only for human-readable logs)
+var inlineOptions = new StreamingOptions 
+{
+    ErrorHandlingMode = ErrorHandlingMode.WriteInline
+};
+
+// Write errors to separate log file (for troubleshooting)
+var errorLogOptions = new StreamingOptions 
+{
+    ErrorHandlingMode = ErrorHandlingMode.WriteToErrorLog,
+    ErrorLogPath = "decryption-errors.log"
+};
+
+// Throw exception on first error (strict validation)
+var strictOptions = new StreamingOptions 
+{
+    ErrorHandlingMode = ErrorHandlingMode.ThrowException,
+    ContinueOnError = false
+};
+
+await EncryptionUtils.DecryptLogFileAsync(input, output, privateKey, skipOptions);
+```
+
+### Error Handling Use Cases
+
+**Skip Mode** - For Structured Logging (JSON, Compact JSON):
+```csharp
+// Prevents corrupted error messages from breaking JSON parsing
+var options = new StreamingOptions { ErrorHandlingMode = ErrorHandlingMode.Skip };
+await EncryptionUtils.DecryptLogFileAsync(input, output, privateKey, options);
+```
+
+**WriteToErrorLog Mode** - For Production Troubleshooting:
+```csharp
+// Clean output + separate error tracking
+var options = new StreamingOptions 
+{ 
+    ErrorHandlingMode = ErrorHandlingMode.WriteToErrorLog,
+    ErrorLogPath = "errors.log"  // Optional, auto-generated if omitted
+};
+await EncryptionUtils.DecryptLogFileAsync(input, output, privateKey, options);
+```
+
+**ThrowException Mode** - For Data Integrity Validation:
+```csharp
+// Fail fast on any corruption
+var options = new StreamingOptions 
+{ 
+    ErrorHandlingMode = ErrorHandlingMode.ThrowException,
+    ContinueOnError = false
+};
+
+try 
+{
+    await EncryptionUtils.DecryptLogFileAsync(input, output, privateKey, options);
+}
+catch (CryptographicException ex)
+{
+    Console.WriteLine($"Decryption failed: {ex.Message}");
+}
 ```
 
 ### Web Application Example
@@ -162,9 +237,22 @@ Task EncryptionUtils.DecryptLogFileAsync(Stream inputStream, Stream outputStream
 ```csharp
 public class StreamingOptions
 {
-    public int BufferSize { get; init; } = 16 * 1024;     // 16KB default
-    public int QueueDepth { get; init; } = 10;            // Queue depth
-    public bool ContinueOnError { get; init; } = true;    // Error handling
+    public int BufferSize { get; init; } = 16 * 1024;                   // 16KB default
+    public int QueueDepth { get; init; } = 10;                          // Queue depth
+    public bool ContinueOnError { get; init; } = true;                  // Error handling
+    public ErrorHandlingMode ErrorHandlingMode { get; init; } = Skip;   // Error mode (default: Skip)
+    public string? ErrorLogPath { get; init; }                          // Error log file path
+}
+```
+
+### ErrorHandlingMode
+```csharp
+public enum ErrorHandlingMode
+{
+    Skip = 0,              // Skip errors silently (DEFAULT - safe for all log formats)
+    WriteInline = 1,       // Write error messages inline (use only for human-readable logs)
+    WriteToErrorLog = 2,   // Write errors to separate log file
+    ThrowException = 3     // Throw exception on first error
 }
 ```
 
@@ -177,14 +265,19 @@ public class StreamingOptions
 
 ## CLI Tool
 
-The companion CLI tool provides key management and decryption:
+The companion CLI tool provides key management and decryption with full error handling control:
 
 ```bash
 # Generate keys
 serilog-encrypt generate --output /path/to/keys
 
-# Decrypt logs
+# Decrypt with default settings
 serilog-encrypt decrypt --key private_key.xml --file log.txt --output decrypted.txt
+
+# Decrypt with error handling options
+serilog-encrypt decrypt -k key.xml -f log.txt -o out.txt -e Skip                    # Skip errors
+serilog-encrypt decrypt -k key.xml -f log.txt -o out.txt -e WriteToErrorLog --error-log errors.log  # Log errors
+serilog-encrypt decrypt -k key.xml -f log.txt -o out.txt -e ThrowException          # Fail on errors
 ```
 
 For detailed CLI documentation, see the [CLI tool documentation](https://www.nuget.org/packages/Serilog.Sinks.File.Encrypt.Cli).
