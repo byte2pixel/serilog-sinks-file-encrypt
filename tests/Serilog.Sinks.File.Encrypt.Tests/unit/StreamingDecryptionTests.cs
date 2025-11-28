@@ -51,7 +51,11 @@ public sealed class StreamingDecryptionTests : EncryptionTestBase
             ContinueOnError = false,
         };
 
-        MemoryStream encryptedStream = CreateEncryptedStream(testMessage, RsaKeyPair.publicKey);
+        MemoryStream encryptedStream = await CreateEncryptedStreamAsync(
+            testMessage,
+            RsaKeyPair.publicKey,
+            TestContext.Current.CancellationToken
+        );
 
         // Act
         string result = await DecryptStreamToStringAsync(
@@ -70,7 +74,11 @@ public sealed class StreamingDecryptionTests : EncryptionTestBase
     {
         // Arrange
         string[] messages = ["Good message 1", "Good message 2"];
-        MemoryStream encryptedStream = CreateEncryptedStream(messages, RsaKeyPair.publicKey);
+        MemoryStream encryptedStream = await CreateEncryptedStreamAsync(
+            messages,
+            RsaKeyPair.publicKey,
+            TestContext.Current.CancellationToken
+        );
 
         // Corrupt part of the stream
         byte[] fileBytes = encryptedStream.ToArray();
@@ -99,7 +107,11 @@ public sealed class StreamingDecryptionTests : EncryptionTestBase
             ErrorHandlingMode = ErrorHandlingMode.Skip,
         };
 
-        MemoryStream encryptedStream = CreateEncryptedStream(messages, RsaKeyPair.publicKey);
+        MemoryStream encryptedStream = await CreateEncryptedStreamAsync(
+            messages,
+            RsaKeyPair.publicKey,
+            TestContext.Current.CancellationToken
+        );
 
         // Corrupt part of the stream
         byte[] fileBytes = encryptedStream.ToArray();
@@ -129,7 +141,11 @@ public sealed class StreamingDecryptionTests : EncryptionTestBase
             ErrorHandlingMode = ErrorHandlingMode.WriteInline,
         };
 
-        MemoryStream encryptedStream = CreateEncryptedStream(messages, RsaKeyPair.publicKey);
+        MemoryStream encryptedStream = await CreateEncryptedStreamAsync(
+            messages,
+            RsaKeyPair.publicKey,
+            TestContext.Current.CancellationToken
+        );
 
         // Corrupt part of the stream
         byte[] fileBytes = encryptedStream.ToArray();
@@ -161,7 +177,11 @@ public sealed class StreamingDecryptionTests : EncryptionTestBase
             ErrorLogPath = errorLogPath,
         };
 
-        MemoryStream encryptedStream = CreateEncryptedStream(messages, RsaKeyPair.publicKey);
+        MemoryStream encryptedStream = await CreateEncryptedStreamAsync(
+            messages,
+            RsaKeyPair.publicKey,
+            TestContext.Current.CancellationToken
+        );
 
         // Corrupt part of the stream
         byte[] fileBytes = encryptedStream.ToArray();
@@ -206,7 +226,11 @@ public sealed class StreamingDecryptionTests : EncryptionTestBase
             ErrorHandlingMode = ErrorHandlingMode.ThrowException,
         };
 
-        MemoryStream encryptedStream = CreateEncryptedStream(messages, RsaKeyPair.publicKey);
+        MemoryStream encryptedStream = await CreateEncryptedStreamAsync(
+            messages,
+            RsaKeyPair.publicKey,
+            TestContext.Current.CancellationToken
+        );
 
         // Corrupt part of the stream
         byte[] fileBytes = encryptedStream.ToArray();
@@ -235,7 +259,11 @@ public sealed class StreamingDecryptionTests : EncryptionTestBase
             ErrorHandlingMode = ErrorHandlingMode.ThrowException,
         };
 
-        MemoryStream encryptedStream = CreateEncryptedStream(messages, RsaKeyPair.publicKey);
+        MemoryStream encryptedStream = await CreateEncryptedStreamAsync(
+            messages,
+            RsaKeyPair.publicKey,
+            TestContext.Current.CancellationToken
+        );
 
         // Act - should succeed without throwing
         string result = await DecryptStreamToStringAsync(
