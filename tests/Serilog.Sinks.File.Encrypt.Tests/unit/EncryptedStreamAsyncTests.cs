@@ -11,11 +11,11 @@ public sealed class EncryptedStreamAsyncTests : EncryptionTestBase
     public async Task FlushAsync_WithSingleMessage_EncryptsAndDecryptsCorrectly()
     {
         // Arrange
-        const string testMessage = "Test message with async flush";
+        const string TestMessage = "Test message with async flush";
 
         // Act - Use async stream creation which calls FlushAsync
         MemoryStream encryptedStream = await CreateEncryptedStreamAsync(
-            testMessage,
+            TestMessage,
             RsaKeyPair.publicKey,
             TestContext.Current.CancellationToken
         );
@@ -27,7 +27,7 @@ public sealed class EncryptedStreamAsyncTests : EncryptionTestBase
         );
 
         // Assert
-        decrypted.ShouldBe(testMessage);
+        decrypted.ShouldBe(TestMessage);
     }
 
     [Fact]
@@ -59,7 +59,7 @@ public sealed class EncryptedStreamAsyncTests : EncryptionTestBase
     {
         // Arrange
         (string publicKey, string privateKey) = EncryptionUtils.GenerateRsaKeyPair(keySize: 4096);
-        const string testMessage = "Testing FlushAsync with 4096-bit RSA key!";
+        const string TestMessage = "Testing FlushAsync with 4096-bit RSA key!";
 
         using RSA rsa = RSA.Create();
         rsa.FromXmlString(publicKey);
@@ -67,7 +67,7 @@ public sealed class EncryptedStreamAsyncTests : EncryptionTestBase
 
         // Act - Use async stream creation which calls FlushAsync
         MemoryStream encryptedStream = await CreateEncryptedStreamAsync(
-            testMessage,
+            TestMessage,
             publicKey,
             TestContext.Current.CancellationToken
         );
@@ -79,7 +79,7 @@ public sealed class EncryptedStreamAsyncTests : EncryptionTestBase
         );
 
         // Assert
-        decrypted.ShouldBe(testMessage);
+        decrypted.ShouldBe(TestMessage);
     }
 
     [Fact]
@@ -134,11 +134,11 @@ public sealed class EncryptedStreamAsyncTests : EncryptionTestBase
     {
         // Arrange
         using CancellationTokenSource cts = new();
-        const string testMessage = "Test message";
+        const string TestMessage = "Test message";
 
         // Act - Create stream with a valid token
         MemoryStream encryptedStream = await CreateEncryptedStreamAsync(
-            testMessage,
+            TestMessage,
             RsaKeyPair.publicKey,
             cts.Token
         );
@@ -153,11 +153,11 @@ public sealed class EncryptedStreamAsyncTests : EncryptionTestBase
     public async Task FlushAsync_ComparedToFlush_ProducesSameDecryptedOutput()
     {
         // Arrange
-        const string testMessage = "Same message for both methods";
+        const string TestMessage = "Same message for both methods";
 
         // Act - Create one with sync Flush
 # pragma warning disable S6966 // Suppress "Async method name should end with 'Async'" for test purpose
-        MemoryStream syncStream = CreateEncryptedStream(testMessage, RsaKeyPair.publicKey);
+        MemoryStream syncStream = CreateEncryptedStream(TestMessage, RsaKeyPair.publicKey);
 # pragma warning restore S6966
         string syncDecrypted = await DecryptStreamToStringAsync(
             syncStream,
@@ -167,7 +167,7 @@ public sealed class EncryptedStreamAsyncTests : EncryptionTestBase
 
         // Create one with async FlushAsync
         MemoryStream asyncStream = await CreateEncryptedStreamAsync(
-            testMessage,
+            TestMessage,
             RsaKeyPair.publicKey,
             TestContext.Current.CancellationToken
         );
@@ -179,7 +179,7 @@ public sealed class EncryptedStreamAsyncTests : EncryptionTestBase
 
         // Assert - Both should decrypt to the same original message
         asyncDecrypted.ShouldBe(syncDecrypted);
-        asyncDecrypted.ShouldBe(testMessage);
-        syncDecrypted.ShouldBe(testMessage);
+        asyncDecrypted.ShouldBe(TestMessage);
+        syncDecrypted.ShouldBe(TestMessage);
     }
 }

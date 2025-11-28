@@ -1,5 +1,3 @@
-using Serilog.Sinks.File.Encrypt.Models;
-
 namespace Serilog.Sinks.File.Encrypt.Tests;
 
 public sealed class FileSinkIntegrationTests : IDisposable
@@ -27,7 +25,9 @@ public sealed class FileSinkIntegrationTests : IDisposable
     private void Dispose(bool disposing)
     {
         if (_disposed)
+        {
             return;
+        }
 
         if (disposing)
         {
@@ -63,7 +63,7 @@ public sealed class FileSinkIntegrationTests : IDisposable
     public void CanWriteEncryptedLogFile()
     {
         // Arrange
-        const string logMessage = "This is a test log message";
+        const string LogMessage = "This is a test log message";
 
         // Act - Configure and create a logger that writes encrypted logs
         Logger logger = new LoggerConfiguration()
@@ -73,7 +73,7 @@ public sealed class FileSinkIntegrationTests : IDisposable
         try
         {
             // Write a test message
-            logger.Information(logMessage);
+            logger.Information(LogMessage);
         }
         finally
         {
@@ -86,14 +86,14 @@ public sealed class FileSinkIntegrationTests : IDisposable
 
         // The file should contain encrypted content (not plaintext)
         string fileContent = System.IO.File.ReadAllText(_logFilePath);
-        fileContent.ShouldNotContain(logMessage);
+        fileContent.ShouldNotContain(LogMessage);
     }
 
     [Fact]
     public async Task CanDecryptLogFileWithPrivateKey()
     {
         // Arrange
-        const string logMessage = "This is a secret log message";
+        const string LogMessage = "This is a secret log message";
 
         // Create a logger that writes encrypted logs
         Logger logger = new LoggerConfiguration()
@@ -101,7 +101,7 @@ public sealed class FileSinkIntegrationTests : IDisposable
             .CreateLogger();
 
         // Write a test message
-        logger.Information(logMessage);
+        logger.Information(LogMessage);
 
         // Dispose to ensure the log is written and file handle is released
         await logger.DisposeAsync();
@@ -128,21 +128,21 @@ public sealed class FileSinkIntegrationTests : IDisposable
         string decryptedContent = await reader.ReadToEndAsync(
             TestContext.Current.CancellationToken
         );
-        decryptedContent.ShouldContain(logMessage);
+        decryptedContent.ShouldContain(LogMessage);
     }
 
     [Fact]
     public async Task CanDecryptLogFileToFile_WithPrivateKey()
     {
         // Arrange
-        const string logMessage = "This is a secret log message";
+        const string LogMessage = "This is a secret log message";
         string decryptedFilePath = Path.Join(_testDirectory, "decrypted.log");
         // Create a logger that writes encrypted logs
         Logger logger = new LoggerConfiguration()
             .WriteTo.File(path: _logFilePath, hooks: new EncryptHooks(_rsaKeyPair.publicKey))
             .CreateLogger();
         // Write a test message
-        logger.Information(logMessage);
+        logger.Information(LogMessage);
         // Dispose to ensure the log is written and file handle is released
         await logger.DisposeAsync();
 
@@ -164,7 +164,7 @@ public sealed class FileSinkIntegrationTests : IDisposable
             decryptedFilePath,
             TestContext.Current.CancellationToken
         );
-        decryptedContent.ShouldContain(logMessage);
+        decryptedContent.ShouldContain(LogMessage);
     }
 
     [Fact]
@@ -242,8 +242,8 @@ public sealed class FileSinkIntegrationTests : IDisposable
     public async Task CanAppendToEncryptedLogFile()
     {
         // Arrange
-        const string firstMessage = "First log entry";
-        const string secondMessage = "Second log entry";
+        const string FirstMessage = "First log entry";
+        const string SecondMessage = "Second log entry";
 
         // Create logger and write first message
         Logger logger = new LoggerConfiguration()
@@ -253,7 +253,7 @@ public sealed class FileSinkIntegrationTests : IDisposable
                 rollingInterval: RollingInterval.Infinite
             )
             .CreateLogger();
-        logger.Information(firstMessage);
+        logger.Information(FirstMessage);
         await logger.DisposeAsync();
         // Recreate logger to append second message
         logger = new LoggerConfiguration()
@@ -263,7 +263,7 @@ public sealed class FileSinkIntegrationTests : IDisposable
                 rollingInterval: RollingInterval.Infinite
             )
             .CreateLogger();
-        logger.Information(secondMessage);
+        logger.Information(SecondMessage);
         await logger.DisposeAsync();
         // Act - Decrypt the log file
         await using FileStream inputStream = System.IO.File.OpenRead(_logFilePath);
@@ -281,8 +281,8 @@ public sealed class FileSinkIntegrationTests : IDisposable
         string decryptedContent = await reader.ReadToEndAsync(
             TestContext.Current.CancellationToken
         );
-        decryptedContent.ShouldContain(firstMessage);
-        decryptedContent.ShouldContain(secondMessage);
+        decryptedContent.ShouldContain(FirstMessage);
+        decryptedContent.ShouldContain(SecondMessage);
     }
 
     [Fact]
@@ -290,7 +290,7 @@ public sealed class FileSinkIntegrationTests : IDisposable
     {
         // Arrange
         string logFilePath = Path.Join(_testDirectory, "json.log");
-        const string testValue = "test-value";
+        const string TestValue = "test-value";
 
         // Act - Configure logger with JSON formatter
         Logger logger = new LoggerConfiguration()
@@ -302,7 +302,7 @@ public sealed class FileSinkIntegrationTests : IDisposable
             .CreateLogger();
 
         // Log message with properties
-        logger.Information("Message with {Property}", testValue);
+        logger.Information("Message with {Property}", TestValue);
         await logger.DisposeAsync();
 
         // Assert
@@ -320,7 +320,7 @@ public sealed class FileSinkIntegrationTests : IDisposable
         string decryptedContent = await reader.ReadToEndAsync(
             TestContext.Current.CancellationToken
         );
-        decryptedContent.ShouldContain(testValue);
+        decryptedContent.ShouldContain(TestValue);
         decryptedContent.ShouldContain("Property");
         decryptedContent.ShouldContain("Message with");
     }
@@ -330,7 +330,7 @@ public sealed class FileSinkIntegrationTests : IDisposable
     {
         // Arrange
         string fileNamePattern = Path.Join(_testDirectory, "rolling-{Date}.log");
-        const string logMessage = "This is a rolling file test";
+        const string LogMessage = "This is a rolling file test";
 
         // Act - Configure logger with rolling files
         Logger logger = new LoggerConfiguration()
@@ -341,7 +341,7 @@ public sealed class FileSinkIntegrationTests : IDisposable
             )
             .CreateLogger();
 
-        logger.Information(logMessage);
+        logger.Information(LogMessage);
         await logger.DisposeAsync();
 
         // Assert - Find the log file that was created
@@ -363,7 +363,7 @@ public sealed class FileSinkIntegrationTests : IDisposable
         string decryptedContent = await reader.ReadToEndAsync(
             TestContext.Current.CancellationToken
         );
-        decryptedContent.ShouldContain(logMessage);
+        decryptedContent.ShouldContain(LogMessage);
     }
 
     [Fact]

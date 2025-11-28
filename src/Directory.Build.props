@@ -44,12 +44,12 @@
     <PackageProjectUrl>https://github.com/byte2pixel/serilog-sinks-file-encrypt</PackageProjectUrl>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReleaseNotes>https://github.com/byte2pixel/serilog-sinks-file-encrypt/releases</PackageReleaseNotes>
-    <PackageTags>serilog;logging;encryption;sink</PackageTags>
+    <PackageTags>serilog;logging;encryption;sink;security;aes;rsa;cryptography;file-encryption;hybrid-encryption;log-security</PackageTags>
   </PropertyGroup>
 
   <ItemGroup Condition="'$(UseBuildTimeTools)' != 'false'">
     <PackageReference Include="MinVer" PrivateAssets="All" />
-<!--    <PackageReference Include="Microsoft.SourceLink.GitHub" PrivateAssets="All" />-->
+    <!--    <PackageReference Include="Microsoft.SourceLink.GitHub" PrivateAssets="All" />-->
     <PackageReference Include="Roslynator.Analyzers">
       <PrivateAssets>All</PrivateAssets>
     </PackageReference>

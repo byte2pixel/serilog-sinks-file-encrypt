@@ -6,7 +6,7 @@ public class DecryptCommandTests : CommandTestBase
     public async Task ExecuteAsync_WithValidEncryptedFile_DecryptsSuccessfully()
     {
         // Arrange
-        const string testLogContent =
+        const string TestLogContent =
             "2024-11-26 14:00:00 [INF] Test log entry\n2024-11-26 14:00:01 [WRN] Warning message\n";
         string privateKeyPath = Path.Join("keys", "private_key.xml");
         string encryptedFilePath = Path.Join("logs", "encrypted.log");
@@ -14,7 +14,7 @@ public class DecryptCommandTests : CommandTestBase
 
         (string publicKey, string privateKey) = EncryptionUtils.GenerateRsaKeyPair();
 
-        byte[] encryptedContent = CreateEncryptedLogFile(testLogContent, publicKey);
+        byte[] encryptedContent = CreateEncryptedLogFile(TestLogContent, publicKey);
 
         FileSystem.AddFile(privateKeyPath, new MockFileData(privateKey));
         FileSystem.AddFile(encryptedFilePath, new MockFileData(encryptedContent));
@@ -43,7 +43,7 @@ public class DecryptCommandTests : CommandTestBase
             decryptedFilePath,
             TestContext.Current.CancellationToken
         );
-        decryptedContent.ShouldBe(testLogContent);
+        decryptedContent.ShouldBe(TestLogContent);
 
         TestConsole.Output.ShouldContain("Successfully decrypted log file!");
         TestConsole.Output.ShouldContain("Reading private key from:");
@@ -112,14 +112,14 @@ public class DecryptCommandTests : CommandTestBase
     public async Task ExecuteAsync_WithSkipErrorMode_DisplaysErrorModeConfiguration()
     {
         // Arrange
-        const string testLogContent = "2024-11-26 14:00:00 [INF] Test log entry\n";
+        const string TestLogContent = "2024-11-26 14:00:00 [INF] Test log entry\n";
         string privateKeyPath = Path.Join("keys", "private_key.xml");
         string encryptedFilePath = Path.Join("logs", "encrypted.log");
         string decryptedFilePath = Path.Join("logs", "decrypted.log");
 
         (string publicKey, string privateKey) = EncryptionUtils.GenerateRsaKeyPair();
 
-        byte[] encryptedContent = CreateEncryptedLogFile(testLogContent, publicKey);
+        byte[] encryptedContent = CreateEncryptedLogFile(TestLogContent, publicKey);
 
         FileSystem.AddFile(privateKeyPath, new MockFileData(privateKey));
         FileSystem.AddFile(encryptedFilePath, new MockFileData(encryptedContent));
@@ -150,7 +150,7 @@ public class DecryptCommandTests : CommandTestBase
     public async Task ExecuteAsync_WithWriteToErrorLogMode_DisplaysErrorLogPath()
     {
         // Arrange
-        const string testLogContent = "2024-11-26 14:00:00 [INF] Test log entry\n";
+        const string TestLogContent = "2024-11-26 14:00:00 [INF] Test log entry\n";
         string privateKeyPath = Path.Join("keys", "private_key.xml");
         string encryptedFilePath = Path.Join("logs", "encrypted.log");
         string decryptedFilePath = Path.Join("logs", "decrypted.log");
@@ -158,7 +158,7 @@ public class DecryptCommandTests : CommandTestBase
 
         (string publicKey, string privateKey) = EncryptionUtils.GenerateRsaKeyPair();
 
-        byte[] encryptedContent = CreateEncryptedLogFile(testLogContent, publicKey);
+        byte[] encryptedContent = CreateEncryptedLogFile(TestLogContent, publicKey);
 
         FileSystem.AddFile(privateKeyPath, new MockFileData(privateKey));
         FileSystem.AddFile(encryptedFilePath, new MockFileData(encryptedContent));
@@ -192,14 +192,14 @@ public class DecryptCommandTests : CommandTestBase
     public async Task ExecuteAsync_WithThrowExceptionMode_DisplaysErrorModeConfiguration()
     {
         // Arrange
-        const string testLogContent = "2024-11-26 14:00:00 [INF] Test log entry\n";
+        const string TestLogContent = "2024-11-26 14:00:00 [INF] Test log entry\n";
         string privateKeyPath = Path.Join("keys", "private_key.xml");
         string encryptedFilePath = Path.Join("logs", "encrypted.log");
         string decryptedFilePath = Path.Join("logs", "decrypted.log");
 
         (string publicKey, string privateKey) = EncryptionUtils.GenerateRsaKeyPair();
 
-        byte[] encryptedContent = CreateEncryptedLogFile(testLogContent, publicKey);
+        byte[] encryptedContent = CreateEncryptedLogFile(TestLogContent, publicKey);
 
         FileSystem.AddFile(privateKeyPath, new MockFileData(privateKey));
         FileSystem.AddFile(encryptedFilePath, new MockFileData(encryptedContent));
@@ -231,13 +231,13 @@ public class DecryptCommandTests : CommandTestBase
     public async Task ExecuteAsync_WhenReadingKeyFileFails_ReturnsErrorAndDisplaysMessage()
     {
         // Arrange
-        const string testLogContent = "2024-11-26 14:00:00 [INF] Test log entry\n";
+        const string TestLogContent = "2024-11-26 14:00:00 [INF] Test log entry\n";
         string privateKeyPath = Path.Join("keys", "private_key.xml");
         string encryptedFilePath = Path.Join("logs", "encrypted.log");
         string decryptedFilePath = Path.Join("logs", "decrypted.log");
 
         (string publicKey, string _) = EncryptionUtils.GenerateRsaKeyPair();
-        byte[] encryptedContent = CreateEncryptedLogFile(testLogContent, publicKey);
+        byte[] encryptedContent = CreateEncryptedLogFile(TestLogContent, publicKey);
 
         // Create properly encrypted file
         FileSystem.AddFile(encryptedFilePath, new MockFileData(encryptedContent));
@@ -275,13 +275,13 @@ public class DecryptCommandTests : CommandTestBase
     public async Task ExecuteAsync_WhenOpeningEncryptedFileFails_ReturnsErrorAndDisplaysMessage()
     {
         // Arrange
-        const string testLogContent = "2024-11-26 14:00:00 [INF] Test log entry\n";
+        const string TestLogContent = "2024-11-26 14:00:00 [INF] Test log entry\n";
         string privateKeyPath = Path.Join("keys", "private_key.xml");
         string encryptedFilePath = Path.Join("logs", "encrypted.log");
         string decryptedFilePath = Path.Join("logs", "decrypted.log");
 
         (string publicKey, string privateKey) = EncryptionUtils.GenerateRsaKeyPair();
-        byte[] encryptedContent = CreateEncryptedLogFile(testLogContent, publicKey);
+        byte[] encryptedContent = CreateEncryptedLogFile(TestLogContent, publicKey);
 
         // Add files to MockFileSystem
         FileSystem.AddFile(privateKeyPath, new MockFileData(privateKey));
@@ -324,14 +324,14 @@ public class DecryptCommandTests : CommandTestBase
     public async Task ExecuteAsync_WhenCreatingOutputFileFails_ReturnsErrorAndDisplaysMessage()
     {
         // Arrange
-        const string testLogContent = "2024-11-26 14:00:00 [INF] Test log entry\n";
+        const string TestLogContent = "2024-11-26 14:00:00 [INF] Test log entry\n";
         string privateKeyPath = Path.Join("keys", "private_key.xml");
         string encryptedFilePath = Path.Join("logs", "encrypted.log");
         string decryptedFilePath = Path.Join("logs", "decrypted.log");
 
         (string publicKey, string privateKey) = EncryptionUtils.GenerateRsaKeyPair();
 
-        byte[] encryptedContent = CreateEncryptedLogFile(testLogContent, publicKey);
+        byte[] encryptedContent = CreateEncryptedLogFile(TestLogContent, publicKey);
 
         FileSystem.AddFile(privateKeyPath, new MockFileData(privateKey));
         FileSystem.AddFile(encryptedFilePath, new MockFileData(encryptedContent));
@@ -377,7 +377,7 @@ public class DecryptCommandTests : CommandTestBase
     public async Task ExecuteAsync_WithInvalidPrivateKey_ReturnsErrorAndDisplaysMessage()
     {
         // Arrange
-        const string testLogContent = "2024-11-26 14:00:00 [INF] Test log entry\n";
+        const string TestLogContent = "2024-11-26 14:00:00 [INF] Test log entry\n";
         string privateKeyPath = Path.Join("keys", "private_key.xml");
         string encryptedFilePath = Path.Join("logs", "encrypted.log");
         string decryptedFilePath = Path.Join("logs", "decrypted.log");
@@ -385,7 +385,7 @@ public class DecryptCommandTests : CommandTestBase
         (string publicKey, string _) = EncryptionUtils.GenerateRsaKeyPair();
         string invalidPrivateKey = "<RSAKeyValue><Invalid>data</Invalid></RSAKeyValue>";
 
-        byte[] encryptedContent = CreateEncryptedLogFile(testLogContent, publicKey);
+        byte[] encryptedContent = CreateEncryptedLogFile(TestLogContent, publicKey);
 
         FileSystem.AddFile(privateKeyPath, new MockFileData(invalidPrivateKey));
         FileSystem.AddFile(encryptedFilePath, new MockFileData(encryptedContent));
@@ -418,7 +418,7 @@ public class DecryptCommandTests : CommandTestBase
     public async Task ExecuteAsync_WithWrongPrivateKey_ReturnsErrorAndDisplaysMessage()
     {
         // Arrange
-        const string testLogContent = "2024-11-26 14:00:00 [INF] Test log entry\n";
+        const string TestLogContent = "2024-11-26 14:00:00 [INF] Test log entry\n";
         string privateKeyPath = Path.Join("keys", "private_key.xml");
         string encryptedFilePath = Path.Join("logs", "encrypted.log");
         string decryptedFilePath = Path.Join("logs", "decrypted.log");
@@ -427,7 +427,7 @@ public class DecryptCommandTests : CommandTestBase
         (string publicKey, string _) = EncryptionUtils.GenerateRsaKeyPair();
         (string _, string wrongPrivateKey) = EncryptionUtils.GenerateRsaKeyPair();
 
-        byte[] encryptedContent = CreateEncryptedLogFile(testLogContent, publicKey);
+        byte[] encryptedContent = CreateEncryptedLogFile(TestLogContent, publicKey);
 
         FileSystem.AddFile(privateKeyPath, new MockFileData(wrongPrivateKey));
         FileSystem.AddFile(encryptedFilePath, new MockFileData(encryptedContent));
