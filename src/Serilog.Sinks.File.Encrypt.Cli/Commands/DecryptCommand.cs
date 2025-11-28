@@ -26,21 +26,21 @@ public sealed class DecryptCommand(IAnsiConsole console, IFileSystem fileSystem)
         /// </summary>
         [CommandOption("-k|--key <KEY>")]
         [Description("The file containing the RSA private key in XML format")]
-        public string KeyFile { get; set; } = "privateKey.xml";
+        public string KeyFile { get; init; } = "privateKey.xml";
 
         /// <summary>
         /// The path to the encrypted log file to decrypt.
         /// </summary>
         [CommandOption("-f|--file <FILE>")]
         [Description("The encrypted log file to decrypt")]
-        public string EncryptedFile { get; set; } = "log.encrypted.txt";
+        public string EncryptedFile { get; init; } = "log.encrypted.txt";
 
         /// <summary>
         /// The path where the decrypted log content will be saved.
         /// </summary>
         [CommandOption("-o|--output <OUTPUT>")]
         [Description("The output file for the decrypted log content")]
-        public string OutputFile { get; set; } = "log.decrypted.txt";
+        public string OutputFile { get; init; } = "log.decrypted.txt";
 
         /// <summary>
         /// How to handle decryption errors (Skip, WriteInline, WriteToErrorLog, ThrowException).
@@ -49,14 +49,14 @@ public sealed class DecryptCommand(IAnsiConsole console, IFileSystem fileSystem)
         [Description(
             "Error handling mode: Skip (default, clean output), WriteInline (errors inline), WriteToErrorLog (separate file), ThrowException (fail fast)"
         )]
-        public ErrorHandlingMode ErrorMode { get; set; } = ErrorHandlingMode.Skip;
+        public ErrorHandlingMode ErrorMode { get; init; } = ErrorHandlingMode.Skip;
 
         /// <summary>
         /// Path to write error log when using WriteToErrorLog mode. Auto-generated if not specified.
         /// </summary>
         [CommandOption("--error-log <PATH>")]
         [Description("Path for error log file (only used with WriteToErrorLog mode)")]
-        public string? ErrorLogPath { get; set; }
+        public string? ErrorLogPath { get; init; }
 
         /// <summary>
         /// Whether to continue processing after encountering errors (only applies when not using ThrowException mode).
@@ -64,7 +64,7 @@ public sealed class DecryptCommand(IAnsiConsole console, IFileSystem fileSystem)
         [CommandOption("--continue-on-error")]
         [Description("Continue decryption even when errors are encountered (default: true)")]
         [DefaultValue(true)]
-        public bool ContinueOnError { get; set; } = true;
+        public bool ContinueOnError { get; init; } = true;
     }
 
     /// <summary>

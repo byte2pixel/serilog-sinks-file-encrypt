@@ -1,4 +1,3 @@
-using System.IO.Abstractions.TestingHelpers;
 using Serilog.Sinks.File.Encrypt.Models;
 
 namespace Serilog.Sinks.File.Encrypt.Tests.unit;
@@ -206,7 +205,9 @@ public abstract class EncryptionTestBase : IDisposable, IAsyncDisposable
     protected virtual void Dispose(bool disposing)
     {
         if (_disposed)
+        {
             return;
+        }
 
         if (disposing)
         {
@@ -237,7 +238,9 @@ public abstract class EncryptionTestBase : IDisposable, IAsyncDisposable
     protected virtual async ValueTask DisposeAsyncCore()
     {
         if (_disposed)
+        {
             return;
+        }
 
         // Dispose all tracked streams asynchronously
         for (int i = _streamsToDispose.Count - 1; i >= 0; i--)

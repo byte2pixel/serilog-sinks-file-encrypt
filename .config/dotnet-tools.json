@@ -9,6 +9,13 @@
       ],
       "rollForward": false
     },
+    "husky": {
+      "version": "0.8.0",
+      "commands": [
+        "husky"
+      ],
+      "rollForward": false
+    },
     "make": {
       "version": "0.9.0",
       "commands": [

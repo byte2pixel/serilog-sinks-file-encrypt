@@ -96,10 +96,19 @@ serilog-encrypt decrypt --key ./keys/private_key.xml --file logs/app.log --outpu
 This project uses .NET 8.0 and Cake for building:
 
 ```bash
-# Restore tools and build
+# First-time setup: Restore tools
 dotnet tool restore
+
+# Build the project
 dotnet make
 ```
+
+**Note for Contributors**: The `dotnet tool restore` command will automatically:
+- Install Cake for build automation
+- Install CSharpier for code formatting  
+- Install and configure Husky.NET git hooks for automatic formatting
+
+No additional setup is needed - git hooks work automatically after tool restoration.
 
 ## 🗺️ Roadmap
 

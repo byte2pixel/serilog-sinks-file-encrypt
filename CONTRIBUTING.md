@@ -74,11 +74,34 @@ cd serilog-sinks-file-encrypt
 
 ### Restore Tools
 
-This project uses [Cake](https://cakebuild.net/) for build automation:
+This project uses [Cake](https://cakebuild.net/) for build automation and [Husky.NET](https://alirezanet.github.io/Husky.Net/) for git hooks:
 
 ```bash
 dotnet tool restore
 ```
+
+**This command will:**
+- Install Cake for build automation
+- Install CSharpier for code formatting
+- Install Husky and set up git hooks for automatic code formatting
+- Install other required tools (Make, etc.)
+
+**After running this command:**
+- Git hooks are automatically installed and active
+- Pre-commit hook will format your code automatically before each commit
+- No additional setup is required
+
+### Development Workflow
+
+Once you've run `dotnet tool restore`, your development workflow is:
+
+1. **Make code changes** as usual in your IDE
+2. **Build and test** your changes locally
+3. **Stage your changes**: `git add .`
+4. **Commit**: `git commit -m "Your message"`
+   - The pre-commit hook will automatically format staged files with CSharpier
+   - If formatting changes are made, you'll need to review and re-commit
+5. **Push**: `git push` (build will run additional checks)
 
 ### Restore NuGet Packages
 
@@ -103,16 +126,6 @@ dotnet make --configuration Debug
 dotnet make clean
 ```
 
-### Using .NET CLI
-
-```bash
-# Build the solution
-dotnet build
-
-# Build a specific project
-dotnet build src/Serilog.Sinks.File.Encrypt/Serilog.Sinks.File.Encrypt.csproj
-```
-
 ## Running Tests
 
 ### Run All Tests
@@ -125,20 +138,10 @@ dotnet make test
 dotnet test
 ```
 
-**Note**: The Cake build collects code coverage by default. If you want to skip coverage collection for faster test runs:
+**Note**: The Cake build collects code coverage by default for CI but not locally. If you want to coverage collection:
 
 ```bash
-dotnet make test --collect-coverage=false
-```
-
-### Run Specific Tests
-
-```bash
-# Run tests for a specific project
-dotnet test test/Serilog.Sinks.File.Encrypt.Tests/Serilog.Sinks.File.Encrypt.Tests.csproj
-
-# Run a specific test
-dotnet test --filter "FullyQualifiedName~EncryptedStreamTests.SingleFlush_DoesNotThrow"
+dotnet make test --collect-coverage=true
 ```
 
 ### Running Benchmarks
@@ -150,53 +153,147 @@ dotnet run -c Release
 
 ## Code Style
 
-This project uses strict code formatting rules to maintain consistency.
+This project uses strict code formatting and quality rules to maintain consistency.
 
-### Formatting Rules
+### EditorConfig
+
+The project includes a comprehensive `.editorconfig` file that defines code style rules. Your IDE should automatically apply these rules. Key conventions:
 
 - **C# Language Version**: 14 (latest)
-- **Nullable Reference Types**: Enabled
+- **Nullable Reference Types**: Enabled globally
 - **Implicit Usings**: Enabled
-- **Formatter**: CSharpier (verified during build)
-- **Indentation**: Tabs/Spaces as configured in .editorconfig
-- **Line Endings**: LF (Unix-style)
+- **Indentation**: 4 spaces (no tabs)
+- **Line Endings**: CRLF (Windows-style)
+- **Namespace Declarations**: File-scoped (C# 10+)
+- **Using Directives**: Outside namespace, sorted with System first
+- **Naming Conventions**:
+  - Private fields: `_camelCase` (with underscore prefix)
+  - Public members: `PascalCase`
+  - Interfaces: `IPascalCase` (with I prefix)
+  - Constants: `PascalCase`
 
-### Code Formatting
+### Code Formatting with CSharpier
 
-The build automatically verifies code formatting. To check formatting:
+The project uses [CSharpier](https://csharpier.com/) for automatic code formatting. Configuration is in `.csharpierrc.json`:
+
+- Print width: 100 characters
+- Tab width: 4 spaces
+- End of line: CRLF
+
+**Automated formatting via Git Hooks:**
+
+This project uses [Husky.NET](https://alirezanet.github.io/Husky.Net/) to automatically format code before commits:
+
+- ✅ **Pre-commit hook**: Formats all C# files with CSharpier before allowing commits
+- ✅ **Automatic setup**: Installed when you run `dotnet tool restore`
+- ✅ **Helpful messages**: Shows how to fix any issues if formatting fails
+
+**If the pre-commit hook modifies files:**
+
+The hook will format your staged files automatically. If changes are made:
 
 ```bash
-# Check formatting (this is done automatically during build)
-dotnet make lint
+# Review what was changed
+git diff --staged
 
-# Format code (if you have CSharpier installed)
-dotnet csharpier .
+# If you're happy with the formatting, re-commit
+git commit -m "Your message"
+
+# Or if you want to see all changes (formatted + unformatted)
+git status
+git diff  # unstaged changes (if any)
 ```
+
+**Manual formatting commands:**
+
+```bash
+# Install CSharpier globally (one-time setup - optional, local tool preferred)
+dotnet tool install -g csharpier
+
+# Check formatting
+dotnet csharpier check .
+
+# Format all code
+dotnet csharpier format .
+
+# Check formatting (done automatically during build)
+dotnet make lint
+```
+
+**Skip pre-commit check (not recommended):**
+
+```bash
+git commit --no-verify -m "Your message"
+```
+
+**The build will fail if code is not formatted correctly.** The git hook catches formatting issues before you push, saving CI time.
+
+### Code Quality with Roslynator
+
+The project uses [Roslynator.Analyzers](https://github.com/dotnet/roslynator) for additional code quality checks. Key rules:
+
+- Code simplification suggestions
+- LINQ optimization hints
+- Documentation comment validation
+- Naming convention enforcement
+
+Most analyzer warnings are suggestions. Address any warnings that appear during build.
 
 ### Coding Conventions
 
-- Follow standard .NET naming conventions
-- Use meaningful variable and method names
-- Add XML documentation comments to all public APIs
-- Include `<summary>`, `<param>`, `<returns>`, and `<exception>` tags
-- Keep methods focused and concise
-- Prefer async/await for I/O operations
-- Use `ConfigureAwait(false)` in library code
+- **Public APIs**: All public members must have XML documentation with:
+  - `<summary>` - Describes what the member does
+  - `<param>` - Documents each parameter with constraints
+  - `<returns>` - Describes return values
+  - `<exception>` - Lists exceptions that can be thrown
+  - `<example>` - Provides code examples (for classes)
+  - `<remarks>` - Additional context (memory usage, thread-safety, performance)
+
+- **Method Design**:
+  - Keep methods focused and concise (single responsibility)
+  - Prefer async/await for I/O operations
+  - Use `ConfigureAwait(false)` in library code (not in tests)
+  - Use pattern matching and modern C# features
+
+- **Error Handling**:
+  - Use guard clauses at method start
+  - Use `ObjectDisposedException.ThrowIf()` for disposal checks
+  - Use `ArgumentNullException.ThrowIfNull()` for null checks
+  - Document all exceptions in XML comments
+
+- **Memory Management**:
+  - Dispose IDisposable resources properly
+  - Use `using` statements or declarations
+  - Consider memory usage in streaming scenarios
+  - Document memory characteristics in `<remarks>`
 
 ### Example
 
 ```csharp
 /// <summary>
-/// Encrypts data written to the underlying stream using AES encryption.
+/// Decrypts an encrypted log file asynchronously using streaming for efficient memory usage.
 /// </summary>
-/// <param name="buffer">The buffer containing data to write.</param>
-/// <param name="offset">The zero-based byte offset in buffer from which to begin copying bytes.</param>
-/// <param name="count">The maximum number of bytes to write.</param>
-/// <exception cref="ObjectDisposedException">The stream has been disposed.</exception>
-/// <exception cref="ArgumentNullException"><paramref name="buffer"/> is null.</exception>
-public override void Write(byte[] buffer, int offset, int count)
+/// <param name="inputStream">Stream containing the encrypted log data. Must be readable and seekable.</param>
+/// <param name="outputStream">Stream where the decrypted content will be written. Must be writable.</param>
+/// <param name="rsaPrivateKey">The XML representation of the RSA private key used for decryption.</param>
+/// <param name="cancellationToken">Cancellation token to cancel the decryption operation.</param>
+/// <returns>A task representing the asynchronous decryption operation.</returns>
+/// <exception cref="ArgumentNullException">Thrown when any parameter is null.</exception>
+/// <exception cref="CryptographicException">Thrown when decryption fails.</exception>
+/// <remarks>
+/// Memory usage is controlled by <see cref="StreamingOptions.BufferSize"/> and 
+/// <see cref="StreamingOptions.QueueDepth"/>. Typical memory usage: 160KB (default).
+/// </remarks>
+public static async Task DecryptLogFileAsync(
+    Stream inputStream,
+    Stream outputStream,
+    string rsaPrivateKey,
+    CancellationToken cancellationToken = default
+)
 {
-    ObjectDisposedException.ThrowIf(_isDisposed, this);
+    ArgumentNullException.ThrowIfNull(inputStream);
+    ArgumentNullException.ThrowIfNull(outputStream);
+    ArgumentNullException.ThrowIfNull(rsaPrivateKey);
     
     // Implementation...
 }

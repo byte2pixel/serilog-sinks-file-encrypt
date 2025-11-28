@@ -1,0 +1,23 @@
+#!/bin/sh
+. "$(dirname "$0")/_/husky.sh"
+
+# Format staged files with CSharpier before commit
+echo "🔧 Formatting staged files with CSharpier..."
+
+# Use the task runner to format only staged files
+dotnet husky run --name "format-csharpier"
+
+if [ $? -eq 0 ]; then
+  echo "✅ Files formatted successfully!"
+else
+  echo ""
+  echo "❌ Failed to format files!"
+  echo ""
+  echo "To format manually:"
+  echo "  dotnet csharpier format ."
+  echo ""
+  echo "Or to skip this hook (not recommended):"
+  echo "  git commit --no-verify"
+  echo ""
+  exit 1
+fi

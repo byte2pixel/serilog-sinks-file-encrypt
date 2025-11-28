@@ -37,8 +37,8 @@ namespace Serilog.Sinks.File.Encrypt;
 public class EncryptedStream : Stream
 {
     // csharpier-ignore-start
-    private static readonly byte[] HeaderMarker = [ 0xFF, 0xFE, 0x4C, 0x4F, 0x47, 0x48, 0x44, 0x00, 0x01 ];
-    private static readonly byte[] ChunkMarker =  [ 0xFF, 0xFE, 0x4C, 0x4F, 0x47, 0x42, 0x44, 0x00, 0x02 ];
+    private static readonly byte[] _headerMarker = [ 0xFF, 0xFE, 0x4C, 0x4F, 0x47, 0x48, 0x44, 0x00, 0x01 ];
+    private static readonly byte[] _chunkMarker =  [ 0xFF, 0xFE, 0x4C, 0x4F, 0x47, 0x42, 0x44, 0x00, 0x02 ];
     // csharpier-ignore-end
 
     private readonly Stream _underlyingStream;
@@ -76,7 +76,7 @@ public class EncryptedStream : Stream
         byte[] encryptedKeyLength = BitConverter.GetBytes(encryptedKey.Length);
         byte[] encryptedIv = rsaPublicKey.Encrypt(currentIv, RSAEncryptionPadding.OaepSHA256);
         byte[] encryptedIvLength = BitConverter.GetBytes(encryptedIv.Length);
-        _underlyingStream.Write(HeaderMarker, 0, HeaderMarker.Length);
+        _underlyingStream.Write(_headerMarker, 0, _headerMarker.Length);
         _underlyingStream.Write(encryptedKeyLength, 0, sizeof(int));
         _underlyingStream.Write(encryptedIvLength, 0, sizeof(int));
         _underlyingStream.Write(encryptedKey, 0, encryptedKey.Length);
@@ -111,7 +111,7 @@ public class EncryptedStream : Stream
             _bufferStream = null;
 
             // Write the complete chunk: [MARKER][LENGTH][ENCRYPTED_DATA]
-            _underlyingStream.Write(ChunkMarker, 0, ChunkMarker.Length);
+            _underlyingStream.Write(_chunkMarker, 0, _chunkMarker.Length);
             byte[] lengthBytes = BitConverter.GetBytes(encryptedData.Length);
             _underlyingStream.Write(lengthBytes, 0, sizeof(int));
             _underlyingStream.Write(encryptedData, 0, encryptedData.Length);
@@ -140,7 +140,7 @@ public class EncryptedStream : Stream
 
             // Write the complete chunk: [MARKER][LENGTH][ENCRYPTED_DATA]
             await _underlyingStream
-                .WriteAsync(ChunkMarker, cancellationToken)
+                .WriteAsync(_chunkMarker, cancellationToken)
                 .ConfigureAwait(false);
             byte[] lengthBytes = BitConverter.GetBytes(encryptedData.Length);
             await _underlyingStream
@@ -261,7 +261,9 @@ public class EncryptedStream : Stream
     protected override void Dispose(bool disposing)
     {
         if (_isDisposed)
+        {
             return;
+        }
 
         _isDisposed = true;
 

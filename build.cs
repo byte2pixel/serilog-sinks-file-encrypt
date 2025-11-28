@@ -1,7 +1,7 @@
 #:sdk Cake.Sdk@6.0.0
 
-var solution = "./serilog-sinks-file-encrypt.sln";
-var testProjects = new[]
+string solution = "./serilog-sinks-file-encrypt.sln";
+string[] testProjects = new[]
 {
     "./tests/Serilog.Sinks.File.Encrypt.Tests/Serilog.Sinks.File.Encrypt.Tests.csproj",
     "./tests/Serilog.Sinks.File.Encrypt.Cli.Tests/Serilog.Sinks.File.Encrypt.Cli.Tests.csproj",
@@ -10,8 +10,8 @@ var testProjects = new[]
 ////////////////////////////////////////////////////////////////
 // Arguments
 
-var target = Argument("target", "Default");
-var configuration = Argument("configuration", "Release");
+string target = Argument("target", "Default");
+string configuration = Argument("configuration", "Release");
 
 ////////////////////////////////////////////////////////////////
 // Tasks
@@ -53,17 +53,18 @@ Task("Test")
     .IsDependentOn("Build")
     .Does(ctx =>
     {
-        var collectCoverage = Argument("collect-coverage", true);
-        var coverageDir = "./.coverage";
+        bool collectCoverage =
+            Argument("collect-coverage", false) || BuildSystem.IsRunningOnGitHubActions;
+        string coverageDir = "./.coverage";
 
         if (collectCoverage)
         {
             ctx.CleanDirectory(coverageDir);
         }
 
-        foreach (var testProject in testProjects)
+        foreach (string? testProject in testProjects)
         {
-            var projectName = System.IO.Path.GetFileNameWithoutExtension(testProject);
+            string projectName = System.IO.Path.GetFileNameWithoutExtension(testProject);
             var settings = new DotNetTestSettings
             {
                 Configuration = configuration,
@@ -76,7 +77,7 @@ Task("Test")
             if (collectCoverage)
             {
                 // Create a unique directory for each test project's results
-                var projectResultsDir = System.IO.Path.Join(coverageDir, projectName);
+                string projectResultsDir = System.IO.Path.Join(coverageDir, projectName);
                 settings.Collectors = ["XPlat Code Coverage"];
                 settings.ResultsDirectory = projectResultsDir;
                 settings.Loggers = ["trx;LogFilePrefix=testResults"];
@@ -113,7 +114,7 @@ Task("Publish-NuGet")
     .IsDependentOn("Package")
     .Does(ctx =>
     {
-        var apiKey = Argument<string?>("nuget-key", null);
+        string? apiKey = Argument<string?>("nuget-key", null);
         if (string.IsNullOrWhiteSpace(apiKey))
         {
             throw new CakeException("No NuGet API key was provided.");

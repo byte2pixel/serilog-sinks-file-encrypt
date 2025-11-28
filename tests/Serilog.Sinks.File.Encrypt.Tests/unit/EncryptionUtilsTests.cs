@@ -1,5 +1,3 @@
-using System.Diagnostics.CodeAnalysis;
-
 namespace Serilog.Sinks.File.Encrypt.Tests.unit;
 
 public class EncryptionUtilsTests : EncryptionTestBase
@@ -28,38 +26,38 @@ public class EncryptionUtilsTests : EncryptionTestBase
     public async Task DecryptLogFileAsync_ReturnsDecryptedContent()
     {
         // Arrange
-        const string originalText = "Hello, simple encrypted log!";
+        const string OriginalText = "Hello, simple encrypted log!";
 
         // Act - Use helper method that handles all stream management
         string decrypted = await EncryptAndDecryptAsync(
-            originalText,
+            OriginalText,
             RsaKeyPair.publicKey,
             RsaKeyPair.privateKey,
             TestContext.Current.CancellationToken
         );
 
         // Assert
-        decrypted.ShouldContain(originalText);
+        decrypted.ShouldContain(OriginalText);
     }
 
     [Fact]
     public async Task DecryptLogFileAsync_ReturnsMultipleDecryptedEntries()
     {
         // Arrange
-        const string logMessage1 = "Simple log file test!";
-        const string logMessage2 = "Second simple log entry!";
+        const string LogMessage1 = "Simple log file test!";
+        const string LogMessage2 = "Second simple log entry!";
 
         // Act - Use helper method that handles all stream management
         string decrypted = await EncryptAndDecryptAsync(
-            [logMessage1, logMessage2],
+            [LogMessage1, LogMessage2],
             RsaKeyPair.publicKey,
             RsaKeyPair.privateKey,
             TestContext.Current.CancellationToken
         );
 
         // Assert
-        decrypted.ShouldContain(logMessage1);
-        decrypted.ShouldContain(logMessage2);
+        decrypted.ShouldContain(LogMessage1);
+        decrypted.ShouldContain(LogMessage2);
     }
 
     [Fact]
@@ -91,7 +89,7 @@ public class EncryptionUtilsTests : EncryptionTestBase
     {
         // Arrange
         (string publicKey, string privateKey) = EncryptionUtils.GenerateRsaKeyPair(keySize: 4096);
-        const string originalText = "Testing 4096-bit RSA key with encrypted stream!";
+        const string OriginalText = "Testing 4096-bit RSA key with encrypted stream!";
 
         using RSA rsa = RSA.Create();
         rsa.FromXmlString(publicKey);
@@ -99,14 +97,14 @@ public class EncryptionUtilsTests : EncryptionTestBase
 
         // Act - Use helper that manages streams automatically
         string decrypted = await EncryptAndDecryptAsync(
-            originalText,
+            OriginalText,
             publicKey,
             privateKey,
             TestContext.Current.CancellationToken
         );
 
         // Assert
-        decrypted.ShouldBe(originalText);
+        decrypted.ShouldBe(OriginalText);
     }
 
     [Fact]
@@ -114,21 +112,21 @@ public class EncryptionUtilsTests : EncryptionTestBase
     {
         // Arrange
         (string publicKey, string privateKey) = EncryptionUtils.GenerateRsaKeyPair(keySize: 4096);
-        const string logMessage1 = "First log entry with 4096-bit key";
-        const string logMessage2 = "Second log entry with 4096-bit key";
-        const string logMessage3 = "Third log entry with 4096-bit key";
+        const string LogMessage1 = "First log entry with 4096-bit key";
+        const string LogMessage2 = "Second log entry with 4096-bit key";
+        const string LogMessage3 = "Third log entry with 4096-bit key";
 
         // Act - Use helper that manages streams automatically
         string decrypted = await EncryptAndDecryptAsync(
-            [logMessage1, logMessage2, logMessage3],
+            [LogMessage1, LogMessage2, LogMessage3],
             publicKey,
             privateKey,
             TestContext.Current.CancellationToken
         );
 
         // Assert
-        decrypted.ShouldContain(logMessage1);
-        decrypted.ShouldContain(logMessage2);
-        decrypted.ShouldContain(logMessage3);
+        decrypted.ShouldContain(LogMessage1);
+        decrypted.ShouldContain(LogMessage2);
+        decrypted.ShouldContain(LogMessage3);
     }
 }
