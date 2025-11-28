@@ -150,53 +150,114 @@ dotnet run -c Release
 
 ## Code Style
 
-This project uses strict code formatting rules to maintain consistency.
+This project uses strict code formatting and quality rules to maintain consistency.
 
-### Formatting Rules
+### EditorConfig
+
+The project includes a comprehensive `.editorconfig` file that defines code style rules. Your IDE should automatically apply these rules. Key conventions:
 
 - **C# Language Version**: 14 (latest)
-- **Nullable Reference Types**: Enabled
+- **Nullable Reference Types**: Enabled globally
 - **Implicit Usings**: Enabled
-- **Formatter**: CSharpier (verified during build)
-- **Indentation**: Tabs/Spaces as configured in .editorconfig
-- **Line Endings**: LF (Unix-style)
+- **Indentation**: 4 spaces (no tabs)
+- **Line Endings**: CRLF (Windows-style)
+- **Namespace Declarations**: File-scoped (C# 10+)
+- **Using Directives**: Outside namespace, sorted with System first
+- **Naming Conventions**:
+  - Private fields: `_camelCase` (with underscore prefix)
+  - Public members: `PascalCase`
+  - Interfaces: `IPascalCase` (with I prefix)
+  - Constants: `PascalCase`
 
-### Code Formatting
+### Code Formatting with CSharpier
 
-The build automatically verifies code formatting. To check formatting:
+The project uses [CSharpier](https://csharpier.com/) for automatic code formatting. Configuration is in `.csharpierrc.json`:
+
+- Print width: 100 characters
+- Tab width: 4 spaces
+- End of line: CRLF
+
+**Format code before committing:**
 
 ```bash
-# Check formatting (this is done automatically during build)
-dotnet make lint
+# Install CSharpier globally (one-time setup)
+dotnet tool install -g csharpier
 
-# Format code (if you have CSharpier installed)
+# Format all code
 dotnet csharpier .
+
+# Check formatting (done automatically during build)
+dotnet make lint
 ```
+
+**The build will fail if code is not formatted correctly.** Use `dotnet csharpier .` to fix formatting issues.
+
+### Code Quality with Roslynator
+
+The project uses [Roslynator.Analyzers](https://github.com/dotnet/roslynator) for additional code quality checks. Key rules:
+
+- Code simplification suggestions
+- LINQ optimization hints
+- Documentation comment validation
+- Naming convention enforcement
+
+Most analyzer warnings are suggestions. Address any warnings that appear during build.
 
 ### Coding Conventions
 
-- Follow standard .NET naming conventions
-- Use meaningful variable and method names
-- Add XML documentation comments to all public APIs
-- Include `<summary>`, `<param>`, `<returns>`, and `<exception>` tags
-- Keep methods focused and concise
-- Prefer async/await for I/O operations
-- Use `ConfigureAwait(false)` in library code
+- **Public APIs**: All public members must have XML documentation with:
+  - `<summary>` - Describes what the member does
+  - `<param>` - Documents each parameter with constraints
+  - `<returns>` - Describes return values
+  - `<exception>` - Lists exceptions that can be thrown
+  - `<example>` - Provides code examples (for classes)
+  - `<remarks>` - Additional context (memory usage, thread-safety, performance)
+
+- **Method Design**:
+  - Keep methods focused and concise (single responsibility)
+  - Prefer async/await for I/O operations
+  - Use `ConfigureAwait(false)` in library code (not in tests)
+  - Use pattern matching and modern C# features
+
+- **Error Handling**:
+  - Use guard clauses at method start
+  - Use `ObjectDisposedException.ThrowIf()` for disposal checks
+  - Use `ArgumentNullException.ThrowIfNull()` for null checks
+  - Document all exceptions in XML comments
+
+- **Memory Management**:
+  - Dispose IDisposable resources properly
+  - Use `using` statements or declarations
+  - Consider memory usage in streaming scenarios
+  - Document memory characteristics in `<remarks>`
 
 ### Example
 
 ```csharp
 /// <summary>
-/// Encrypts data written to the underlying stream using AES encryption.
+/// Decrypts an encrypted log file asynchronously using streaming for efficient memory usage.
 /// </summary>
-/// <param name="buffer">The buffer containing data to write.</param>
-/// <param name="offset">The zero-based byte offset in buffer from which to begin copying bytes.</param>
-/// <param name="count">The maximum number of bytes to write.</param>
-/// <exception cref="ObjectDisposedException">The stream has been disposed.</exception>
-/// <exception cref="ArgumentNullException"><paramref name="buffer"/> is null.</exception>
-public override void Write(byte[] buffer, int offset, int count)
+/// <param name="inputStream">Stream containing the encrypted log data. Must be readable and seekable.</param>
+/// <param name="outputStream">Stream where the decrypted content will be written. Must be writable.</param>
+/// <param name="rsaPrivateKey">The XML representation of the RSA private key used for decryption.</param>
+/// <param name="cancellationToken">Cancellation token to cancel the decryption operation.</param>
+/// <returns>A task representing the asynchronous decryption operation.</returns>
+/// <exception cref="ArgumentNullException">Thrown when any parameter is null.</exception>
+/// <exception cref="CryptographicException">Thrown when decryption fails.</exception>
+/// <remarks>
+/// Memory usage is controlled by <see cref="StreamingOptions.BufferSize"/> and 
+/// <see cref="StreamingOptions.QueueDepth"/>. Typical memory usage: 160KB (default).
+/// </remarks>
+public static async Task DecryptLogFileAsync(
+    Stream inputStream,
+    Stream outputStream,
+    string rsaPrivateKey,
+    CancellationToken cancellationToken = default
+)
 {
-    ObjectDisposedException.ThrowIf(_isDisposed, this);
+    ArgumentNullException.ThrowIfNull(inputStream);
+    ArgumentNullException.ThrowIfNull(outputStream);
+    ArgumentNullException.ThrowIfNull(rsaPrivateKey);
     
     // Implementation...
 }

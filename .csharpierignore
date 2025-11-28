@@ -1,0 +1,19 @@
+# Ignore build artifacts
+**/bin/
+**/obj/
+**/.artifacts/
+**/.coverage/
+
+# Ignore package folders
+**/packages/
+
+# Ignore generated files
+**/BenchmarkDotNet.Artifacts/
+
+# Ignore tool output
+**/.vs/
+**/.vscode/
+**/.idea/
+**/*.user
+**/*.suo
+

@@ -8,16 +8,16 @@ public sealed class StreamingDecryptionTests : EncryptionTestBase
     public async Task DecryptLogFileAsync_WithSingleMessage_ReturnsCorrectContent()
     {
         // Arrange & Act
-        const string testMessage = "Test log message";
+        const string TestMessage = "Test log message";
         string result = await EncryptAndDecryptAsync(
-            testMessage,
+            TestMessage,
             RsaKeyPair.publicKey,
             RsaKeyPair.privateKey,
             TestContext.Current.CancellationToken
         );
 
         // Assert
-        Assert.Equal(testMessage, result);
+        Assert.Equal(TestMessage, result);
     }
 
     [Fact]
@@ -43,7 +43,7 @@ public sealed class StreamingDecryptionTests : EncryptionTestBase
     public async Task DecryptLogFileAsync_WithCustomStreamingOptions_RespectsConfiguration()
     {
         // Arrange
-        const string testMessage = "Test message with custom options";
+        const string TestMessage = "Test message with custom options";
         StreamingOptions customOptions = new()
         {
             BufferSize = 8 * 1024, // 8KB
@@ -52,7 +52,7 @@ public sealed class StreamingDecryptionTests : EncryptionTestBase
         };
 
         MemoryStream encryptedStream = await CreateEncryptedStreamAsync(
-            testMessage,
+            TestMessage,
             RsaKeyPair.publicKey,
             TestContext.Current.CancellationToken
         );
@@ -66,7 +66,7 @@ public sealed class StreamingDecryptionTests : EncryptionTestBase
         );
 
         // Assert
-        Assert.Equal(testMessage, result);
+        Assert.Equal(TestMessage, result);
     }
 
     [Fact]

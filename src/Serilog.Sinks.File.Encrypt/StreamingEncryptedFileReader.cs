@@ -11,10 +11,10 @@ namespace Serilog.Sinks.File.Encrypt;
 internal sealed class StreamingEncryptedFileReader : IDisposable, IAsyncDisposable
 {
     // csharpier-ignore-start
-    private static readonly byte[] HeaderMarker = [0xFF, 0xFE, 0x4C, 0x4F, 0x47, 0x48, 0x44, 0x00, 0x01];
-    private static readonly byte[] MessageMarker = [0xFF, 0xFE, 0x4C, 0x4F, 0x47, 0x42, 0x44, 0x00, 0x02];
+    private static readonly byte[] _headerMarker = [0xFF, 0xFE, 0x4C, 0x4F, 0x47, 0x48, 0x44, 0x00, 0x01];
+    private static readonly byte[] _messageMarker = [0xFF, 0xFE, 0x4C, 0x4F, 0x47, 0x42, 0x44, 0x00, 0x02];
     // csharpier-ignore-end
-    private static readonly int MarkerLength = HeaderMarker.Length;
+    private static readonly int _markerLength = _headerMarker.Length;
 
     private readonly Stream _inputStream;
     private readonly RSA _rsa;
@@ -71,6 +71,8 @@ internal sealed class StreamingEncryptedFileReader : IDisposable, IAsyncDisposab
     /// <summary>
     /// Producer task that reads and decrypts sections from the input stream
     /// </summary>
+    /// <exception cref="CryptographicException"></exception>
+    /// <exception cref="InvalidOperationException"></exception>
     private async Task ProduceDecryptionChunksAsync(
         ChannelWriter<IDecryptionChunk> writer,
         CancellationToken cancellationToken
@@ -172,7 +174,9 @@ internal sealed class StreamingEncryptedFileReader : IDisposable, IAsyncDisposab
     {
         byte[]? markerBuffer = await ReadMarkerBufferAsync(cancellationToken);
         if (markerBuffer == null)
+        {
             return;
+        }
 
         if (IsHeaderMarker(markerBuffer))
         {
@@ -223,7 +227,9 @@ internal sealed class StreamingEncryptedFileReader : IDisposable, IAsyncDisposab
     )
     {
         if (!_context.HasKeys)
+        {
             return;
+        }
 
         MessageSection body = await ReadMessageSectionAsync(cancellationToken);
         string decryptedText = await DecryptMessageContentAsync(
@@ -241,7 +247,7 @@ internal sealed class StreamingEncryptedFileReader : IDisposable, IAsyncDisposab
         CancellationToken cancellationToken
     )
     {
-        _inputStream.Position = markerPosition + MarkerLength;
+        _inputStream.Position = markerPosition + _markerLength;
 
         // Read key and IV lengths
         byte[] keyLengthBytes = new byte[4];
@@ -303,11 +309,11 @@ internal sealed class StreamingEncryptedFileReader : IDisposable, IAsyncDisposab
     /// </summary>
     private static void ValidateMessageSize(int dataLength)
     {
-        const int maxLogMessageSize = 10_000_000; // 10 MB should be more than enough for any single log message
-        if (dataLength > maxLogMessageSize)
+        const int MaxLogMessageSize = 10_000_000; // 10 MB should be more than enough for any single log message
+        if (dataLength > MaxLogMessageSize)
         {
             throw new InvalidOperationException(
-                $"Log message size ({dataLength} bytes) is unexpectedly large (>{maxLogMessageSize} bytes). This may indicate file corruption."
+                $"Log message size ({dataLength} bytes) is unexpectedly large (>{MaxLogMessageSize} bytes). This may indicate file corruption."
             );
         }
     }
@@ -455,7 +461,7 @@ internal sealed class StreamingEncryptedFileReader : IDisposable, IAsyncDisposab
     // Helper methods
     private async Task<byte[]?> ReadMarkerBufferAsync(CancellationToken cancellationToken)
     {
-        byte[] markerBuffer = new byte[MarkerLength];
+        byte[] markerBuffer = new byte[_markerLength];
         int bytesRead = await _inputStream.ReadAsync(markerBuffer, cancellationToken);
         return bytesRead == markerBuffer.Length ? markerBuffer : null;
     }
@@ -463,10 +469,10 @@ internal sealed class StreamingEncryptedFileReader : IDisposable, IAsyncDisposab
     private bool IsEndOfStream() => _inputStream.Position >= _inputStream.Length;
 
     private static bool IsHeaderMarker(byte[] markerBuffer) =>
-        markerBuffer.SequenceEqual(HeaderMarker);
+        markerBuffer.SequenceEqual(_headerMarker);
 
     private static bool IsBodyMarker(byte[] markerBuffer) =>
-        markerBuffer.SequenceEqual(MessageMarker);
+        markerBuffer.SequenceEqual(_messageMarker);
 
     private void SkipUnknownData(byte[] markerBuffer) =>
         _inputStream.Position -= markerBuffer.Length - 1;
@@ -489,25 +495,27 @@ internal sealed class StreamingEncryptedFileReader : IDisposable, IAsyncDisposab
     private async Task TryRecoverAsync(CancellationToken cancellationToken)
     {
         // Try to find the next valid marker
-        byte[] searchBuffer = new byte[MarkerLength];
+        byte[] searchBuffer = new byte[_markerLength];
 
-        while (_inputStream.Position < _inputStream.Length - MarkerLength)
+        while (_inputStream.Position < _inputStream.Length - _markerLength)
         {
             // Read potential marker
             int bytesRead = await _inputStream.ReadAsync(searchBuffer, cancellationToken);
-            if (bytesRead < MarkerLength)
+            if (bytesRead < _markerLength)
+            {
                 break;
+            }
 
             // Check if it's a valid marker
             if (IsHeaderMarker(searchBuffer) || IsBodyMarker(searchBuffer))
             {
                 // Move back to start of marker
-                _inputStream.Position -= MarkerLength;
+                _inputStream.Position -= _markerLength;
                 return;
             }
 
             // Move back and advance by 1 byte to continue searching
-            _inputStream.Position -= MarkerLength - 1;
+            _inputStream.Position -= _markerLength - 1;
         }
     }
 
@@ -522,7 +530,7 @@ internal sealed class StreamingEncryptedFileReader : IDisposable, IAsyncDisposab
         long originalPosition = _inputStream.Position;
         try
         {
-            _inputStream.Position = markerPosition + MarkerLength;
+            _inputStream.Position = markerPosition + _markerLength;
 
             byte[] keyLengthBytes = new byte[4];
             byte[] ivLengthBytes = new byte[4];
@@ -539,10 +547,10 @@ internal sealed class StreamingEncryptedFileReader : IDisposable, IAsyncDisposab
             int ivLength = BitConverter.ToInt32(ivLengthBytes, 0);
 
             // Validate the lengths are reasonable for RSA encrypted AES keys/IVs
-            const int minKeyIvLength = 256;
-            const int maxKeyIvLength = 4096;
-            return keyLength is >= minKeyIvLength and <= maxKeyIvLength
-                && ivLength is >= minKeyIvLength and <= maxKeyIvLength;
+            const int MinKeyIvLength = 256;
+            const int MaxKeyIvLength = 4096;
+            return keyLength is >= MinKeyIvLength and <= MaxKeyIvLength
+                && ivLength is >= MinKeyIvLength and <= MaxKeyIvLength;
         }
         catch (IOException)
         {
@@ -574,7 +582,9 @@ internal sealed class StreamingEncryptedFileReader : IDisposable, IAsyncDisposab
     public void Dispose()
     {
         if (_disposed)
+        {
             return;
+        }
 
         _rsa.Dispose();
         _errorLogWriter?.Dispose();
@@ -584,7 +594,9 @@ internal sealed class StreamingEncryptedFileReader : IDisposable, IAsyncDisposab
     public async ValueTask DisposeAsync()
     {
         if (_disposed)
+        {
             return;
+        }
 
         _rsa.Dispose();
 
