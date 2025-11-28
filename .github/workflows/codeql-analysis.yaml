@@ -10,6 +10,10 @@ on:
     # Run at 00:00 UTC every Monday
     - cron: '0 0 * * 1'
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   analyze:
     name: Analyze Code

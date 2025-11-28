@@ -6,7 +6,7 @@ We release security updates for the following versions:
 
 | Version | Supported          |
 |---------|--------------------|
-| 0.x.x   | :white_check_mark: |
+| 1.x.x   | :white_check_mark: |
 
 As this project is in pre-release (0.x.x versions), we provide security updates for the latest pre-release version. Once version 1.0.0 is released, we will provide security updates for the current major version and the previous major version for a minimum of 6 months after the next major release.
 
