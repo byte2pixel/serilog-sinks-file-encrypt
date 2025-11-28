@@ -53,14 +53,12 @@ Task("Test")
     .IsDependentOn("Build")
     .Does(ctx =>
     {
-        var collectCoverage = Argument<bool>("collect-coverage", true);
+        var collectCoverage = Argument("collect-coverage", true);
         var coverageDir = "./.coverage";
-        var testResultsDir = "./.test-results";
 
         if (collectCoverage)
         {
             ctx.CleanDirectory(coverageDir);
-            ctx.CleanDirectory(testResultsDir);
         }
 
         foreach (var testProject in testProjects)
@@ -79,9 +77,9 @@ Task("Test")
             {
                 // Create a unique directory for each test project's results
                 var projectResultsDir = System.IO.Path.Combine(coverageDir, projectName);
-                settings.Collectors = new[] { "XPlat Code Coverage" };
+                settings.Collectors = ["XPlat Code Coverage"];
                 settings.ResultsDirectory = projectResultsDir;
-                settings.Loggers = new[] { "trx" };
+                settings.Loggers = ["trx;LogFilePrefix=testResults"];
             }
 
             ctx.Information($"Running tests for {projectName}...");
