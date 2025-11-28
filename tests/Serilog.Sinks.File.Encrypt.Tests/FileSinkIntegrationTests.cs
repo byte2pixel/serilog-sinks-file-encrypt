@@ -153,7 +153,7 @@ public sealed class FileSinkIntegrationTests : IDisposable
         logger.Information("This is a second log message");
         await logger.DisposeAsync();
         // Act - Decrypt the log file to a specified file
-        await EncryptionUtils.DecryptLogFileToFileAsync(
+        await EncryptionUtils.DecryptLogFileAsync(
             _logFilePath,
             decryptedFilePath,
             _rsaKeyPair.privateKey,
