@@ -7,21 +7,15 @@ namespace Serilog.Sinks.File.Encrypt.Tests.unit;
 /// Base class for encryption tests providing common test fixtures and helper methods.
 /// All streams created during tests are automatically tracked and disposed.
 /// </summary>
-public abstract class EncryptionTestBase : IDisposable
+public abstract class EncryptionTestBase : IDisposable, IAsyncDisposable
 {
-    protected MockFileSystem FileSystem { get; }
-    protected (string publicKey, string privateKey) RsaKeyPair { get; }
-    private readonly List<Stream> _streamsToDispose = new();
+    protected (string publicKey, string privateKey) RsaKeyPair { get; } =
+        EncryptionUtils.GenerateRsaKeyPair();
+    private readonly List<Stream> _streamsToDispose = [];
     private bool _disposed;
 
-    protected EncryptionTestBase()
-    {
-        FileSystem = new MockFileSystem();
-        RsaKeyPair = EncryptionUtils.GenerateRsaKeyPair();
-    }
-
     /// <summary>
-    /// Creates an encrypted memory stream with the given messages. Stream is automatically disposed.
+    /// Creates an encrypted memory stream with the given messages using synchronous Flush. Stream is automatically disposed.
     /// </summary>
     protected MemoryStream CreateEncryptedStream(string[] messages, string publicKey)
     {
@@ -49,11 +43,54 @@ public abstract class EncryptionTestBase : IDisposable
     }
 
     /// <summary>
-    /// Creates an encrypted memory stream with a single message. Stream is automatically disposed.
+    /// Creates an encrypted memory stream with a single message using synchronous Flush. Stream is automatically disposed.
     /// </summary>
     protected MemoryStream CreateEncryptedStream(string message, string publicKey)
     {
         return CreateEncryptedStream([message], publicKey);
+    }
+
+    /// <summary>
+    /// Creates an encrypted memory stream with the given messages using asynchronous FlushAsync. Stream is automatically disposed.
+    /// </summary>
+    protected async Task<MemoryStream> CreateEncryptedStreamAsync(
+        string[] messages,
+        string publicKey,
+        CancellationToken cancellationToken = default
+    )
+    {
+        MemoryStream memoryStream = new();
+        _streamsToDispose.Add(memoryStream);
+
+        using RSA rsa = RSA.Create();
+        rsa.FromXmlString(publicKey);
+
+        // Create EncryptedStream but don't dispose it - disposing would close the underlying MemoryStream
+        EncryptedStream encryptedStream = new(memoryStream, rsa);
+
+        foreach (byte[] message in messages.Select(m => Encoding.UTF8.GetBytes(m)))
+        {
+            await encryptedStream.WriteAsync(message, cancellationToken);
+            await encryptedStream.FlushAsync(cancellationToken);
+        }
+
+        // Don't dispose encryptedStream here - let it be garbage collected
+        // The MemoryStream will be disposed by the test base
+
+        memoryStream.Position = 0;
+        return memoryStream;
+    }
+
+    /// <summary>
+    /// Creates an encrypted memory stream with a single message using asynchronous FlushAsync. Stream is automatically disposed.
+    /// </summary>
+    protected async Task<MemoryStream> CreateEncryptedStreamAsync(
+        string message,
+        string publicKey,
+        CancellationToken cancellationToken = default
+    )
+    {
+        return await CreateEncryptedStreamAsync([message], publicKey, cancellationToken);
     }
 
     /// <summary>
@@ -86,7 +123,11 @@ public abstract class EncryptionTestBase : IDisposable
         CancellationToken cancellationToken = default
     )
     {
-        MemoryStream encryptedStream = CreateEncryptedStream(messages, publicKey);
+        MemoryStream encryptedStream = await CreateEncryptedStreamAsync(
+            messages,
+            publicKey,
+            cancellationToken
+        );
         return await DecryptStreamToStringAsync(encryptedStream, privateKey, cancellationToken);
     }
 
@@ -190,6 +231,34 @@ public abstract class EncryptionTestBase : IDisposable
     public void Dispose()
     {
         Dispose(true);
+        GC.SuppressFinalize(this);
+    }
+
+    protected virtual async ValueTask DisposeAsyncCore()
+    {
+        if (_disposed)
+            return;
+
+        // Dispose all tracked streams asynchronously
+        for (int i = _streamsToDispose.Count - 1; i >= 0; i--)
+        {
+            try
+            {
+                await _streamsToDispose[i].DisposeAsync().ConfigureAwait(false);
+            }
+            catch
+            {
+                // Ignore disposal errors in tests
+            }
+        }
+        _streamsToDispose.Clear();
+
+        _disposed = true;
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        await DisposeAsyncCore().ConfigureAwait(false);
         GC.SuppressFinalize(this);
     }
 }
