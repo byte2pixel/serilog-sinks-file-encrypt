@@ -1,5 +1,4 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
-
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
@@ -8,15 +7,18 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\Serilog.Sinks.File.Encrypt\Serilog.Sinks.File.Encrypt.csproj" />
   </ItemGroup>
-    
+
   <ItemGroup>
     <PackageReference Include="Serilog" Version="4.3.0" />
     <PackageReference Include="Serilog.Sinks.Console" Version="6.0.0" />
     <PackageReference Include="Serilog.Sinks.File" Version="7.0.0" />
   </ItemGroup>
-    
-  <ItemGroup Condition="Exists('./public_key.xml')">
-    <EmbeddedResource Include="./public_key.xml" CopyToOutputDirectory="Never" LogicalName="public_key.xml" />
-  </ItemGroup>
 
+  <ItemGroup Condition="Exists('./public_key.xml')">
+    <EmbeddedResource
+      Include="./public_key.xml"
+      CopyToOutputDirectory="Never"
+      LogicalName="public_key.xml"
+    />
+  </ItemGroup>
 </Project>

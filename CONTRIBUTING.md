@@ -183,8 +183,10 @@ The project uses [CSharpier](https://csharpier.com/) for automatic code formatti
 # Install CSharpier globally (one-time setup)
 dotnet tool install -g csharpier
 
-# Format all code
-dotnet csharpier .
+# Check Format
+dotnet csharpier check .
+# Format Code
+dotnet csharpier format .
 
 # Check formatting (done automatically during build)
 dotnet make lint
