@@ -7,9 +7,10 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE.md)
 [![codecov](https://codecov.io/gh/byte2pixel/serilog-sinks-file-encrypt/graph/badge.svg?token=HCDP3VVZ5B)](https://codecov.io/gh/byte2pixel/serilog-sinks-file-encrypt)
 
-A Serilog sink that encrypts log files using RSA and AES encryption. This package provides secure logging by encrypting log data before writing to disk, ensuring sensitive information remains protected.
+A [Serilog.File.Sink](https://github.com/serilog/serilog-sinks-file) hook that encrypts log files using RSA and AES encryption. This package provides secure logging by encrypting log data before writing to disk, ensuring sensitive information remains protected.
 
-> **⚠️ Pre-release Software**: This library is currently in pre-release. APIs may change before the 1.0 release. See [SECURITY.md](SECURITY.md) for security considerations and best practices.
+> [!Note] **⚠️ Pre-release Software**
+> This library is currently in pre-release. APIs may change before the 1.0 release.
 
 ## 📦 Packages
 
@@ -31,7 +32,7 @@ This repository contains two packages:
 ### 🔧 Requirements
 
 - .NET 8.0 or higher
-- Serilog.Sinks.File package
+- A project using [Serilog.Sinks.File](https://github.com/serilog/serilog-sinks-file) package
 - RSA key pair for encryption/decryption in XML format
 
 ### 1. Install the packages
@@ -79,7 +80,7 @@ serilog-encrypt decrypt --key ./keys/private_key.xml --file logs/app.log --outpu
 
 ## 📚 Documentation
 
-- **[Main Package Documentation](./resources/nuget/Serilog.Sinks.File.Encrypt.md)** - Comprehensive guide for the encryption sink
+- **[Main Package Documentation](./resources/nuget/Serilog.Sinks.File.Encrypt.md)** - Comprehensive guide for the hook package
 - **[CLI Tool Documentation](./resources/nuget/Serilog.Sinks.File.Encrypt.Cli.md)** - Guide for the command-line tool
 
 ## 🛡️ Security
@@ -98,6 +99,13 @@ This project uses .NET 8.0 and Cake for building:
 dotnet tool restore
 dotnet make
 ```
+
+## 🗺️ Roadmap
+
+- Enhanced key management features
+- Integration with cloud key management services
+- Support for additional encryption algorithms
+- Performance optimizations
 
 ## 🤝 Contributing
 

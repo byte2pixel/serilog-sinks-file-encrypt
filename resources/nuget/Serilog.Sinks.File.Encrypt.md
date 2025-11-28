@@ -5,15 +5,15 @@
 [![Build Status](https://github.com/byte2pixel/serilog-sinks-file-encrypt/actions/workflows/ci.yaml/badge.svg)](https://github.com/byte2pixel/serilog-sinks-file-encrypt/actions/workflows/ci.yaml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/byte2pixel/serilog-sinks-file-encrypt/blob/main/LICENSE.md)
 
-A Serilog sink that encrypts log files using RSA and AES encryption. This package provides secure logging by encrypting log data before writing to disk, ensuring sensitive information remains protected.
+A [Serilog.File.Sink](https://github.com/serilog/serilog-sinks-file) hook that encrypts log files using RSA and AES encryption. This package provides secure logging by encrypting log data before writing to disk, ensuring sensitive information remains protected.
 
 ## Features
 
 - **Hybrid Encryption**: Uses RSA encryption for key exchange and AES for efficient data encryption
-- **Seamless Integration**: Plugs directly into Serilog's file sink using lifecycle hooks
+- **Seamless Integration**: Plugs directly into [Serilog.File.Sink](https://github.com/serilog/serilog-sinks-file) using file lifecycle hooks
 - **Memory-Optimized**: Producer-consumer architecture for efficient processing of large files
 - **CLI Tool Integration**: Companion CLI tool for key generation and log decryption
-- **High Performance**: Optimized encryption with chunked processing
+- **Optimal Performance**: Optimized encryption performance using hybrid encryption.
 
 ## Use Cases
 
@@ -88,7 +88,7 @@ serilog-encrypt decrypt --key ./keys/private_key.xml --file logs/app.log --outpu
 using Serilog.Sinks.File.Encrypt;
 
 // Generate a new RSA key pair
-var (publicKey, privateKey) = EncryptionUtils.GenerateRsaKeyPair(2048);
+var (publicKey, privateKey) = EncryptionUtils.GenerateRsaKeyPair(4096);
 
 // Save keys to files
 File.WriteAllText("public_key.xml", publicKey);
@@ -115,6 +115,8 @@ var options = new StreamingOptions
     BufferSize = 64 * 1024,  // 64KB chunks
     QueueDepth = 20,         // Queue depth
     ContinueOnError = true   // Continue on corruption
+    ErrorHandlingMode = ErrorHandlingMode.WriteToErrorLog, // Log errors to a separate file
+    ErrorLogPath = "decryption-errors.log" // Custom error log path
 };
 
 using var input = File.OpenRead("large-log.encrypted");
@@ -285,4 +287,5 @@ For detailed CLI documentation, see the [CLI tool documentation](https://www.nug
 ## Requirements
 
 - .NET 8.0 or higher
-- Serilog.Sinks.File package
+- A project using [Serilog.Sinks.File](https://github.com/serilog/serilog-sinks-file)
+- RSA key pair for encryption/decryption in XML format (generated via CLI tool or programmatically)
