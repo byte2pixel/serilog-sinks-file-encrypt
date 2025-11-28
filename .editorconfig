@@ -158,10 +158,10 @@ csharp_style_expression_bodied_lambdas = when_on_single_line:silent
 csharp_style_expression_bodied_local_functions = when_on_single_line:silent
 
 # Namespace preferences
-csharp_style_namespace_declarations = file_scoped:warning
+csharp_style_namespace_declarations = file_scoped:error
 
 # Using directive preferences
-csharp_using_directive_placement = outside_namespace:warning
+csharp_using_directive_placement = outside_namespace:error
 
 ################################################################
 # .NET Code Style Rules
