@@ -74,11 +74,34 @@ cd serilog-sinks-file-encrypt
 
 ### Restore Tools
 
-This project uses [Cake](https://cakebuild.net/) for build automation:
+This project uses [Cake](https://cakebuild.net/) for build automation and [Husky.NET](https://alirezanet.github.io/Husky.Net/) for git hooks:
 
 ```bash
 dotnet tool restore
 ```
+
+**This command will:**
+- Install Cake for build automation
+- Install CSharpier for code formatting
+- Install Husky and set up git hooks for automatic code formatting
+- Install other required tools (Make, etc.)
+
+**After running this command:**
+- Git hooks are automatically installed and active
+- Pre-commit hook will format your code automatically before each commit
+- No additional setup is required
+
+### Development Workflow
+
+Once you've run `dotnet tool restore`, your development workflow is:
+
+1. **Make code changes** as usual in your IDE
+2. **Build and test** your changes locally
+3. **Stage your changes**: `git add .`
+4. **Commit**: `git commit -m "Your message"`
+   - The pre-commit hook will automatically format staged files with CSharpier
+   - If formatting changes are made, you'll need to review and re-commit
+5. **Push**: `git push` (build will run additional checks)
 
 ### Restore NuGet Packages
 
@@ -103,16 +126,6 @@ dotnet make --configuration Debug
 dotnet make clean
 ```
 
-### Using .NET CLI
-
-```bash
-# Build the solution
-dotnet build
-
-# Build a specific project
-dotnet build src/Serilog.Sinks.File.Encrypt/Serilog.Sinks.File.Encrypt.csproj
-```
-
 ## Running Tests
 
 ### Run All Tests
@@ -125,20 +138,10 @@ dotnet make test
 dotnet test
 ```
 
-**Note**: The Cake build collects code coverage by default. If you want to skip coverage collection for faster test runs:
+**Note**: The Cake build collects code coverage by default for CI but not locally. If you want to coverage collection:
 
 ```bash
-dotnet make test --collect-coverage=false
-```
-
-### Run Specific Tests
-
-```bash
-# Run tests for a specific project
-dotnet test test/Serilog.Sinks.File.Encrypt.Tests/Serilog.Sinks.File.Encrypt.Tests.csproj
-
-# Run a specific test
-dotnet test --filter "FullyQualifiedName~EncryptedStreamTests.SingleFlush_DoesNotThrow"
+dotnet make test --collect-coverage=true
 ```
 
 ### Running Benchmarks
@@ -177,22 +180,53 @@ The project uses [CSharpier](https://csharpier.com/) for automatic code formatti
 - Tab width: 4 spaces
 - End of line: CRLF
 
-**Format code before committing:**
+**Automated formatting via Git Hooks:**
+
+This project uses [Husky.NET](https://alirezanet.github.io/Husky.Net/) to automatically format code before commits:
+
+- ✅ **Pre-commit hook**: Formats all C# files with CSharpier before allowing commits
+- ✅ **Automatic setup**: Installed when you run `dotnet tool restore`
+- ✅ **Helpful messages**: Shows how to fix any issues if formatting fails
+
+**If the pre-commit hook modifies files:**
+
+The hook will format your staged files automatically. If changes are made:
 
 ```bash
-# Install CSharpier globally (one-time setup)
+# Review what was changed
+git diff --staged
+
+# If you're happy with the formatting, re-commit
+git commit -m "Your message"
+
+# Or if you want to see all changes (formatted + unformatted)
+git status
+git diff  # unstaged changes (if any)
+```
+
+**Manual formatting commands:**
+
+```bash
+# Install CSharpier globally (one-time setup - optional, local tool preferred)
 dotnet tool install -g csharpier
 
-# Check Format
+# Check formatting
 dotnet csharpier check .
-# Format Code
+
+# Format all code
 dotnet csharpier format .
 
 # Check formatting (done automatically during build)
 dotnet make lint
 ```
 
-**The build will fail if code is not formatted correctly.** Use `dotnet csharpier .` to fix formatting issues.
+**Skip pre-commit check (not recommended):**
+
+```bash
+git commit --no-verify -m "Your message"
+```
+
+**The build will fail if code is not formatted correctly.** The git hook catches formatting issues before you push, saving CI time.
 
 ### Code Quality with Roslynator
 
