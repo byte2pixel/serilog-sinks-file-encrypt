@@ -76,7 +76,7 @@ Task("Test")
             if (collectCoverage)
             {
                 // Create a unique directory for each test project's results
-                var projectResultsDir = System.IO.Path.Combine(coverageDir, projectName);
+                var projectResultsDir = System.IO.Path.Join(coverageDir, projectName);
                 settings.Collectors = ["XPlat Code Coverage"];
                 settings.ResultsDirectory = projectResultsDir;
                 settings.Loggers = ["trx;LogFilePrefix=testResults"];

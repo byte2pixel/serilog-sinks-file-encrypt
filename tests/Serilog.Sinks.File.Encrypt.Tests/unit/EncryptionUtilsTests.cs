@@ -2,7 +2,7 @@ using System.Diagnostics.CodeAnalysis;
 
 namespace Serilog.Sinks.File.Encrypt.Tests.unit;
 
-public class EncryptionUtilsTests
+public class EncryptionUtilsTests : EncryptionTestBase
 {
     [Fact]
     public void GenerateRsaKeyPair_ReturnsValidKeys()
@@ -24,130 +24,111 @@ public class EncryptionUtilsTests
         decryptedData.ShouldBe(data);
     }
 
-    [SuppressMessage("csharpsquid:S6966", "Tests should use async suffix where applicable")]
     [Fact]
     public async Task DecryptLogFileAsync_ReturnsDecryptedContent()
     {
         // Arrange
-        (string publicKey, string privateKey) = EncryptionUtils.GenerateRsaKeyPair();
         const string originalText = "Hello, simple encrypted log!";
-        string tempFile = Path.GetTempFileName();
 
-        try
-        {
-            await using (FileStream fs = System.IO.File.Create(tempFile))
-            using (RSA rsa = RSA.Create())
-            {
-                rsa.FromXmlString(publicKey);
-                await using (EncryptedStream encStream = new(fs, rsa))
-                {
-                    byte[] data = Encoding.UTF8.GetBytes(originalText);
-#pragma warning disable S6966 // Awaitable method should be used
-                    encStream.Write(data, 0, data.Length);
-                    encStream.Flush();
-#pragma warning restore S6966 // Awaitable method should be used
-                }
-            }
+        // Act - Use helper method that handles all stream management
+        string decrypted = await EncryptAndDecryptAsync(
+            originalText,
+            RsaKeyPair.publicKey,
+            RsaKeyPair.privateKey,
+            TestContext.Current.CancellationToken
+        );
 
-            // Act
-            await using (FileStream inputStream = System.IO.File.OpenRead(tempFile))
-            using (MemoryStream outputStream = new())
-            {
-                await EncryptionUtils.DecryptLogFileAsync(
-                    inputStream,
-                    outputStream,
-                    privateKey,
-                    cancellationToken: TestContext.Current.CancellationToken
-                );
-
-                // Assert
-                outputStream.Position = 0;
-                using StreamReader reader = new(outputStream);
-                string decrypted = await reader.ReadToEndAsync(
-                    TestContext.Current.CancellationToken
-                );
-                decrypted.ShouldContain(originalText);
-            }
-        }
-        finally
-        {
-            try
-            {
-                System.IO.File.Delete(tempFile);
-            }
-            catch (IOException)
-            {
-                // Directory may be locked by another process - acceptable in test cleanup
-            }
-            catch (UnauthorizedAccessException)
-            {
-                // May not have permissions - acceptable in test cleanup
-            }
-        }
+        // Assert
+        decrypted.ShouldContain(originalText);
     }
 
     [Fact]
     public async Task DecryptLogFileAsync_ReturnsMultipleDecryptedEntries()
     {
         // Arrange
-        (string publicKey, string privateKey) = EncryptionUtils.GenerateRsaKeyPair();
         const string logMessage1 = "Simple log file test!";
         const string logMessage2 = "Second simple log entry!";
-        string tempFile = Path.GetTempFileName();
 
-        try
-        {
-            await using (FileStream fs = System.IO.File.Create(tempFile))
-            using (RSA rsa = RSA.Create())
-            {
-                rsa.FromXmlString(publicKey);
-                await using (EncryptedStream encStream = new(fs, rsa))
-                {
-                    byte[] data1 = Encoding.UTF8.GetBytes(logMessage1);
-                    await encStream.WriteAsync(data1, TestContext.Current.CancellationToken);
-                    await encStream.FlushAsync(TestContext.Current.CancellationToken);
+        // Act - Use helper method that handles all stream management
+        string decrypted = await EncryptAndDecryptAsync(
+            [logMessage1, logMessage2],
+            RsaKeyPair.publicKey,
+            RsaKeyPair.privateKey,
+            TestContext.Current.CancellationToken
+        );
 
-                    byte[] data2 = Encoding.UTF8.GetBytes(logMessage2);
-                    await encStream.WriteAsync(data2, TestContext.Current.CancellationToken);
-                    await encStream.FlushAsync(TestContext.Current.CancellationToken);
-                }
-            }
+        // Assert
+        decrypted.ShouldContain(logMessage1);
+        decrypted.ShouldContain(logMessage2);
+    }
 
-            // Act
-            await using (FileStream inputStream = System.IO.File.OpenRead(tempFile))
-            using (MemoryStream outputStream = new())
-            {
-                await EncryptionUtils.DecryptLogFileAsync(
-                    inputStream,
-                    outputStream,
-                    privateKey,
-                    cancellationToken: TestContext.Current.CancellationToken
-                );
+    [Fact]
+    public void GenerateRsaKeyPair_With4096BitKey_ReturnsValidKeys()
+    {
+        // Arrange & Act
+        (string publicKey, string privateKey) = EncryptionUtils.GenerateRsaKeyPair(keySize: 4096);
 
-                // Assert
-                outputStream.Position = 0;
-                using StreamReader reader = new(outputStream);
-                string decrypted = await reader.ReadToEndAsync(
-                    TestContext.Current.CancellationToken
-                );
-                decrypted.ShouldContain(logMessage1);
-                decrypted.ShouldContain(logMessage2);
-            }
-        }
-        finally
-        {
-            try
-            {
-                System.IO.File.Delete(tempFile);
-            }
-            catch (IOException)
-            {
-                // Directory may be locked by another process - acceptable in test cleanup
-            }
-            catch (UnauthorizedAccessException)
-            {
-                // May not have permissions - acceptable in test cleanup
-            }
-        }
+        using RSA privateKeyRsa = RSA.Create();
+        privateKeyRsa.FromXmlString(privateKey);
+
+        using RSA publicKeyRsa = RSA.Create();
+        publicKeyRsa.FromXmlString(publicKey);
+
+        // Assert - Verify key size is 4096 bits
+        privateKeyRsa.KeySize.ShouldBe(4096);
+        publicKeyRsa.KeySize.ShouldBe(4096);
+
+        // Verify keys can encrypt and decrypt
+        byte[] data = "Test data for 4096-bit key"u8.ToArray();
+        byte[] encryptedData = publicKeyRsa.Encrypt(data, RSAEncryptionPadding.Pkcs1);
+        byte[] decryptedData = privateKeyRsa.Decrypt(encryptedData, RSAEncryptionPadding.Pkcs1);
+
+        decryptedData.ShouldBe(data);
+    }
+
+    [Fact]
+    public async Task EncryptedStream_With4096BitKey_EncryptsAndDecryptsSuccessfully()
+    {
+        // Arrange
+        (string publicKey, string privateKey) = EncryptionUtils.GenerateRsaKeyPair(keySize: 4096);
+        const string originalText = "Testing 4096-bit RSA key with encrypted stream!";
+
+        using RSA rsa = RSA.Create();
+        rsa.FromXmlString(publicKey);
+        rsa.KeySize.ShouldBe(4096); // Verify key size
+
+        // Act - Use helper that manages streams automatically
+        string decrypted = await EncryptAndDecryptAsync(
+            originalText,
+            publicKey,
+            privateKey,
+            TestContext.Current.CancellationToken
+        );
+
+        // Assert
+        decrypted.ShouldBe(originalText);
+    }
+
+    [Fact]
+    public async Task EncryptedStream_With4096BitKey_HandlesMultipleChunks()
+    {
+        // Arrange
+        (string publicKey, string privateKey) = EncryptionUtils.GenerateRsaKeyPair(keySize: 4096);
+        const string logMessage1 = "First log entry with 4096-bit key";
+        const string logMessage2 = "Second log entry with 4096-bit key";
+        const string logMessage3 = "Third log entry with 4096-bit key";
+
+        // Act - Use helper that manages streams automatically
+        string decrypted = await EncryptAndDecryptAsync(
+            [logMessage1, logMessage2, logMessage3],
+            publicKey,
+            privateKey,
+            TestContext.Current.CancellationToken
+        );
+
+        // Assert
+        decrypted.ShouldContain(logMessage1);
+        decrypted.ShouldContain(logMessage2);
+        decrypted.ShouldContain(logMessage3);
     }
 }
