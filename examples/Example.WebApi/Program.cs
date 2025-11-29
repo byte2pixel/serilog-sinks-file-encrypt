@@ -1,7 +1,7 @@
 using System.Diagnostics;
 using Example.WebApi;
+using Microsoft.AspNetCore.Mvc;
 using Serilog;
-using ILogger = Microsoft.Extensions.Logging.ILogger;
 
 WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 
@@ -11,10 +11,7 @@ builder.Services.AddOpenApi();
 builder.Services.AddSerilog(
     (context, configuration) =>
     {
-        configuration
-            .ReadFrom.Configuration(builder.Configuration)
-            .ReadFrom.Services(context)
-            .Enrich.FromLogContext();
+        configuration.ReadFrom.Configuration(builder.Configuration).ReadFrom.Services(context);
     }
 );
 
@@ -33,7 +30,7 @@ string[] summaries = ["Freezing", "Bracing", "Chilly", "Cool", "Mild", "Warm", "
 
 app.MapGet(
         "/weatherforecast",
-        (ILogger logger) =>
+        ([FromServices] ILogger<Program> logger) =>
         {
             var stopwatch = Stopwatch.StartNew();
             logger.LogDebug("Starting weather forecast generation");
