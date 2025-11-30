@@ -4,5 +4,6 @@
     <IsPackable>false</IsPackable>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <WarnOnPackingNonPackableProject>false</WarnOnPackingNonPackableProject>
   </PropertyGroup>
 </Project>
