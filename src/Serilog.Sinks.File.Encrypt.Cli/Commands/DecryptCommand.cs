@@ -22,25 +22,52 @@ public sealed class DecryptCommand(IAnsiConsole console, IFileSystem fileSystem)
     public sealed class Settings : CommandSettings
     {
         /// <summary>
+        /// The path to an encrypted log file or directory containing encrypted log files.
+        /// Supports glob patterns like *.log
+        /// </summary>
+        [CommandArgument(0, "<PATH>")]
+        [Description("Path to encrypted log file, directory, or glob pattern (e.g., *.log)")]
+        public string InputPath { get; init; } = string.Empty;
+
+        /// <summary>
         /// The path to the RSA private key file in XML format.
         /// </summary>
         [CommandOption("-k|--key <KEY>")]
         [Description("The file containing the RSA private key in XML format")]
-        public string KeyFile { get; init; } = "privateKey.xml";
+        public string KeyFile { get; init; } = "private_key.xml";
 
         /// <summary>
-        /// The path to the encrypted log file to decrypt.
-        /// </summary>
-        [CommandOption("-f|--file <FILE>")]
-        [Description("The encrypted log file to decrypt")]
-        public string EncryptedFile { get; init; } = "log.encrypted.txt";
-
-        /// <summary>
-        /// The path where the decrypted log content will be saved.
+        /// The output directory or file path. If not specified, files are decrypted in place with .decrypted extension.
         /// </summary>
         [CommandOption("-o|--output <OUTPUT>")]
-        [Description("The output file for the decrypted log content")]
-        public string OutputFile { get; init; } = "log.decrypted.txt";
+        [Description(
+            "Output directory or file path (default: adds .decrypted to original filename)"
+        )]
+        public string? OutputPath { get; init; }
+
+        /// <summary>
+        /// Process directories recursively.
+        /// </summary>
+        [CommandOption("-r|--recursive")]
+        [Description("Process directories recursively")]
+        [DefaultValue(false)]
+        public bool Recursive { get; init; } = false;
+
+        /// <summary>
+        /// File pattern to match when processing directories (e.g., *.log, app*.txt).
+        /// </summary>
+        [CommandOption("-p|--pattern <PATTERN>")]
+        [Description("File pattern to match when processing directories (default: *.log)")]
+        [DefaultValue("*.log")]
+        public string Pattern { get; init; } = "*.log";
+
+        /// <summary>
+        /// Overwrite existing decrypted files without prompting.
+        /// </summary>
+        [CommandOption("--overwrite")]
+        [Description("Overwrite existing decrypted files without prompting")]
+        [DefaultValue(false)]
+        public bool Overwrite { get; init; } = false;
 
         /// <summary>
         /// How to handle decryption errors (Skip, WriteInline, WriteToErrorLog, ThrowException).
@@ -68,7 +95,7 @@ public sealed class DecryptCommand(IAnsiConsole console, IFileSystem fileSystem)
     }
 
     /// <summary>
-    /// Decrypts the specified encrypted log file using the provided RSA private key and writes the decrypted content to the output file.
+    /// Decrypts the specified encrypted log file(s) using the provided RSA private key and writes the decrypted content to output file(s).
     /// </summary>
     /// <param name="context">The command context.</param>
     /// <param name="settings">The decrypt settings.</param>
@@ -82,33 +109,29 @@ public sealed class DecryptCommand(IAnsiConsole console, IFileSystem fileSystem)
     {
         try
         {
-            // Validate input files exist
-            if (!fileSystem.File.Exists(settings.KeyFile))
+            if (ValidateInputs(settings))
             {
-                console.MarkupLineInterpolated(
-                    $"[red]✗ Error: Key file '{settings.KeyFile}' does not exist.[/]"
-                );
                 return 1;
             }
 
-            if (!fileSystem.File.Exists(settings.EncryptedFile))
-            {
-                console.MarkupLineInterpolated(
-                    $"[red]✗ Error: Encrypted file '{settings.EncryptedFile}' does not exist.[/]"
-                );
-                return 1;
-            }
-
-            console.MarkupLineInterpolated(
-                $"[blue]Reading private key from:[/] {settings.KeyFile}"
-            );
             string rsaPrivateKey = await fileSystem.File.ReadAllTextAsync(
                 settings.KeyFile,
                 cancellationToken
             );
 
+            // Determine if input is a file, directory, or pattern
+            List<string> filesToDecrypt = GetFilesToDecrypt(settings);
+
+            if (filesToDecrypt.Count == 0)
+            {
+                console.MarkupLineInterpolated(
+                    $"[yellow]⚠ No files found matching the specified path or pattern.[/]"
+                );
+                return 0;
+            }
+
             console.MarkupLineInterpolated(
-                $"[blue]Decrypting log file:[/] {settings.EncryptedFile}"
+                $"[blue]Found {filesToDecrypt.Count} file(s) to decrypt[/]"
             );
 
             // Configure streaming options based on user settings
@@ -130,27 +153,26 @@ public sealed class DecryptCommand(IAnsiConsole console, IFileSystem fileSystem)
                 console.MarkupLineInterpolated($"[dim]Error log path:[/] {settings.ErrorLogPath}");
             }
 
-            // Perform the decryption using streaming API for better memory efficiency
-            // Use IFileSystem to open streams so we can mock them in tests
-            await using FileSystemStream inputStream = fileSystem.File.OpenRead(
-                settings.EncryptedFile
-            );
-            await using FileSystemStream outputStream = fileSystem.File.Create(settings.OutputFile);
+            console.WriteLine();
 
-            await EncryptionUtils.DecryptLogFileAsync(
-                inputStream,
-                outputStream,
+            (int successCount, int failureCount) = await ProcessFilesAsync(
+                settings,
+                filesToDecrypt,
                 rsaPrivateKey,
                 streamingOptions,
                 cancellationToken
             );
 
-            console.MarkupLine("[green]✓ Successfully decrypted log file![/]");
-            console.MarkupLineInterpolated(
-                $"[yellow]Decrypted content written to:[/] {settings.OutputFile}"
-            );
+            // Summary
+            console.WriteLine();
+            console.MarkupLine("[bold]Summary:[/]");
+            console.MarkupLineInterpolated($"  [green]✓ Success:[/] {successCount}");
+            if (failureCount > 0)
+            {
+                console.MarkupLineInterpolated($"  [red]✗ Failed:[/] {failureCount}");
+            }
 
-            return 0;
+            return failureCount > 0 ? 1 : 0;
         }
         catch (IOException ex)
         {
@@ -179,5 +201,196 @@ public sealed class DecryptCommand(IAnsiConsole console, IFileSystem fileSystem)
             console.MarkupLineInterpolated($"[red]✗ Invalid file: {ex.Message}[/]");
             return 1;
         }
+    }
+
+    private async Task<(int successCount, int failureCount)> ProcessFilesAsync(
+        Settings settings,
+        List<string> filesToDecrypt,
+        string rsaPrivateKey,
+        StreamingOptions streamingOptions,
+        CancellationToken cancellationToken
+    )
+    {
+        int successCount = 0;
+        int failureCount = 0;
+        foreach (string inputFile in filesToDecrypt)
+        {
+            string outputFile = DetermineOutputPath(inputFile, settings);
+
+            // Check if output file exists
+            if (fileSystem.File.Exists(outputFile) && !settings.Overwrite)
+            {
+                console.MarkupLineInterpolated(
+                    $"[yellow]⊘ Skipping (already exists):[/] {inputFile}"
+                );
+                console.MarkupLineInterpolated(
+                    $"  [dim]→ {outputFile} (use --overwrite to replace)[/]"
+                );
+                continue;
+            }
+
+            try
+            {
+                console.MarkupLineInterpolated($"[cyan]⧗ Decrypting:[/] {inputFile}");
+
+                // Ensure output directory exists
+                string? outputDir = fileSystem.Path.GetDirectoryName(outputFile);
+                if (!string.IsNullOrEmpty(outputDir) && !fileSystem.Directory.Exists(outputDir))
+                {
+                    fileSystem.Directory.CreateDirectory(outputDir);
+                }
+
+                // Perform the decryption using streaming API
+                await using FileSystemStream inputStream = fileSystem.File.OpenRead(inputFile);
+                await using FileSystemStream outputStream = fileSystem.File.Create(outputFile);
+
+                await EncryptionUtils.DecryptLogFileAsync(
+                    inputStream,
+                    outputStream,
+                    rsaPrivateKey,
+                    streamingOptions,
+                    cancellationToken
+                );
+
+                console.MarkupLineInterpolated($"[green]✓ Decrypted:[/] {inputFile}");
+                console.MarkupLineInterpolated($"  [dim]→ {outputFile}[/]");
+                successCount++;
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                console.MarkupLineInterpolated($"[red]✗ Failed:[/] {inputFile} - {ex.Message}");
+                failureCount++;
+            }
+            catch (System.Security.Cryptography.CryptographicException ex)
+            {
+                console.MarkupLineInterpolated(
+                    $"[red]✗ Decryption failed:[/] {inputFile} - {ex.Message}"
+                );
+                failureCount++;
+            }
+        }
+
+        return (successCount, failureCount);
+    }
+
+    private bool ValidateInputs(Settings settings)
+    {
+        // Validate inputs
+        if (string.IsNullOrWhiteSpace(settings.InputPath))
+        {
+            console.MarkupLine("[red]✗ Error: Input path is required.[/]");
+            return true;
+        }
+
+        if (!fileSystem.File.Exists(settings.KeyFile))
+        {
+            console.MarkupLineInterpolated(
+                $"[red]✗ Error: Key file '{settings.KeyFile}' does not exist.[/]"
+            );
+            return true;
+        }
+
+        console.MarkupLineInterpolated($"[blue]Reading private key from:[/] {settings.KeyFile}");
+        return false;
+    }
+
+    /// <summary>
+    /// Gets the list of files to decrypt based on the input path and settings.
+    /// </summary>
+    private List<string> GetFilesToDecrypt(Settings settings)
+    {
+        List<string> files = [];
+        string[] foundFiles;
+        SearchOption searchOption;
+
+        // Check if it's a direct file path
+        if (fileSystem.File.Exists(settings.InputPath))
+        {
+            files.Add(settings.InputPath);
+            return files;
+        }
+
+        // Check if it's a directory
+        if (fileSystem.Directory.Exists(settings.InputPath))
+        {
+            searchOption = settings.Recursive
+                ? SearchOption.AllDirectories
+                : SearchOption.TopDirectoryOnly;
+
+            foundFiles = fileSystem.Directory.GetFiles(
+                settings.InputPath,
+                settings.Pattern,
+                searchOption
+            );
+            files.AddRange(foundFiles);
+            return files;
+        }
+
+        if (!settings.InputPath.Contains('*') && !settings.InputPath.Contains('?'))
+        {
+            return files;
+        }
+
+        string? directory = fileSystem.Path.GetDirectoryName(settings.InputPath);
+        string pattern = fileSystem.Path.GetFileName(settings.InputPath);
+
+        if (string.IsNullOrEmpty(directory))
+        {
+            directory = fileSystem.Directory.GetCurrentDirectory();
+        }
+
+        if (!fileSystem.Directory.Exists(directory) || string.IsNullOrEmpty(pattern))
+        {
+            return files;
+        }
+
+        searchOption = settings.Recursive
+            ? SearchOption.AllDirectories
+            : SearchOption.TopDirectoryOnly;
+
+        foundFiles = fileSystem.Directory.GetFiles(directory, pattern, searchOption);
+        files.AddRange(foundFiles);
+
+        return files;
+    }
+
+    /// <summary>
+    /// Determines the output file path based on the input file and settings.
+    /// </summary>
+    private string DetermineOutputPath(string inputFile, Settings settings)
+    {
+        // If output path is explicitly specified
+        if (!string.IsNullOrWhiteSpace(settings.OutputPath))
+        {
+            // If decrypting multiple files and output is a directory
+            if (fileSystem.Directory.Exists(settings.OutputPath))
+            {
+                string inputFileName = fileSystem.Path.GetFileName(inputFile);
+                string outputFileName = GenerateDecryptedFileName(inputFileName);
+                return fileSystem.Path.Combine(settings.OutputPath, outputFileName);
+            }
+
+            // If decrypting a single file, use the output path directly
+            return settings.OutputPath;
+        }
+
+        // Default: add .decrypted extension in the same directory
+        string directory = fileSystem.Path.GetDirectoryName(inputFile) ?? string.Empty;
+        string inputFileName2 = fileSystem.Path.GetFileName(inputFile);
+        string decryptedFileName = GenerateDecryptedFileName(inputFileName2);
+
+        return fileSystem.Path.Combine(directory, decryptedFileName);
+    }
+
+    /// <summary>
+    /// Generates a decrypted filename by adding .decrypted before the extension.
+    /// Example: app.log -> app.decrypted.log
+    /// </summary>
+    private string GenerateDecryptedFileName(string fileName)
+    {
+        string nameWithoutExtension = fileSystem.Path.GetFileNameWithoutExtension(fileName);
+        string extension = fileSystem.Path.GetExtension(fileName);
+
+        return $"{nameWithoutExtension}.decrypted{extension}";
     }
 }

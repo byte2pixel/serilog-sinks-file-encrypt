@@ -79,11 +79,14 @@ The log files contain encrypted binary data that cannot be read without decrypti
 Use the CLI tool to decrypt and view the log contents:
 
 ```bash
-# Decrypt a specific log file
-serilog-encrypt decrypt --key ../../../private_key.xml --file log20251123.txt --output decrypted-log.txt
+# Decrypt a specific log file (creates log20251123.decrypted.txt)
+serilog-encrypt decrypt log20251123.txt -k ../../../private_key.xml
+
+# Or decrypt with custom output name
+serilog-encrypt decrypt log20251123.txt -k ../../../private_key.xml -o decrypted-log.txt
 
 # View the decrypted content
-cat decrypted-log.txt
+cat log20251123.decrypted.txt
 ```
 
 You should now see the original log messages in plain text format.

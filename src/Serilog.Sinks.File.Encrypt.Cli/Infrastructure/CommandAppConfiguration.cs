@@ -28,13 +28,23 @@ public static class CommandAppConfiguration
     /// <returns>An action that configures the CommandApp</returns>
     public static Action<IConfigurator> GetConfiguration()
     {
+        const string PrivateKey = "private_key.xml";
+        const string Decrypt = "decrypt";
+
         return c =>
         {
             c.SetApplicationName("serilog-encrypt");
             c.AddCommand<GenerateCommand>("generate")
-                .WithDescription("Generate a new RSA key pair for log encryption");
-            c.AddCommand<DecryptCommand>("decrypt")
-                .WithDescription("Decrypt encrypted log files using an RSA private key");
+                .WithDescription("Generate a new RSA key pair for log encryption")
+                .WithExample("generate", "--output", "./keys");
+
+            c.AddCommand<DecryptCommand>(Decrypt)
+                .WithDescription("Decrypt encrypted log files using an RSA private key")
+                .WithExample(Decrypt, "app.log", "-k", PrivateKey)
+                .WithExample(Decrypt, "./logs", "-k", PrivateKey)
+                .WithExample(Decrypt, "*.log", "-k", PrivateKey)
+                .WithExample(Decrypt, "./logs", "-k", PrivateKey, "-r")
+                .WithExample(Decrypt, "app.log", "-k", PrivateKey, "-o", "decrypted.log");
             c.ValidateExamples();
         };
     }
