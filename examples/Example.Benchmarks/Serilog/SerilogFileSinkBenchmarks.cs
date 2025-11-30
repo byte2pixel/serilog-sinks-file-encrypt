@@ -26,7 +26,7 @@ public class SerilogFileSinkBenchmarks
     public void Setup()
     {
         _publicKey = new KeyService().PublicKey;
-        _logDirectory = Path.Combine(
+        _logDirectory = Path.Join(
             Path.GetTempPath(),
             "SerilogBenchmarks",
             Guid.NewGuid().ToString()
@@ -37,7 +37,7 @@ public class SerilogFileSinkBenchmarks
     [Benchmark(Baseline = true)]
     public void LogWithoutEncryption()
     {
-        string logPath = Path.Combine(_logDirectory, $"no-encrypt-{Guid.NewGuid()}.log");
+        string logPath = Path.Join(_logDirectory, $"no-encrypt-{Guid.NewGuid()}.log");
 
         using Logger logger = new LoggerConfiguration()
             .WriteTo.File(path: logPath, rollingInterval: RollingInterval.Infinite, buffered: false)
@@ -49,7 +49,7 @@ public class SerilogFileSinkBenchmarks
     [Benchmark]
     public void LogWithEncryption()
     {
-        string logPath = Path.Combine(_logDirectory, $"encrypted-{Guid.NewGuid()}.log");
+        string logPath = Path.Join(_logDirectory, $"encrypted-{Guid.NewGuid()}.log");
 
         using Logger logger = new LoggerConfiguration()
             .WriteTo.File(
@@ -66,7 +66,7 @@ public class SerilogFileSinkBenchmarks
     [Benchmark]
     public void LogWithEncryptionBuffered()
     {
-        string logPath = Path.Combine(_logDirectory, $"encrypted-buffered-{Guid.NewGuid()}.log");
+        string logPath = Path.Join(_logDirectory, $"encrypted-buffered-{Guid.NewGuid()}.log");
 
         using Logger logger = new LoggerConfiguration()
             .WriteTo.File(

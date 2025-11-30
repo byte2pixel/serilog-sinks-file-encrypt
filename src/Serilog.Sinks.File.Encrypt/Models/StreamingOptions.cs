@@ -139,7 +139,7 @@ public sealed class StreamingOptions
     /// var options = new StreamingOptions
     /// {
     ///     ErrorHandlingMode = ErrorHandlingMode.WriteToErrorLog,
-    ///     ErrorLogPath = Path.Combine("logs", "decryption_errors.log")
+    ///     ErrorLogPath = Path.Join("logs", "decryption_errors.log")
     /// };
     /// </code>
     /// </example>

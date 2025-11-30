@@ -22,7 +22,7 @@ public class BackgroundWorkerBenchmarks
     public void Setup()
     {
         _publicKey = new KeyService().PublicKey;
-        _logDirectory = Path.Combine(
+        _logDirectory = Path.Join(
             Path.GetTempPath(),
             "BackgroundWorkerBenchmarks",
             Guid.NewGuid().ToString()
@@ -33,7 +33,7 @@ public class BackgroundWorkerBenchmarks
     [Benchmark(Baseline = true)]
     public void SimulateBackgroundWorkerWithoutEncryption()
     {
-        string logPath = Path.Combine(_logDirectory, $"worker-no-encrypt-{Guid.NewGuid()}.log");
+        string logPath = Path.Join(_logDirectory, $"worker-no-encrypt-{Guid.NewGuid()}.log");
 
         using Logger logger = new LoggerConfiguration()
             .MinimumLevel.Debug()
@@ -46,7 +46,7 @@ public class BackgroundWorkerBenchmarks
     [Benchmark]
     public void SimulateBackgroundWorkerWithEncryption()
     {
-        string logPath = Path.Combine(_logDirectory, $"worker-encrypted-{Guid.NewGuid()}.log");
+        string logPath = Path.Join(_logDirectory, $"worker-encrypted-{Guid.NewGuid()}.log");
 
         using Logger logger = new LoggerConfiguration()
             .MinimumLevel.Debug()

@@ -22,7 +22,7 @@ public class WebApiRequestBenchmarks
     public void Setup()
     {
         _publicKey = new KeyService().PublicKey;
-        _logDirectory = Path.Combine(
+        _logDirectory = Path.Join(
             Path.GetTempPath(),
             "WebApiBenchmarks",
             Guid.NewGuid().ToString()
@@ -33,7 +33,7 @@ public class WebApiRequestBenchmarks
     [Benchmark(Baseline = true)]
     public void SimulateApiRequestsWithoutEncryption()
     {
-        string logPath = Path.Combine(_logDirectory, $"api-no-encrypt-{Guid.NewGuid()}.log");
+        string logPath = Path.Join(_logDirectory, $"api-no-encrypt-{Guid.NewGuid()}.log");
 
         using Logger logger = new LoggerConfiguration()
             .MinimumLevel.Information()
@@ -47,7 +47,7 @@ public class WebApiRequestBenchmarks
     [Benchmark]
     public void SimulateApiRequestsWithEncryption()
     {
-        string logPath = Path.Combine(_logDirectory, $"api-encrypted-{Guid.NewGuid()}.log");
+        string logPath = Path.Join(_logDirectory, $"api-encrypted-{Guid.NewGuid()}.log");
 
         using Logger logger = new LoggerConfiguration()
             .MinimumLevel.Information()
