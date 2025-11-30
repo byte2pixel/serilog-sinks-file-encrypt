@@ -32,6 +32,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Example.Benchmarks", "examp
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Serilog.Sinks.File.Encrypt.Cli.Tests", "tests\Serilog.Sinks.File.Encrypt.Cli.Tests\Serilog.Sinks.File.Encrypt.Cli.Tests.csproj", "{8FCF3215-6F29-4075-9DA0-EB594E2F1CE2}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Example.WebApi", "examples\Example.WebApi\Example.WebApi.csproj", "{9D263729-D997-4D1A-8886-DE35362AC13B}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -114,6 +116,18 @@ Global
 		{8FCF3215-6F29-4075-9DA0-EB594E2F1CE2}.Release|x64.Build.0 = Release|Any CPU
 		{8FCF3215-6F29-4075-9DA0-EB594E2F1CE2}.Release|x86.ActiveCfg = Release|Any CPU
 		{8FCF3215-6F29-4075-9DA0-EB594E2F1CE2}.Release|x86.Build.0 = Release|Any CPU
+		{9D263729-D997-4D1A-8886-DE35362AC13B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{9D263729-D997-4D1A-8886-DE35362AC13B}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{9D263729-D997-4D1A-8886-DE35362AC13B}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{9D263729-D997-4D1A-8886-DE35362AC13B}.Debug|x64.Build.0 = Debug|Any CPU
+		{9D263729-D997-4D1A-8886-DE35362AC13B}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{9D263729-D997-4D1A-8886-DE35362AC13B}.Debug|x86.Build.0 = Debug|Any CPU
+		{9D263729-D997-4D1A-8886-DE35362AC13B}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{9D263729-D997-4D1A-8886-DE35362AC13B}.Release|Any CPU.Build.0 = Release|Any CPU
+		{9D263729-D997-4D1A-8886-DE35362AC13B}.Release|x64.ActiveCfg = Release|Any CPU
+		{9D263729-D997-4D1A-8886-DE35362AC13B}.Release|x64.Build.0 = Release|Any CPU
+		{9D263729-D997-4D1A-8886-DE35362AC13B}.Release|x86.ActiveCfg = Release|Any CPU
+		{9D263729-D997-4D1A-8886-DE35362AC13B}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -125,6 +139,7 @@ Global
 		{810C95A0-AAFE-4932-A645-45BFF7744D5F} = {66966427-EC5F-42A8-AB6B-4239098DF247}
 		{B1D5AC31-9DB0-4AF4-ABD9-F2AA245CD2D3} = {66966427-EC5F-42A8-AB6B-4239098DF247}
 		{8FCF3215-6F29-4075-9DA0-EB594E2F1CE2} = {0C88DD14-F956-CE84-757C-A364CCF449FC}
+		{9D263729-D997-4D1A-8886-DE35362AC13B} = {66966427-EC5F-42A8-AB6B-4239098DF247}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {800B3CB2-1770-466A-8BAE-5940517A1D92}
