@@ -21,7 +21,18 @@ A [Serilog.File.Sink](https://github.com/serilog/serilog-sinks-file) hook that e
 - Compliance with data protection regulations by encrypting log files.
 - Protection against unauthorized access to log files in shared or cloud environments.
 
-There is overhead due to encryption; suitable for scenarios where security is prioritized over raw performance.
+## Performance
+
+Production-ready performance with minimal overhead:
+
+- ✅ **6-17% time overhead** in real-world scenarios (well under typical targets)
+- ✅ **200K+ logs/second** throughput with buffered writes
+- ✅ **1.6-2.2x memory overhead** for typical usage patterns
+- 🚀 **Buffered writes recommended** - Encrypted buffered I/O outperforms non-encrypted unbuffered
+
+**Buffering Trade-off:** While buffered writes provide excellent performance, they carry a risk of data loss if the application crashes before flushing. **Always call `Log.CloseAndFlush()` on application shutdown.**
+
+For detailed benchmarks and analysis, see the [Benchmark Documentation](https://github.com/byte2pixel/serilog-sinks-file-encrypt/tree/main/examples/Example.Benchmarks#readme).
 
 ## Installation
 
@@ -60,7 +71,7 @@ using Serilog.Sinks.File.Encrypt;
 // Load your public key
 string publicKeyXml = File.ReadAllText("./keys/public_key.xml");
 
-// Configure Serilog with encryption
+// Configure Serilog with encryption (default: unbuffered for data safety)
 Log.Logger = new LoggerConfiguration()
     .WriteTo.File(
         path: "logs/app.log",
@@ -69,8 +80,12 @@ Log.Logger = new LoggerConfiguration()
 
 // Log as usual
 Log.Information("This message will be encrypted!");
+
+// Always flush on shutdown
 Log.CloseAndFlush();
 ```
+
+> **💡 Performance Tip:** For high-volume scenarios where you can tolerate potential data loss on crashes, use `buffered: true` to reduce overhead from 15-17% to 6-8%. See the [Advanced Usage](#advanced-usage) section below.
 
 ### 3. Decrypt Logs
 
@@ -81,6 +96,33 @@ serilog-encrypt decrypt --key ./keys/private_key.xml --file logs/app.log --outpu
 ```
 
 ## Advanced Usage
+
+### High-Performance Configuration (Buffered Mode)
+
+For high-volume logging scenarios where you can tolerate potential data loss on crashes:
+
+```csharp
+using Serilog;
+using Serilog.Sinks.File.Encrypt;
+
+string publicKeyXml = File.ReadAllText("./keys/public_key.xml");
+
+Log.Logger = new LoggerConfiguration()
+    .WriteTo.File(
+        path: "logs/app.log",
+        buffered: true,              // Enables high-performance mode
+        flushToDiskInterval: TimeSpan.FromSeconds(1),
+        hooks: new EncryptHooks(publicKeyXml))
+    .CreateLogger();
+
+// CRITICAL: Always flush on shutdown
+Log.CloseAndFlush();
+```
+
+⚠️ **Warning:** Buffered writes risk data loss on crashes. Only use when:
+- Application has reliable shutdown handling
+- You can tolerate loss of recent logs (up to `flushToDiskInterval`)
+- Performance is critical (background workers, high-volume systems)
 
 ### Programmatic Key Generation
 
