@@ -61,7 +61,7 @@ using Serilog.Sinks.File.Encrypt;
 // Load your public key
 string publicKeyXml = File.ReadAllText("./keys/public_key.xml");
 
-// Configure Serilog with encryption
+// Configure Serilog with encryption `hooks:`
 Log.Logger = new LoggerConfiguration()
     .WriteTo.File(
         path: "logs/app.log",
@@ -70,6 +70,8 @@ Log.Logger = new LoggerConfiguration()
 
 // Log as usual
 Log.Information("This message will be encrypted!");
+
+// Always flush on application shutdown
 Log.CloseAndFlush();
 ```
 
@@ -83,6 +85,35 @@ serilog-encrypt decrypt --key ./keys/private_key.xml --file logs/app.log --outpu
 
 - **[Main Package Documentation](./resources/nuget/Serilog.Sinks.File.Encrypt.md)** - Comprehensive guide for the hook package
 - **[CLI Tool Documentation](./resources/nuget/Serilog.Sinks.File.Encrypt.Cli.md)** - Guide for the command-line tool
+- **[Benchmark Results](./examples/Example.Benchmarks/README.md)** - Detailed performance analysis and benchmarks
+
+## 📊 Performance
+
+The library is optimized for production use with excellent performance characteristics:
+
+- ✅ **Time Overhead:** 6-17% in real-world scenarios
+- ✅ **Throughput:** 200K+ logs/second (exceeds baseline by 20-200x)
+- ✅ **Memory:** 1.6-2.2x overhead with buffered writes
+- 🚀 **Buffering Advantage:** Encrypted buffered writes outperform non-encrypted unbuffered writes
+
+**Recommended Configuration for Best Performance:**
+
+```csharp
+Log.Logger = new LoggerConfiguration()
+    .WriteTo.File(
+        path: "logs/app.log",
+        buffered: true,              // Critical for performance!
+        flushToDiskInterval: TimeSpan.FromSeconds(1),
+        hooks: new EncryptHooks(publicKeyXml))
+    .CreateLogger();
+
+// Always flush on shutdown to prevent data loss
+Log.CloseAndFlush();
+```
+
+⚠️ **Important:** Buffered writes with encryption carry a risk of data loss on crashes. Always call `Log.CloseAndFlush()` on application shutdown.
+
+For detailed benchmark data and analysis, see the **[Benchmark Documentation](./examples/Example.Benchmarks/README.md)**.
 
 ## 🛡️ Security
 
