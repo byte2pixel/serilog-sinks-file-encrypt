@@ -751,8 +751,8 @@ public class DecryptCommandTests : CommandTestBase
             .Path.GetDirectoryName(Arg.Any<string>())
             .Returns(x => Path.GetDirectoryName((string)x[0]));
         mockFs
-            .Path.Combine(Arg.Any<string>(), Arg.Any<string>())
-            .Returns(x => Path.Combine((string)x[0], (string)x[1]));
+            .Path.Join(Arg.Any<string>(), Arg.Any<string>())
+            .Returns(x => Path.Join((string)x[0], (string)x[1]));
 
         mockFs.File.OpenRead(validFile).Returns(_ => FileSystem.File.OpenRead(validFile));
         mockFs

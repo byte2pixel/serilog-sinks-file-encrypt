@@ -7,6 +7,10 @@
 
 A [Serilog.File.Sink](https://github.com/serilog/serilog-sinks-file) hook that encrypts log files using RSA and AES encryption. This package provides secure logging by encrypting log data before writing to disk, ensuring sensitive information remains protected.
 
+> [!Note]
+> :construction: **Early release Software** :construction:
+> This library is newly released. APIs may change in future versions. Please report any issues you encounter or suggestions for improvement.
+ 
 ## Features
 
 - **Hybrid Encryption**: Uses RSA encryption for key exchange and AES for efficient data encryption

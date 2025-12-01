@@ -7,6 +7,10 @@
 
 A command-line tool for managing RSA key pairs and decrypting log files created by the [Serilog.Sinks.File.Encrypt](https://www.nuget.org/packages/Serilog.Sinks.File.Encrypt#readme-body-tab) package.
 
+> [!Note]
+> :construction: **Early release Software** :construction:
+> This Cli is newly released. Commands and options may change in future versions. Please report any issues you encounter or suggestions for improvement.
+
 ## Installation
 
 Install the tool globally using the .NET CLI:
