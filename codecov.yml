@@ -1,11 +1,35 @@
 coverage:
+  precision: 2
+  round: down
+  range: "60...90"  # Yellow between 60-90%, green above 90%
+
   status:
+    # Overall project coverage requirements
     project:
       default:
         target: 80%
         threshold: 1%
+        base: auto
+        if_ci_failed: error
+        paths:
+          - "src/**"
+    # Coverage requirements for new code (PR)
+    patch:
+      default:
+        target: 85%
+        threshold: 5%
+        base: auto
+        if_ci_failed: error
+        paths:
+          - "src/**"
 
 ignore:
   - "**/Program.cs"
   - "**/examples/**"
   - "**/tests/**"
+  - "**/*.designer.cs"
+  - "**/*.g.cs"
+  - "**/*.g.i.cs"
+  - "**/Migrations/**"
+  - "**/obj/**"
+  - "**/bin/**"

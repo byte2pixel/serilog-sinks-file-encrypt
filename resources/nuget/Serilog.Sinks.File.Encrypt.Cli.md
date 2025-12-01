@@ -37,16 +37,39 @@ This creates two files:
 Decrypt encrypted log files using your RSA private key:
 
 ```bash
-serilog-encrypt decrypt --key private_key.xml --file log.encrypted.txt --output log.decrypted.txt
+# Decrypt a single file (output: app.decrypted.log in same directory)
+serilog-encrypt decrypt app.log -k private_key.xml
+
+# Decrypt a single file with custom output
+serilog-encrypt decrypt app.log -k private_key.xml -o decrypted.log
+
+# Decrypt all .log files in current directory
+serilog-encrypt decrypt *.log -k private_key.xml
+
+# Decrypt all files in a directory (default pattern: *.log)
+serilog-encrypt decrypt ./logs -k private_key.xml
+
+# Decrypt all files in a directory recursively
+serilog-encrypt decrypt ./logs -k private_key.xml -r
+
+# Decrypt with custom pattern
+serilog-encrypt decrypt ./logs -k private_key.xml -p "app*.txt"
+
+# Decrypt to a specific output directory
+serilog-encrypt decrypt ./logs -k private_key.xml -o ./decrypted
 ```
 
+**Arguments:**
+- `<PATH>`: Path to encrypted log file, directory, or glob pattern (e.g., *.log)
+
 **Options:**
-- `-k|--key <KEY>`: Path to the RSA private key file (default: `privateKey.xml`)
-- `-f|--file <FILE>`: Path to the encrypted log file (default: `log.encrypted.txt`)
-- `-o|--output <OUTPUT>`: Path for the decrypted output file (default: `log.decrypted.txt`)
-- `-e|--error-mode <MODE>`: Error handling mode (default: `WriteInline`)
-  - `Skip`: Silently skip corrupted sections
-  - `WriteInline`: Write error messages inline (default)
+- `-k|--key <KEY>`: Path to the RSA private key file (default: `private_key.xml`)
+- `-o|--output <OUTPUT>`: Output directory or file path (default: adds `.decrypted` to original filename)
+- `-r|--recursive`: Process directories recursively
+- `-p|--pattern <PATTERN>`: File pattern to match when processing directories (default: `*.log`)
+- `-e|--error-mode <MODE>`: Error handling mode (default: `Skip`)
+  - `Skip`: Silently skip corrupted sections (clean output)
+  - `WriteInline`: Write error messages inline
   - `WriteToErrorLog`: Write errors to a separate log file
   - `ThrowException`: Stop immediately on first error
 - `--error-log <PATH>`: Path for error log file (only used with `WriteToErrorLog` mode)
@@ -57,6 +80,8 @@ serilog-encrypt decrypt --key private_key.xml --file log.encrypted.txt --output 
 - Flexible error handling for corrupted data
 - Fixed memory usage regardless of log file size
 - Support for structured logging formats (JSON, etc.)
+- Batch processing with glob patterns
+- Directory traversal with recursive option
 
 ## Examples
 
@@ -69,19 +94,31 @@ serilog-encrypt generate --output .
 serilog-encrypt generate --output ./keys
 ```
 
-### Basic Log Decryption
+### Single File Decryption
 ```bash
-# Decrypt with default settings (errors skipped silently)
-serilog-encrypt decrypt --key ./keys/private_key.xml --file ./logs/app.log --output ./logs/app-decrypted.log
+# Decrypt a single file (creates app.decrypted.log)
+serilog-encrypt decrypt app.log -k ./keys/private_key.xml
 
-# Write errors inline (for human-readable logs only)
-serilog-encrypt decrypt --key ./keys/private_key.xml --file ./logs/app.log --output ./logs/app-decrypted.log --error-mode WriteInline
+# Decrypt with custom output name
+serilog-encrypt decrypt app.log -k ./keys/private_key.xml -o readable.log
+```
 
-# Write errors to a separate log file
-serilog-encrypt decrypt --key ./keys/private_key.xml --file ./logs/app.log --output ./logs/app-decrypted.log --error-mode WriteToErrorLog --error-log ./logs/errors.log
+### Batch Decryption
+```bash
+# Decrypt all .log files in current directory
+serilog-encrypt decrypt *.log -k ./keys/private_key.xml
 
-# Stop on first error (strict validation)
-serilog-encrypt decrypt --key ./keys/private_key.xml --file ./logs/app.log --output ./logs/app-decrypted.log --error-mode ThrowException --continue-on-error false
+# Decrypt all files in a directory
+serilog-encrypt decrypt ./logs -k ./keys/private_key.xml
+
+# Decrypt recursively through subdirectories
+serilog-encrypt decrypt ./logs -k ./keys/private_key.xml -r
+
+# Decrypt with custom pattern (e.g., only app logs)
+serilog-encrypt decrypt ./logs -k ./keys/private_key.xml -p "app*.log"
+
+# Decrypt to a different output directory
+serilog-encrypt decrypt ./logs -k ./keys/private_key.xml -o ./decrypted-logs
 ```
 
 ### Error Handling Scenarios
@@ -89,19 +126,19 @@ serilog-encrypt decrypt --key ./keys/private_key.xml --file ./logs/app.log --out
 **For Structured Logging (JSON, Compact JSON):**
 Use `Skip` mode to avoid corrupting the log format:
 ```bash
-serilog-encrypt decrypt -k key.xml -f app.json.log -o decrypted.json.log -e Skip
+serilog-encrypt decrypt app.json.log -k key.xml -e Skip
 ```
 
 **For Troubleshooting:**
 Use `WriteToErrorLog` mode to track decryption issues:
 ```bash
-serilog-encrypt decrypt -k key.xml -f app.log -o decrypted.log -e WriteToErrorLog --error-log issues.log
+serilog-encrypt decrypt app.log -k key.xml -e WriteToErrorLog --error-log issues.log
 ```
 
 **For Data Integrity Validation:**
 Use `ThrowException` mode to ensure no data loss:
 ```bash
-serilog-encrypt decrypt -k key.xml -f app.log -o decrypted.log -e ThrowException --continue-on-error false
+serilog-encrypt decrypt app.log -k key.xml -o decrypted.log -e ThrowException --continue-on-error false
 ```
 
 ## Security Notes
