@@ -78,7 +78,11 @@ Log.CloseAndFlush();
 ### 4. Decrypt Logs
 
 ```bash
-serilog-encrypt decrypt --key ./keys/private_key.xml --file logs/app.log --output logs/app-decrypted.log
+# Decrypt a single file
+serilog-encrypt decrypt logs/app.log -k ./keys/private_key.xml
+
+# Decrypt all logs in a directory
+serilog-encrypt decrypt logs/ -k ./keys/private_key.xml
 ```
 
 ## 📚 Documentation

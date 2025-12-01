@@ -258,9 +258,9 @@ To verify everything is working correctly:
    # You should see encrypted/binary content, not readable text
    notepad logs/prod{date}.txt
    
-   # Decrypt to verify content
-   serilog-encrypt decrypt -i logs/prod{date}.txt -o logs/decrypted.txt -k private_key.xml
-   notepad logs/decrypted.txt
+   # Decrypt to verify content (creates logs/prod{date}.decrypted.txt)
+   serilog-encrypt decrypt logs/prod{date}.txt -k private_key.xml
+   notepad logs/prod{date}.decrypted.txt
    ```
 
 ## Running the Application
@@ -301,7 +301,10 @@ Check the appropriate log files to see the logged messages.
 To decrypt the production logs, you can use the CLI tool:
 ```bash
 # The log file name will include the date (e.g., prod20251129.txt)
-serilog-encrypt decrypt -i logs/prod20251129.txt -o logs/prod_decrypted.txt -k private_key.xml
+serilog-encrypt decrypt logs/prod20251129.txt -k private_key.xml
+
+# Or decrypt all production logs in the directory
+serilog-encrypt decrypt logs/ -k private_key.xml -p "prod*.txt"
 ```
 
 **Note**: You will need the private key file (`private_key.xml`) that was generated earlier with the `serilog-encrypt generate` command.
