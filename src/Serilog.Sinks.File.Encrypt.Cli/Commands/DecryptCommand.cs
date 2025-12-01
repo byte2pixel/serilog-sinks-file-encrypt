@@ -370,7 +370,7 @@ public sealed class DecryptCommand(IAnsiConsole console, IFileSystem fileSystem)
 
             string inputFileName = fileSystem.Path.GetFileName(inputFile);
             string outputFileName = GenerateDecryptedFileName(inputFileName);
-            return fileSystem.Path.Combine(settings.OutputPath, outputFileName);
+            return fileSystem.Path.Join(settings.OutputPath, outputFileName);
         }
 
         // Default: add .decrypted extension in the same directory
@@ -378,7 +378,7 @@ public sealed class DecryptCommand(IAnsiConsole console, IFileSystem fileSystem)
         string inputFileName2 = fileSystem.Path.GetFileName(inputFile);
         string decryptedFileName = GenerateDecryptedFileName(inputFileName2);
 
-        return fileSystem.Path.Combine(directory, decryptedFileName);
+        return fileSystem.Path.Join(directory, decryptedFileName);
     }
 
     /// <summary>
