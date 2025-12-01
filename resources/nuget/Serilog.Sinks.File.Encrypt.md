@@ -150,7 +150,7 @@ using Serilog.Sinks.File.Encrypt;
 
 // File-to-file decryption
 string privateKeyXml = File.ReadAllText("private_key.xml");
-await EncryptionUtils.DecryptLogFileToFileAsync(
+await EncryptionUtils.DecryptFileLogAsync(
     "logs/app.log", 
     "logs/decrypted.log", 
     privateKeyXml);
@@ -275,7 +275,7 @@ app.Run();
 ### Decryption
 ```csharp
 // File-to-file async decryption
-Task EncryptionUtils.DecryptLogFileToFileAsync(string encryptedFilePath, string outputFilePath, string rsaPrivateKey, StreamingOptions? options = null, CancellationToken cancellationToken = default)
+Task EncryptionUtils.DecryptLogFileAsync(string encryptedFilePath, string outputFilePath, string rsaPrivateKey, StreamingOptions? options = null, CancellationToken cancellationToken = default)
 
 // Stream-to-stream async decryption  
 Task EncryptionUtils.DecryptLogFileAsync(Stream inputStream, Stream outputStream, string rsaPrivateKey, StreamingOptions? options = null, CancellationToken cancellationToken = default)

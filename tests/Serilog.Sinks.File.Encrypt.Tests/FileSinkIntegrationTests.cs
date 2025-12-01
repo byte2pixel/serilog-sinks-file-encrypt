@@ -132,7 +132,7 @@ public sealed class FileSinkIntegrationTests : IDisposable
     }
 
     [Fact]
-    public async Task CanDecryptLogFileToFile_WithPrivateKey()
+    public async Task CanDecryptLogFile_ToFile_WithPrivateKey()
     {
         // Arrange
         const string LogMessage = "This is a secret log message";

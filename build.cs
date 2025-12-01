@@ -20,6 +20,7 @@ Task("Clean")
     .Does(ctx =>
     {
         ctx.CleanDirectory("./.artifacts");
+        ctx.CleanDirectory("./.coverage");
     });
 
 Task("Lint")
