@@ -51,7 +51,7 @@ public sealed class DecryptCommand(IAnsiConsole console, IFileSystem fileSystem)
         [CommandOption("-r|--recursive")]
         [Description("Process directories recursively")]
         [DefaultValue(false)]
-        public bool Recursive { get; init; } = false;
+        public bool Recursive { get; init; }
 
         /// <summary>
         /// File pattern to match when processing directories (e.g., *.log, app*.txt).
@@ -60,14 +60,6 @@ public sealed class DecryptCommand(IAnsiConsole console, IFileSystem fileSystem)
         [Description("File pattern to match when processing directories (default: *.log)")]
         [DefaultValue("*.log")]
         public string Pattern { get; init; } = "*.log";
-
-        /// <summary>
-        /// Overwrite existing decrypted files without prompting.
-        /// </summary>
-        [CommandOption("--overwrite")]
-        [Description("Overwrite existing decrypted files without prompting")]
-        [DefaultValue(false)]
-        public bool Overwrite { get; init; } = false;
 
         /// <summary>
         /// How to handle decryption errors (Skip, WriteInline, WriteToErrorLog, ThrowException).
@@ -203,6 +195,15 @@ public sealed class DecryptCommand(IAnsiConsole console, IFileSystem fileSystem)
         }
     }
 
+    /// <summary>
+    /// Loops through and processes each file for decryption.
+    /// </summary>
+    /// <param name="settings">The command settings.</param>
+    /// <param name="filesToDecrypt">The list of files to decrypt</param>
+    /// <param name="rsaPrivateKey">The private key.</param>
+    /// <param name="streamingOptions">The streaming decryption options.</param>
+    /// <param name="cancellationToken">The cancellation token.</param>
+    /// <returns></returns>
     private async Task<(int successCount, int failureCount)> ProcessFilesAsync(
         Settings settings,
         List<string> filesToDecrypt,
@@ -217,23 +218,15 @@ public sealed class DecryptCommand(IAnsiConsole console, IFileSystem fileSystem)
         {
             string outputFile = DetermineOutputPath(inputFile, settings);
 
-            // Check if output file exists
-            if (fileSystem.File.Exists(outputFile) && !settings.Overwrite)
+            if (fileSystem.File.Exists(outputFile))
             {
-                console.MarkupLineInterpolated(
-                    $"[yellow]⊘ Skipping (already exists):[/] {inputFile}"
-                );
-                console.MarkupLineInterpolated(
-                    $"  [dim]→ {outputFile} (use --overwrite to replace)[/]"
-                );
-                continue;
+                console.MarkupLineInterpolated($"[dim]{outputFile} will be overwritten.[/]");
             }
 
             try
             {
                 console.MarkupLineInterpolated($"[cyan]⧗ Decrypting:[/] {inputFile}");
 
-                // Ensure output directory exists
                 string? outputDir = fileSystem.Path.GetDirectoryName(outputFile);
                 if (!string.IsNullOrEmpty(outputDir) && !fileSystem.Directory.Exists(outputDir))
                 {
@@ -273,6 +266,11 @@ public sealed class DecryptCommand(IAnsiConsole console, IFileSystem fileSystem)
         return (successCount, failureCount);
     }
 
+    /// <summary>
+    /// Simple input validation of the settings.
+    /// </summary>
+    /// <param name="settings">The command settings.</param>
+    /// <returns>True if all the inputs pass validation.</returns>
     private bool ValidateInputs(Settings settings)
     {
         // Validate inputs
@@ -297,6 +295,7 @@ public sealed class DecryptCommand(IAnsiConsole console, IFileSystem fileSystem)
     /// <summary>
     /// Gets the list of files to decrypt based on the input path and settings.
     /// </summary>
+    /// <param name="settings">The command settings.</param>
     private List<string> GetFilesToDecrypt(Settings settings)
     {
         List<string> files = [];
@@ -357,21 +356,21 @@ public sealed class DecryptCommand(IAnsiConsole console, IFileSystem fileSystem)
     /// <summary>
     /// Determines the output file path based on the input file and settings.
     /// </summary>
+    /// <param name="inputFile">The log file that is being decrypted.</param>
+    /// <param name="settings">The command settings.</param>
     private string DetermineOutputPath(string inputFile, Settings settings)
     {
         // If output path is explicitly specified
         if (!string.IsNullOrWhiteSpace(settings.OutputPath))
         {
-            // If decrypting multiple files and output is a directory
-            if (fileSystem.Directory.Exists(settings.OutputPath))
+            if (!fileSystem.Directory.Exists(settings.OutputPath))
             {
-                string inputFileName = fileSystem.Path.GetFileName(inputFile);
-                string outputFileName = GenerateDecryptedFileName(inputFileName);
-                return fileSystem.Path.Combine(settings.OutputPath, outputFileName);
+                return settings.OutputPath;
             }
 
-            // If decrypting a single file, use the output path directly
-            return settings.OutputPath;
+            string inputFileName = fileSystem.Path.GetFileName(inputFile);
+            string outputFileName = GenerateDecryptedFileName(inputFileName);
+            return fileSystem.Path.Combine(settings.OutputPath, outputFileName);
         }
 
         // Default: add .decrypted extension in the same directory
@@ -386,6 +385,8 @@ public sealed class DecryptCommand(IAnsiConsole console, IFileSystem fileSystem)
     /// Generates a decrypted filename by adding .decrypted before the extension.
     /// Example: app.log -> app.decrypted.log
     /// </summary>
+    /// <param name="fileName">The name of the encrypted log file.</param>
+    /// <returns>The name to use for the decrypted log file.</returns>
     private string GenerateDecryptedFileName(string fileName)
     {
         string nameWithoutExtension = fileSystem.Path.GetFileNameWithoutExtension(fileName);

@@ -57,9 +57,6 @@ serilog-encrypt decrypt ./logs -k private_key.xml -p "app*.txt"
 
 # Decrypt to a specific output directory
 serilog-encrypt decrypt ./logs -k private_key.xml -o ./decrypted
-
-# Overwrite existing decrypted files
-serilog-encrypt decrypt app.log -k private_key.xml --overwrite
 ```
 
 **Arguments:**
@@ -70,7 +67,6 @@ serilog-encrypt decrypt app.log -k private_key.xml --overwrite
 - `-o|--output <OUTPUT>`: Output directory or file path (default: adds `.decrypted` to original filename)
 - `-r|--recursive`: Process directories recursively
 - `-p|--pattern <PATTERN>`: File pattern to match when processing directories (default: `*.log`)
-- `--overwrite`: Overwrite existing decrypted files without prompting
 - `-e|--error-mode <MODE>`: Error handling mode (default: `Skip`)
   - `Skip`: Silently skip corrupted sections (clean output)
   - `WriteInline`: Write error messages inline
@@ -105,9 +101,6 @@ serilog-encrypt decrypt app.log -k ./keys/private_key.xml
 
 # Decrypt with custom output name
 serilog-encrypt decrypt app.log -k ./keys/private_key.xml -o readable.log
-
-# Decrypt and overwrite existing output
-serilog-encrypt decrypt app.log -k ./keys/private_key.xml --overwrite
 ```
 
 ### Batch Decryption
@@ -145,7 +138,7 @@ serilog-encrypt decrypt app.log -k key.xml -e WriteToErrorLog --error-log issues
 **For Data Integrity Validation:**
 Use `ThrowException` mode to ensure no data loss:
 ```bash
-serilog-encrypt decrypt -k key.xml -f app.log -o decrypted.log -e ThrowException --continue-on-error false
+serilog-encrypt decrypt app.log -k key.xml -o decrypted.log -e ThrowException --continue-on-error false
 ```
 
 ## Security Notes

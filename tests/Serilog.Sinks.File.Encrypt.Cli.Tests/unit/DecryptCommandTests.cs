@@ -662,7 +662,7 @@ public class DecryptCommandTests : CommandTestBase
     }
 
     [Fact]
-    public async Task ExecuteAsync_WithOverwriteOption_OverwritesExistingFiles()
+    public async Task ExecuteAsync_OverwritesExistingFiles()
     {
         // Arrange
         const string LogContent = "2024-11-26 14:00:00 [INF] New content\n";
@@ -679,14 +679,13 @@ public class DecryptCommandTests : CommandTestBase
             encryptedFile,
             new MockFileData(CreateEncryptedLogFile(LogContent, publicKey))
         );
-        FileSystem.AddFile(decryptedFile, new MockFileData(OldContent)); // Pre-existing file
+        FileSystem.AddFile(decryptedFile, new MockFileData(OldContent));
 
         DecryptCommand command = new(TestConsole, FileSystem);
         DecryptCommand.Settings settings = new()
         {
             InputPath = encryptedFile,
             KeyFile = privateKeyPath,
-            Overwrite = true,
         };
 
         // Act
@@ -697,59 +696,14 @@ public class DecryptCommandTests : CommandTestBase
         );
 
         // Assert
-        result.ShouldBe(0); // Success
+        result.ShouldBe(0);
         string content = await FileSystem.File.ReadAllTextAsync(
             decryptedFile,
             TestContext.Current.CancellationToken
         );
         content.ShouldBe(LogContent); // Should be new content, not old
+        TestConsole.Output.ShouldContain("will be overwritten");
         TestConsole.Output.ShouldContain("✓ Decrypted:");
-    }
-
-    [Fact]
-    public async Task ExecuteAsync_WithoutOverwriteOption_SkipsExistingFiles()
-    {
-        // Arrange
-        const string LogContent = "2024-11-26 14:00:00 [INF] New content\n";
-        const string OldContent = "Old content";
-
-        string privateKeyPath = Path.Join("keys", "private_key.xml");
-        string encryptedFile = Path.Join("logs", "app.log");
-        string decryptedFile = Path.Join("logs", "app.decrypted.log");
-
-        (string publicKey, string privateKey) = EncryptionUtils.GenerateRsaKeyPair();
-
-        FileSystem.AddFile(privateKeyPath, new MockFileData(privateKey));
-        FileSystem.AddFile(
-            encryptedFile,
-            new MockFileData(CreateEncryptedLogFile(LogContent, publicKey))
-        );
-        FileSystem.AddFile(decryptedFile, new MockFileData(OldContent)); // Pre-existing file
-
-        DecryptCommand command = new(TestConsole, FileSystem);
-        DecryptCommand.Settings settings = new()
-        {
-            InputPath = encryptedFile,
-            KeyFile = privateKeyPath,
-            Overwrite = false,
-        };
-
-        // Act
-        int result = await command.ExecuteAsync(
-            new CommandContext(Arguments, Remaining, "decrypt", null),
-            settings,
-            CancellationToken.None
-        );
-
-        // Assert
-        result.ShouldBe(0); // Success (but file was skipped)
-        string content = await FileSystem.File.ReadAllTextAsync(
-            decryptedFile,
-            TestContext.Current.CancellationToken
-        );
-        content.ShouldBe(OldContent); // Should still be old content
-        TestConsole.Output.ShouldContain("⊘ Skipping (already exists):");
-        TestConsole.Output.ShouldContain("use --overwrite to replace");
     }
 
     [Fact]
