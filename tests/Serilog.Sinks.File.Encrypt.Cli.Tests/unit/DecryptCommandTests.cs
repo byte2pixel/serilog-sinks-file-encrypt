@@ -106,7 +106,7 @@ public class DecryptCommandTests : CommandTestBase
     }
 
     [Fact]
-    public async Task ExecuteAsync_WithSkipErrorMode_DisplaysErrorModeConfiguration()
+    public async Task ExecuteAsync_WithDefaultErrorHandling_DecryptsSuccessfully()
     {
         // Arrange
         const string TestLogContent = "2024-11-26 14:00:00 [INF] Test log entry\n";
@@ -127,7 +127,6 @@ public class DecryptCommandTests : CommandTestBase
             KeyFile = privateKeyPath,
             InputPath = encryptedFilePath,
             OutputPath = decryptedFilePath,
-            ErrorMode = ErrorHandlingMode.Skip,
         };
 
         // Act
@@ -139,12 +138,10 @@ public class DecryptCommandTests : CommandTestBase
 
         // Assert
         result.ShouldBe(0);
-        TestConsole.Output.ShouldContain("Error handling mode:");
-        TestConsole.Output.ShouldContain("Skip");
     }
 
     [Fact]
-    public async Task ExecuteAsync_WithWriteToErrorLogMode_DisplaysErrorLogPath()
+    public async Task ExecuteAsync_WithErrorLogPath_DisplaysErrorLogPath()
     {
         // Arrange
         const string TestLogContent = "2024-11-26 14:00:00 [INF] Test log entry\n";
@@ -166,7 +163,6 @@ public class DecryptCommandTests : CommandTestBase
             KeyFile = privateKeyPath,
             InputPath = encryptedFilePath,
             OutputPath = decryptedFilePath,
-            ErrorMode = ErrorHandlingMode.WriteToErrorLog,
             ErrorLogPath = errorLogPath,
         };
 
@@ -179,14 +175,12 @@ public class DecryptCommandTests : CommandTestBase
 
         // Assert
         result.ShouldBe(0);
-        TestConsole.Output.ShouldContain("Error handling mode:");
-        TestConsole.Output.ShouldContain("WriteToErrorLog");
-        TestConsole.Output.ShouldContain("Error log path:");
+        TestConsole.Output.ShouldContain("Error log:");
         TestConsole.Output.ShouldContain(errorLogPath);
     }
 
     [Fact]
-    public async Task ExecuteAsync_WithThrowExceptionMode_DisplaysErrorModeConfiguration()
+    public async Task ExecuteAsync_WithStrictMode_FailsOnFirstError()
     {
         // Arrange
         const string TestLogContent = "2024-11-26 14:00:00 [INF] Test log entry\n";
@@ -207,8 +201,7 @@ public class DecryptCommandTests : CommandTestBase
             InputPath = encryptedFilePath,
             KeyFile = privateKeyPath,
             OutputPath = decryptedFilePath,
-            ErrorMode = ErrorHandlingMode.ThrowException,
-            ContinueOnError = false,
+            Strict = true,
         };
 
         // Act
@@ -220,8 +213,6 @@ public class DecryptCommandTests : CommandTestBase
 
         // Assert
         result.ShouldBe(0);
-        TestConsole.Output.ShouldContain("Error handling mode:");
-        TestConsole.Output.ShouldContain("ThrowException");
     }
 
     [Fact]
@@ -435,8 +426,7 @@ public class DecryptCommandTests : CommandTestBase
             KeyFile = privateKeyPath,
             InputPath = encryptedFilePath,
             OutputPath = decryptedFilePath,
-            ContinueOnError = false,
-            ErrorMode = ErrorHandlingMode.ThrowException,
+            Strict = true,
         };
 
         // Act
@@ -473,8 +463,7 @@ public class DecryptCommandTests : CommandTestBase
             InputPath = encryptedFilePath,
             KeyFile = privateKeyPath,
             OutputPath = decryptedFilePath,
-            ContinueOnError = false,
-            ErrorMode = ErrorHandlingMode.ThrowException,
+            Strict = true,
         };
 
         // Act
@@ -587,12 +576,7 @@ public class DecryptCommandTests : CommandTestBase
         );
 
         DecryptCommand command = new(TestConsole, FileSystem);
-        DecryptCommand.Settings settings = new()
-        {
-            InputPath = logsDir,
-            KeyFile = privateKeyPath,
-            Pattern = "*.log",
-        };
+        DecryptCommand.Settings settings = new() { InputPath = logsDir, KeyFile = privateKeyPath };
 
         // Act
         int result = await command.ExecuteAsync(
@@ -641,7 +625,6 @@ public class DecryptCommandTests : CommandTestBase
         {
             InputPath = logsDir,
             KeyFile = privateKeyPath,
-            Pattern = "*.log",
             Recursive = true,
         };
 
@@ -770,8 +753,6 @@ public class DecryptCommandTests : CommandTestBase
         {
             InputPath = Path.Join("logs", "*.log"),
             KeyFile = privateKeyPath,
-            ErrorMode = ErrorHandlingMode.Skip,
-            ContinueOnError = true,
         };
 
         // Act
@@ -789,7 +770,7 @@ public class DecryptCommandTests : CommandTestBase
     }
 
     [Fact]
-    public async Task ExecuteAsync_WithCustomPattern_OnlyDecryptsMatchingFiles()
+    public async Task ExecuteAsync_WithGlobPattern_OnlyDecryptsMatchingFiles()
     {
         // Arrange
         const string LogContent = "2024-11-26 14:00:00 [INF] Test log\n";
@@ -814,9 +795,8 @@ public class DecryptCommandTests : CommandTestBase
         DecryptCommand command = new(TestConsole, FileSystem);
         DecryptCommand.Settings settings = new()
         {
-            InputPath = logsDir,
+            InputPath = Path.Join(logsDir, "*.txt"), // Use glob pattern in InputPath
             KeyFile = privateKeyPath,
-            Pattern = "*.txt", // Only match .txt files
         };
 
         // Act
@@ -969,6 +949,99 @@ public class DecryptCommandTests : CommandTestBase
         result.ShouldBe(0); // Success
         FileSystem.Directory.Exists(Path.Join("new-dir")).ShouldBeTrue();
         FileSystem.File.Exists(outputFile).ShouldBeTrue();
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WithDirectory_SkipsAlreadyDecryptedFiles()
+    {
+        // Arrange
+        const string LogContent1 = "2024-11-26 14:00:00 [INF] Encrypted log\n";
+        const string LogContent2 = "This is already decrypted content\n";
+
+        string privateKeyPath = Path.Join("keys", "private_key.xml");
+        string logsDir = Path.Join("logs");
+        string encryptedFile = Path.Join(logsDir, "app1.log");
+        string alreadyDecryptedFile = Path.Join(logsDir, "app2.decrypted.log");
+
+        (string publicKey, string privateKey) = EncryptionUtils.GenerateRsaKeyPair();
+
+        FileSystem.AddFile(privateKeyPath, new MockFileData(privateKey));
+        FileSystem.AddFile(
+            encryptedFile,
+            new MockFileData(CreateEncryptedLogFile(LogContent1, publicKey))
+        );
+        // Add a file that looks like it was already decrypted
+        FileSystem.AddFile(alreadyDecryptedFile, new MockFileData(LogContent2));
+
+        DecryptCommand command = new(TestConsole, FileSystem);
+        DecryptCommand.Settings settings = new() { InputPath = logsDir, KeyFile = privateKeyPath };
+
+        // Act
+        int result = await command.ExecuteAsync(
+            new CommandContext(Arguments, Remaining, "decrypt", null),
+            settings,
+            CancellationToken.None
+        );
+
+        // Assert
+        result.ShouldBe(0); // Success
+        TestConsole.Output.ShouldContain("Found 1 file(s) to decrypt"); // Only the encrypted file
+        TestConsole.Output.ShouldContain("✓ Success: 1");
+
+        // The encrypted file should be decrypted
+        FileSystem.File.Exists(Path.Join(logsDir, "app1.decrypted.log")).ShouldBeTrue();
+
+        // The already-decrypted file should remain unchanged
+        string unchangedContent = await FileSystem.File.ReadAllTextAsync(
+            alreadyDecryptedFile,
+            TestContext.Current.CancellationToken
+        );
+        unchangedContent.ShouldBe(LogContent2);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WithGlobPattern_SkipsAlreadyDecryptedFiles()
+    {
+        // Arrange
+        const string LogContent = "2024-11-26 14:00:00 [INF] Test log\n";
+
+        string privateKeyPath = Path.Join("keys", "private_key.xml");
+        string logsDir = Path.Join("logs");
+        string encryptedFile1 = Path.Join(logsDir, "app.log");
+        string encryptedFile2 = Path.Join(logsDir, "service.log");
+        string alreadyDecryptedFile = Path.Join(logsDir, "old.decrypted.log");
+
+        (string publicKey, string privateKey) = EncryptionUtils.GenerateRsaKeyPair();
+
+        FileSystem.AddFile(privateKeyPath, new MockFileData(privateKey));
+        FileSystem.AddFile(
+            encryptedFile1,
+            new MockFileData(CreateEncryptedLogFile(LogContent, publicKey))
+        );
+        FileSystem.AddFile(
+            encryptedFile2,
+            new MockFileData(CreateEncryptedLogFile(LogContent, publicKey))
+        );
+        FileSystem.AddFile(alreadyDecryptedFile, new MockFileData("Already decrypted"));
+
+        DecryptCommand command = new(TestConsole, FileSystem);
+        DecryptCommand.Settings settings = new()
+        {
+            InputPath = Path.Join(logsDir, "*.log"),
+            KeyFile = privateKeyPath,
+        };
+
+        // Act
+        int result = await command.ExecuteAsync(
+            new CommandContext(Arguments, Remaining, "decrypt", null),
+            settings,
+            CancellationToken.None
+        );
+
+        // Assert
+        result.ShouldBe(0); // Success
+        TestConsole.Output.ShouldContain("Found 2 file(s) to decrypt"); // Only non-decrypted files
+        TestConsole.Output.ShouldContain("✓ Success: 2");
     }
 
     /// <summary>

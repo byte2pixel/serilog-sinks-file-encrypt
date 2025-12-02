@@ -9,7 +9,7 @@
 A command-line tool for managing RSA key pairs and decrypting log files created by the [Serilog.Sinks.File.Encrypt](https://www.nuget.org/packages/Serilog.Sinks.File.Encrypt#readme-body-tab) package.
 
 > [!Note]
-> :construction: **Early release Software** :construction:
+> :construction: **Newly Released** :construction:
 > This Cli is newly released. Commands and options may change in future versions. Please report any issues you encounter or suggestions for improvement.
 
 ## Installation
@@ -48,45 +48,40 @@ serilog-encrypt decrypt app.log -k private_key.xml
 # Decrypt a single file with custom output
 serilog-encrypt decrypt app.log -k private_key.xml -o decrypted.log
 
-# Decrypt all .log files in current directory
+# Decrypt all .log files in current directory using a glob pattern
 serilog-encrypt decrypt *.log -k private_key.xml
 
-# Decrypt all files in a directory (default pattern: *.log)
+# Decrypt with custom glob pattern (e.g., only app logs)
+serilog-encrypt decrypt "app*.log" -k private_key.xml
+
+# Decrypt all .log files in a directory
 serilog-encrypt decrypt ./logs -k private_key.xml
 
-# Decrypt all files in a directory recursively
+# Decrypt all .log files in a directory recursively
 serilog-encrypt decrypt ./logs -k private_key.xml -r
-
-# Decrypt with custom pattern
-serilog-encrypt decrypt ./logs -k private_key.xml -p "app*.txt"
 
 # Decrypt to a specific output directory
 serilog-encrypt decrypt ./logs -k private_key.xml -o ./decrypted
 ```
 
 **Arguments:**
-- `<PATH>`: Path to encrypted log file, directory, or glob pattern (e.g., *.log)
+- `<PATH>`: Path to encrypted log file, directory (uses `*.log` pattern), or glob pattern (e.g., `*.log`, `logs/*.txt`)
 
 **Options:**
 - `-k|--key <KEY>`: Path to the RSA private key file (default: `private_key.xml`)
 - `-o|--output <OUTPUT>`: Output directory or file path (default: adds `.decrypted` to original filename)
 - `-r|--recursive`: Process directories recursively
-- `-p|--pattern <PATTERN>`: File pattern to match when processing directories (default: `*.log`)
-- `-e|--error-mode <MODE>`: Error handling mode (default: `Skip`)
-  - `Skip`: Silently skip corrupted sections (clean output)
-  - `WriteInline`: Write error messages inline
-  - `WriteToErrorLog`: Write errors to a separate log file
-  - `ThrowException`: Stop immediately on first error
-- `--error-log <PATH>`: Path for error log file (only used with `WriteToErrorLog` mode)
-- `--continue-on-error`: Continue decryption even when errors are encountered (default: `true`)
+- `-s|--strict`: Fail immediately on first decryption error (default: continues processing all files)
+- `--error-log <PATH>`: Write detailed error information to a separate log file
 
 **Features:**
 - Memory-optimized for large log files
-- Flexible error handling for corrupted data
+- Simple error handling: continues on errors by default, or use `--strict` to fail fast
 - Fixed memory usage regardless of log file size
 - Support for structured logging formats (JSON, etc.)
 - Batch processing with glob patterns
 - Directory traversal with recursive option
+- Automatically skips files with `.decrypted.` in the name to prevent re-decryption
 
 ## Examples
 
@@ -106,6 +101,9 @@ serilog-encrypt decrypt app.log -k ./keys/private_key.xml
 
 # Decrypt with custom output name
 serilog-encrypt decrypt app.log -k ./keys/private_key.xml -o readable.log
+
+# Decrypt with strict error checking
+serilog-encrypt decrypt app.log -k ./keys/private_key.xml --strict
 ```
 
 ### Batch Decryption
@@ -113,37 +111,37 @@ serilog-encrypt decrypt app.log -k ./keys/private_key.xml -o readable.log
 # Decrypt all .log files in current directory
 serilog-encrypt decrypt *.log -k ./keys/private_key.xml
 
-# Decrypt all files in a directory
+# Decrypt all .log files in a directory (uses *.log pattern automatically)
 serilog-encrypt decrypt ./logs -k ./keys/private_key.xml
 
 # Decrypt recursively through subdirectories
 serilog-encrypt decrypt ./logs -k ./keys/private_key.xml -r
 
-# Decrypt with custom pattern (e.g., only app logs)
-serilog-encrypt decrypt ./logs -k ./keys/private_key.xml -p "app*.log"
+# Decrypt with custom glob pattern
+serilog-encrypt decrypt "logs/app*.txt" -k ./keys/private_key.xml
 
 # Decrypt to a different output directory
 serilog-encrypt decrypt ./logs -k ./keys/private_key.xml -o ./decrypted-logs
 ```
 
-### Error Handling Scenarios
+### Error Handling
 
-**For Structured Logging (JSON, Compact JSON):**
-Use `Skip` mode to avoid corrupting the log format:
+**Default Behavior (Recommended):**
+By default, the tool continues processing all files even if some fail to decrypt:
 ```bash
-serilog-encrypt decrypt app.json.log -k key.xml -e Skip
+serilog-encrypt decrypt ./logs -k private_key.xml
 ```
 
-**For Troubleshooting:**
-Use `WriteToErrorLog` mode to track decryption issues:
+**Strict Mode:**
+Stop immediately on first error (useful for validation):
 ```bash
-serilog-encrypt decrypt app.log -k key.xml -e WriteToErrorLog --error-log issues.log
+serilog-encrypt decrypt app.log -k private_key.xml --strict
 ```
 
-**For Data Integrity Validation:**
-Use `ThrowException` mode to ensure no data loss:
+**Error Logging:**
+Log detailed error information to a separate file while continuing to process files:
 ```bash
-serilog-encrypt decrypt app.log -k key.xml -o decrypted.log -e ThrowException --continue-on-error false
+serilog-encrypt decrypt ./logs -k private_key.xml --error-log decryption-errors.log
 ```
 
 ## Security Notes
@@ -152,6 +150,24 @@ serilog-encrypt decrypt app.log -k key.xml -o decrypted.log -e ThrowException --
 - The private key is required to decrypt log files
 - Store keys separately from your application code
 - Consider using secure key management systems in production
+
+## Usage Notes
+
+### Re-decryption Safety
+The tool automatically skips files with `.decrypted.` in the filename to prevent accidental re-decryption. This means you can safely:
+- Run decrypt multiple times on the same directory as new encrypted logs are added
+- Use the `-r` (recursive) option without worrying about processing already-decrypted files
+- Keep decrypted files alongside encrypted files in the same directory
+
+**Example:**
+```bash
+# First run: decrypts app.log → app.decrypted.log
+serilog-encrypt decrypt ./logs -k key.xml
+
+# Later, after new logs are added
+# Second run: only processes new encrypted files, skips app.decrypted.log
+serilog-encrypt decrypt ./logs -k key.xml
+```
 
 ## Integration with Serilog
 
