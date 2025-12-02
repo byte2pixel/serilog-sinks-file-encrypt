@@ -23,6 +23,20 @@ coverage:
         paths:
           - "src/**"
 
+component_management:
+  individual_components:
+    - component_id: encrypt-lib
+      name: encrypt
+      paths:
+        - src/Serilog.Sinks.File.Encrypt/
+    - component_id: encrypt-cli
+      name: cli tool
+      paths:
+        - src/Serilog.Sinks.File.Encrypt.Cli/
+
+comment:
+  layout: "condensed_header, diff, components, condensed_files"
+
 ignore:
   - "**/Program.cs"
   - "**/examples/**"
