@@ -303,8 +303,8 @@ To decrypt the production logs, you can use the CLI tool:
 # The log file name will include the date (e.g., prod20251129.txt)
 serilog-encrypt decrypt logs/prod20251129.txt -k private_key.xml
 
-# Or decrypt all production logs in the directory
-serilog-encrypt decrypt logs/ -k private_key.xml -p "prod*.txt"
+# Or decrypt all production logs using a glob pattern
+serilog-encrypt decrypt "logs/prod*.txt" -k private_key.xml
 ```
 
 **Note**: You will need the private key file (`private_key.xml`) that was generated earlier with the `serilog-encrypt generate` command.

@@ -43,8 +43,11 @@ public static class CommandAppConfiguration
                 .WithExample(Decrypt, "app.log", "-k", PrivateKey)
                 .WithExample(Decrypt, "./logs", "-k", PrivateKey)
                 .WithExample(Decrypt, "*.log", "-k", PrivateKey)
+                .WithExample(Decrypt, "logs/*.txt", "-k", PrivateKey)
                 .WithExample(Decrypt, "./logs", "-k", PrivateKey, "-r")
-                .WithExample(Decrypt, "app.log", "-k", PrivateKey, "-o", "decrypted.log");
+                .WithExample(Decrypt, "app.log", "-k", PrivateKey, "-o", "decrypted.log")
+                .WithExample(Decrypt, "app.log", "-k", PrivateKey, "--strict")
+                .WithExample(Decrypt, "./logs", "-k", PrivateKey, "--error-log", "errors.log");
             c.ValidateExamples();
         };
     }

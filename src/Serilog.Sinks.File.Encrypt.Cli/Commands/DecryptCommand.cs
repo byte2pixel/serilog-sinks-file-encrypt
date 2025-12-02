@@ -26,7 +26,9 @@ public sealed class DecryptCommand(IAnsiConsole console, IFileSystem fileSystem)
         /// Supports glob patterns like *.log
         /// </summary>
         [CommandArgument(0, "<PATH>")]
-        [Description("Path to encrypted log file, directory, or glob pattern (e.g., *.log)")]
+        [Description(
+            "Path to encrypted log file, directory (uses *.log pattern), or glob pattern (e.g., *.log)"
+        )]
         public string InputPath { get; init; } = string.Empty;
 
         /// <summary>
@@ -54,36 +56,21 @@ public sealed class DecryptCommand(IAnsiConsole console, IFileSystem fileSystem)
         public bool Recursive { get; init; }
 
         /// <summary>
-        /// File pattern to match when processing directories (e.g., *.log, app*.txt).
+        /// Fail immediately on first decryption error instead of continuing with remaining files.
         /// </summary>
-        [CommandOption("-p|--pattern <PATTERN>")]
-        [Description("File pattern to match when processing directories (default: *.log)")]
-        [DefaultValue("*.log")]
-        public string Pattern { get; init; } = "*.log";
-
-        /// <summary>
-        /// How to handle decryption errors (Skip, WriteInline, WriteToErrorLog, ThrowException).
-        /// </summary>
-        [CommandOption("-e|--error-mode <MODE>")]
+        [CommandOption("-s|--strict")]
         [Description(
-            "Error handling mode: Skip (default, clean output), WriteInline (errors inline), WriteToErrorLog (separate file), ThrowException (fail fast)"
+            "Fail immediately on first decryption error (default: false, continues processing)"
         )]
-        public ErrorHandlingMode ErrorMode { get; init; } = ErrorHandlingMode.Skip;
+        [DefaultValue(false)]
+        public bool Strict { get; init; }
 
         /// <summary>
-        /// Path to write error log when using WriteToErrorLog mode. Auto-generated if not specified.
+        /// Path to write detailed error information. If specified, errors are logged to this file instead of being skipped silently.
         /// </summary>
         [CommandOption("--error-log <PATH>")]
-        [Description("Path for error log file (only used with WriteToErrorLog mode)")]
+        [Description("Write detailed error information to a separate log file")]
         public string? ErrorLogPath { get; init; }
-
-        /// <summary>
-        /// Whether to continue processing after encountering errors (only applies when not using ThrowException mode).
-        /// </summary>
-        [CommandOption("--continue-on-error")]
-        [Description("Continue decryption even when errors are encountered (default: true)")]
-        [DefaultValue(true)]
-        public bool ContinueOnError { get; init; } = true;
     }
 
     /// <summary>
@@ -127,23 +114,35 @@ public sealed class DecryptCommand(IAnsiConsole console, IFileSystem fileSystem)
             );
 
             // Configure streaming options based on user settings
+            ErrorHandlingMode errorMode;
+            bool continueOnError;
+
+            if (settings.Strict)
+            {
+                // Strict mode: fail on first error
+                errorMode = ErrorHandlingMode.ThrowException;
+                continueOnError = false;
+            }
+            else if (!string.IsNullOrWhiteSpace(settings.ErrorLogPath))
+            {
+                // Error log specified: write errors to separate file
+                errorMode = ErrorHandlingMode.WriteToErrorLog;
+                continueOnError = true;
+                console.MarkupLineInterpolated($"[dim]Error log:[/] {settings.ErrorLogPath}");
+            }
+            else
+            {
+                // Default: skip errors silently
+                errorMode = ErrorHandlingMode.Skip;
+                continueOnError = true;
+            }
+
             StreamingOptions streamingOptions = new()
             {
-                ErrorHandlingMode = settings.ErrorMode,
+                ErrorHandlingMode = errorMode,
                 ErrorLogPath = settings.ErrorLogPath,
-                ContinueOnError = settings.ContinueOnError,
+                ContinueOnError = continueOnError,
             };
-
-            // Display error handling configuration
-            console.MarkupLineInterpolated($"[dim]Error handling mode:[/] {settings.ErrorMode}");
-
-            if (
-                settings.ErrorMode == ErrorHandlingMode.WriteToErrorLog
-                && !string.IsNullOrWhiteSpace(settings.ErrorLogPath)
-            )
-            {
-                console.MarkupLineInterpolated($"[dim]Error log path:[/] {settings.ErrorLogPath}");
-            }
 
             console.WriteLine();
 
@@ -309,22 +308,19 @@ public sealed class DecryptCommand(IAnsiConsole console, IFileSystem fileSystem)
             return files;
         }
 
-        // Check if it's a directory
+        // Check if it's a directory (always uses *.log pattern)
         if (fileSystem.Directory.Exists(settings.InputPath))
         {
             searchOption = settings.Recursive
                 ? SearchOption.AllDirectories
                 : SearchOption.TopDirectoryOnly;
 
-            foundFiles = fileSystem.Directory.GetFiles(
-                settings.InputPath,
-                settings.Pattern,
-                searchOption
-            );
-            files.AddRange(foundFiles);
+            foundFiles = fileSystem.Directory.GetFiles(settings.InputPath, "*.log", searchOption);
+            files.AddRange(FilterDecryptedFiles(foundFiles));
             return files;
         }
 
+        // Check if it's a glob pattern (e.g., *.log, logs/*.txt)
         if (!settings.InputPath.Contains('*') && !settings.InputPath.Contains('?'))
         {
             return files;
@@ -348,9 +344,24 @@ public sealed class DecryptCommand(IAnsiConsole console, IFileSystem fileSystem)
             : SearchOption.TopDirectoryOnly;
 
         foundFiles = fileSystem.Directory.GetFiles(directory, pattern, searchOption);
-        files.AddRange(foundFiles);
+        files.AddRange(FilterDecryptedFiles(foundFiles));
 
         return files;
+    }
+
+    /// <summary>
+    /// Filters out files that have already been decrypted (contain .decrypted in the filename).
+    /// This prevents attempting to re-decrypt already decrypted files.
+    /// </summary>
+    /// <param name="files">The list of files to filter.</param>
+    /// <returns>Filtered list excluding already-decrypted files.</returns>
+    private IEnumerable<string> FilterDecryptedFiles(string[] files)
+    {
+        return files.Where(f =>
+        {
+            string fileName = fileSystem.Path.GetFileName(f);
+            return !fileName.Contains(".decrypted.", StringComparison.OrdinalIgnoreCase);
+        });
     }
 
     /// <summary>
