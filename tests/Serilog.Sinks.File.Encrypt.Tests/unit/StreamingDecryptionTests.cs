@@ -82,7 +82,6 @@ public sealed class StreamingDecryptionTests : EncryptionTestBase
 
         // Corrupt part of the stream
         byte[] fileBytes = encryptedStream.ToArray();
-        // Corrupt the second message part
         byte[] corrupted = CorruptData(fileBytes, fileBytes.Length / 2);
         MemoryStream corruptedStream = CreateMemoryStream(corrupted);
 
@@ -116,7 +115,6 @@ public sealed class StreamingDecryptionTests : EncryptionTestBase
 
         // Corrupt part of the stream
         byte[] fileBytes = encryptedStream.ToArray();
-        // Corrupt the second message part
         byte[] corrupted = CorruptData(fileBytes, fileBytes.Length / 2);
         MemoryStream corruptedStream = CreateMemoryStream(corrupted);
 
