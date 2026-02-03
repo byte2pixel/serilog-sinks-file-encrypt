@@ -30,6 +30,104 @@ namespace Serilog.Sinks.File.Encrypt;
 public static class EncryptionUtils
 {
     /// <summary>
+    /// Escapes occurrences of the specified marker in the data by inserting an escape byte after each occurrence.
+    /// </summary>
+    /// <param name="data">The data to escape.</param>
+    /// <param name="marker">The marker to search for.</param>
+    /// <param name="escapeMarker">The escape marker to insert for each found <paramref name="marker"/> within <paramref name="data"/>.</param>
+    /// <returns>Inplace modified <paramref name="data"/> with escaped markers.</returns>
+    internal static byte[] Escape(this byte[] data, byte[] marker, byte escapeMarker)
+    {
+        while (true)
+        {
+            int pos = data.IndexOf(marker);
+
+            if (pos != -1)
+            {
+                Array.Resize(ref data, data.Length + 1);
+                Array.Copy(data, pos + 1, data, pos + 2, data.Length - (pos + 2));
+                data[pos + 1] = escapeMarker;
+            }
+            else
+            {
+                break;
+            }
+        }
+
+        return data;
+    }
+
+    /// <summary>
+    /// Unescapes occurrences of the specified marker in the data by removing the escape byte after each occurrence.
+    /// </summary>
+    /// <param name="data">The data to unescape.</param>
+    /// <param name="marker">The marker to search for.</param>
+    /// <param name="escapeMarker">The escape marker to remove.</param>
+    /// <returns>Inplace modified <paramref name="data"/> with unescaped markers.</returns>
+    internal static byte[] Unescape(this byte[] data, byte[] marker, byte escapeMarker)
+    {
+        byte[] markerWithEscape = new byte[marker.Length + 1];
+
+        markerWithEscape[0] = marker[0];
+        markerWithEscape[1] = escapeMarker;
+        Array.Copy(marker, 1, markerWithEscape, 2, marker.Length - 1);
+
+        while (true)
+        {
+            int pos = data.IndexOf(markerWithEscape);
+
+            if (pos != -1)
+            {
+                Array.Copy(data, pos + 2, data, pos + 1, data.Length - (pos + 2));
+                Array.Resize(ref data, data.Length - 1);
+            }
+            else
+            {
+                break;
+            }
+        }
+
+        return data;
+    }
+
+    /// <summary>
+    /// AES-GCM encryption requires a unique nonce for each encryption operation.
+    /// This method retrieves the current nonce value stored in the last 8 bytes of the data array.
+    /// </summary>
+    /// <param name="nonce">Nonce of any length >= 8</param>
+    /// <returns>The current nonce counter value.</returns>
+    internal static long GetNonce(this byte[] nonce)
+    {
+        ArgumentNullException.ThrowIfNull(nonce, nameof(nonce));
+
+        if (nonce.Length < 8)
+        {
+            throw new ArgumentException("Invalid nonce length", nameof(nonce));
+        }
+
+        return BitConverter.ToInt64(nonce, nonce.Length - sizeof(long));
+    }
+
+    /// <summary>
+    /// AES-GCM encryption requires a unique nonce for each encryption operation.
+    /// This method increments the nonce value stored in the last 8 bytes of the data array.
+    /// </summary>
+    /// <param name="nonce">Nonce of any length >= 8</param>
+    internal static void IncreaseNonce(this byte[] nonce)
+    {
+        ArgumentNullException.ThrowIfNull(nonce, nameof(nonce));
+
+        if (nonce.Length < 8)
+        {
+            throw new ArgumentException("Invalid nonce length", nameof(nonce));
+        }
+
+        long value = nonce.GetNonce() + 1 % long.MaxValue;
+        byte[] nonceBytes = BitConverter.GetBytes(value);
+        nonceBytes.CopyTo(nonce, nonce.Length - sizeof(long));
+    }
+
+    /// <summary>
     /// Generates a new RSA key pair for encryption and decryption operations.
     /// </summary>
     /// <param name="keySize">The size of the key in bits. Must be at least 2048. Recommended: 2048 (default) or 4096 for enhanced security.</param>
