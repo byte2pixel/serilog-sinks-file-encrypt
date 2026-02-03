@@ -94,7 +94,7 @@ public sealed class StreamingDecryptionTests : EncryptionTestBase
         );
 
         // Assert
-        result.ShouldBe("Good message 1");
+        result.ShouldBeEmpty();
     }
 
     [Fact]
@@ -129,7 +129,7 @@ public sealed class StreamingDecryptionTests : EncryptionTestBase
         );
 
         // Assert
-        result.ShouldBe("Good message 1");
+        result.ShouldBeEmpty();
     }
 
     [Fact]

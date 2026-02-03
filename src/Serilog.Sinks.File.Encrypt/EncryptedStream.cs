@@ -110,26 +110,14 @@ public class EncryptedStream : Stream
     /// <inheritdoc/>
     public override void Flush()
     {
-        if (_aes != null)
-        {
-            _underlyingStream.Flush();
-
-            _aes.Dispose();
-            _aes = null;
-        }
+        _underlyingStream.Flush();
     }
 
     /// <inheritdoc/>
     public override async Task FlushAsync(CancellationToken cancellationToken)
     {
-        if (_aes != null)
-        {
-            await _underlyingStream.FlushAsync(cancellationToken)
-                .ConfigureAwait(false);
-
-            _aes.Dispose();
-            _aes = null;
-        }
+        await _underlyingStream.FlushAsync(cancellationToken)
+            .ConfigureAwait(false);
     }
 
     /// <summary>
