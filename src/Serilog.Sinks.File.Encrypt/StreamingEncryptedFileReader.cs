@@ -181,7 +181,7 @@ internal sealed class StreamingEncryptedFileReader : IDisposable, IAsyncDisposab
 
         if (IsHeaderMarker(markerBuffer))
         {
-            await ProcessHeaderSectionAsync(markerBuffer, cancellationToken);
+            await ProcessHeaderSectionAsync(cancellationToken);
         }
         else if (_context.HasKeys)
         {
@@ -199,7 +199,6 @@ internal sealed class StreamingEncryptedFileReader : IDisposable, IAsyncDisposab
     /// Processes a header section to extract encryption keys
     /// </summary>
     private async Task ProcessHeaderSectionAsync(
-        byte[] markerBuffer,
         CancellationToken cancellationToken
     )
     {
