@@ -198,6 +198,9 @@ public sealed class StreamingDecryptionTests : EncryptionTestBase
             TestContext.Current.CancellationToken
         );
 
+        // Assert
+        result.ShouldBeEmpty();
+
         // Error log file should exist (in real file system for this test)
         string fileContents = await System.IO.File.ReadAllTextAsync(
             errorLogPath,
