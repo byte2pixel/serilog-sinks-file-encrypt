@@ -45,9 +45,9 @@ public class EncryptHooks : FileLifecycleHooks
     /// <summary>
     /// Creates a new instance of <see cref="EncryptHooks"/> with the provided RSA public key.
     /// </summary>
-    /// <param name="rsaPublicKeyXml">The RSA public key in XML format. Use <see cref="EncryptionUtils.GenerateRsaKeyPair"/> to generate keys.</param>
-    /// <exception cref="ArgumentNullException">Thrown when <paramref name="rsaPublicKeyXml"/> is null or whitespace.</exception>
-    /// <exception cref="CryptographicException">Thrown when the XML format is invalid or cannot be parsed as an RSA public key.</exception>
+    /// <param name="rsaPublicKey">The RSA public key in XML or PEM format. Use <see cref="EncryptionUtils.GenerateRsaKeyPair"/> to generate keys.</param>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="rsaPublicKey"/> is null or whitespace.</exception>
+    /// <exception cref="CryptographicException">Thrown when the format is invalid or cannot be parsed as an RSA public key.</exception>
     /// <remarks>
     /// The public key is loaded and validated during construction. Keep the corresponding private key secure
     /// for decryption purposes - it should never be deployed with application code.
@@ -59,14 +59,14 @@ public class EncryptHooks : FileLifecycleHooks
     /// var hooks = new EncryptHooks(publicKey);
     ///
     /// // From file
-    /// string publicKey = File.ReadAllText("public_key.xml");
+    /// string publicKey = File.ReadAllText("public_key.(xml/pem)");
     /// var hooks = new EncryptHooks(publicKey);
     /// </code>
     /// </example>
-    public EncryptHooks(string rsaPublicKeyXml)
+    public EncryptHooks(string rsaPublicKey)
     {
         _rsaPublicKey = RSA.Create();
-        _rsaPublicKey.FromXmlString(rsaPublicKeyXml);
+        _rsaPublicKey.FromString(rsaPublicKey);
     }
 
     /// <summary>

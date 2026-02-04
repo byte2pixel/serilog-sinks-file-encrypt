@@ -1,6 +1,7 @@
 using System.ComponentModel;
 using System.Diagnostics.CodeAnalysis;
 using System.IO.Abstractions;
+using Serilog.Sinks.File.Encrypt.Models;
 using Spectre.Console;
 using Spectre.Console.Cli;
 
@@ -21,10 +22,10 @@ public sealed class GenerateCommand(IAnsiConsole console, IFileSystem fileSystem
     public sealed class Settings : CommandSettings
     {
         /// <summary>
-        /// The output path to write the public/private key pair in XML format.
+        /// The output path to write the public/private key pair.
         /// </summary>
         [CommandOption("-o|--output <OUTPUT>", isRequired: true)]
-        [Description("The output path to write the public/private key pair in XML format")]
+        [Description("The output path to write the public/private key pair")]
         public string OutputPath { get; init; } = string.Empty;
 
         /// <summary>
@@ -34,6 +35,13 @@ public sealed class GenerateCommand(IAnsiConsole console, IFileSystem fileSystem
         [Description("The size of the RSA key in bits (default: 2048)")]
         [DefaultValue(2048)]
         public int KeySize { get; init; } = 2048;
+
+        /// <summary>
+        /// The export format for the RSA keys.
+        /// </summary>
+        [CommandOption("-f|--format <FORMAT>")]
+        [Description("The encoding format for the RSA keys (default: Xml)")]
+        public KeyFormat Format { get; init; } = KeyFormat.Xml;
     }
 
     /// <summary>
@@ -62,12 +70,15 @@ public sealed class GenerateCommand(IAnsiConsole console, IFileSystem fileSystem
 
             // Generate the RSA key pair
             (string publicKey, string privateKey) keyPair = EncryptionUtils.GenerateRsaKeyPair(
-                settings.KeySize
+                settings.KeySize,
+                settings.Format
             );
 
+            string fileExt = settings.Format.ToString().ToLower();
+
             // Define file paths
-            string privateKeyPath = fileSystem.Path.Join(settings.OutputPath, "private_key.xml");
-            string publicKeyPath = fileSystem.Path.Join(settings.OutputPath, "public_key.xml");
+            string privateKeyPath = fileSystem.Path.Join(settings.OutputPath, $"private_key.{fileExt}");
+            string publicKeyPath = fileSystem.Path.Join(settings.OutputPath, $"public_key.{fileExt}");
 
             // Write keys to files
             fileSystem.File.WriteAllText(privateKeyPath, keyPair.privateKey);

@@ -1,3 +1,5 @@
+using Serilog.Sinks.File.Encrypt.Models;
+
 namespace Serilog.Sinks.File.Encrypt.Cli.Tests.unit;
 
 public class DecryptCommandTests : CommandTestBase
@@ -8,11 +10,58 @@ public class DecryptCommandTests : CommandTestBase
         // Arrange
         const string TestLogContent =
             "2024-11-26 14:00:00 [INF] Test log entry\n2024-11-26 14:00:01 [WRN] Warning message\n";
+        string privateKeyPath = Path.Join("keys", "private_key.pem");
+        string encryptedFilePath = Path.Join("logs", "encrypted.log");
+        string decryptedFilePath = Path.Join("logs", "decrypted.log");
+
+        (string publicKey, string privateKey) = EncryptionUtils.GenerateRsaKeyPair(format: KeyFormat.Pem);
+
+        byte[] encryptedContent = CreateEncryptedLogFile(TestLogContent, publicKey);
+
+        FileSystem.AddFile(privateKeyPath, new MockFileData(privateKey));
+        FileSystem.AddFile(encryptedFilePath, new MockFileData(encryptedContent));
+
+        DecryptCommand command = new(TestConsole, FileSystem);
+        DecryptCommand.Settings settings = new()
+        {
+            InputPath = encryptedFilePath,
+            KeyFile = privateKeyPath,
+            OutputPath = decryptedFilePath,
+        };
+
+        // Act
+        int result = await command.ExecuteAsync(
+            new CommandContext(Arguments, Remaining, "decrypt", null),
+            settings,
+            CancellationToken.None
+        );
+
+        // Assert
+        result.ShouldBe(0); // Success
+
+        FileSystem.File.Exists(decryptedFilePath).ShouldBeTrue();
+
+        string decryptedContent = await FileSystem.File.ReadAllTextAsync(
+            decryptedFilePath,
+            TestContext.Current.CancellationToken
+        );
+        decryptedContent.ShouldBe(TestLogContent);
+
+        TestConsole.Output.ShouldContain("✓ Decrypted:");
+        TestConsole.Output.ShouldContain("Reading private key from:");
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WithValidXmlEncryptedFile_DecryptsSuccessfully()
+    {
+        // Arrange
+        const string TestLogContent =
+            "2024-11-26 14:00:00 [INF] Test log entry\n2024-11-26 14:00:01 [WRN] Warning message\n";
         string privateKeyPath = Path.Join("keys", "private_key.xml");
         string encryptedFilePath = Path.Join("logs", "encrypted.log");
         string decryptedFilePath = Path.Join("logs", "decrypted.log");
 
-        (string publicKey, string privateKey) = EncryptionUtils.GenerateRsaKeyPair();
+        (string publicKey, string privateKey) = EncryptionUtils.GenerateRsaKeyPair(format: KeyFormat.Xml);
 
         byte[] encryptedContent = CreateEncryptedLogFile(TestLogContent, publicKey);
 
@@ -1051,7 +1100,7 @@ public class DecryptCommandTests : CommandTestBase
     {
         using MemoryStream memoryStream = new();
         using RSA rsa = RSA.Create();
-        rsa.FromXmlString(rsaPublicKey);
+        rsa.FromString(rsaPublicKey);
 
         using (EncryptedStream encryptedStream = new(memoryStream, rsa))
         {
