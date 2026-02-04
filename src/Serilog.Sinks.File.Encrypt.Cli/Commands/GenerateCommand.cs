@@ -40,7 +40,7 @@ public sealed class GenerateCommand(IAnsiConsole console, IFileSystem fileSystem
         /// The export format for the RSA keys.
         /// </summary>
         [CommandOption("-f|--format <FORMAT>")]
-        [Description("The encoding format for the RSA keys (default: Xml)")]
+        [Description("The encoding format (Xml or Pem) for the RSA keys (default: Xml)")]
         public KeyFormat Format { get; init; } = KeyFormat.Xml;
     }
 
