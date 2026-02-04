@@ -98,7 +98,7 @@ public class EncryptedStream : Stream
             ..encryptedNonce,
             ..encryptedSessionKey];
 
-        messageHeader.Escape(_marker, _escapeMarker);
+        Escape(ref messageHeader);
 
         _underlyingStream.Write(_marker);
         _underlyingStream.Write(encryptedTagSizeLength);
@@ -246,6 +246,10 @@ public class EncryptedStream : Stream
                 {
                     // Encryption finalization error - safe to ignore during disposal
                 }
+                finally
+                {
+                    _aes.Dispose();
+                }
             }
 
             _underlyingStream.Dispose();
@@ -266,8 +270,31 @@ public class EncryptedStream : Stream
 
         // concat and escape message data
         byte[] message = [.. cypherText, .. hmac];
-        message.Escape(_marker, _escapeMarker);
+        Escape(ref message);
 
         return [.. BitConverter.GetBytes(message.Length), .. message];
+    }
+
+    /// <summary>
+    /// Escapes occurrences of the specified marker in the data by inserting in-place an escape byte after each occurrence.
+    /// </summary>
+    /// <param name="data">The data to escape.</param>
+    private void Escape(ref byte[] data)
+    {
+        while (true)
+        {
+            int pos = data.IndexOf(_marker);
+
+            if (pos != -1)
+            {
+                Array.Resize(ref data, data.Length + 1);
+                Array.Copy(data, pos + 1, data, pos + 2, data.Length - (pos + 2));
+                data[pos + 1] = _escapeMarker;
+            }
+            else
+            {
+                break;
+            }
+        }
     }
 }

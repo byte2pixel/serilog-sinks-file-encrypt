@@ -255,7 +255,7 @@ internal sealed class StreamingEncryptedFileReader : IDisposable, IAsyncDisposab
 
         await _inputStream.ReadExactlyAsync(headerSection, cancellationToken);
 
-        headerSection.Unescape(_marker, _escapeMarker);
+        Unescape(ref headerSection);
 
         return new HeaderSection(headerSection[..tagBytesLength],
             headerSection[tagBytesLength..^nonceLength],
@@ -297,7 +297,7 @@ internal sealed class StreamingEncryptedFileReader : IDisposable, IAsyncDisposab
     {
         byte[] message = new byte[messageLength];
         await _inputStream.ReadExactlyAsync(message, cancellationToken);
-        message.Unescape(_marker, _escapeMarker);
+        Unescape(ref message);
 
         byte[] cypherText = message[..^_context.TagLength];
         byte[] hmac = message[^_context.TagLength..];
@@ -448,6 +448,34 @@ internal sealed class StreamingEncryptedFileReader : IDisposable, IAsyncDisposab
         int bytesRead = await _inputStream.ReadAsync(markerBuffer, cancellationToken);
         _inputStream.Position -= bytesRead != _markerLength ? 0 : _markerLength;
         return bytesRead == _markerLength ? markerBuffer : null;
+    }
+
+    /// <summary>
+    /// Unescapes occurrences of the specified marker in the data by removing in-place the escape byte after each occurrence.
+    /// </summary>
+    /// <param name="data">The data to unescape.</param>
+    private void Unescape(ref byte[] data)
+    {
+        byte[] markerWithEscape = new byte[_marker.Length + 1];
+
+        markerWithEscape[0] = _marker[0];
+        markerWithEscape[1] = _escapeMarker;
+        Array.Copy(_marker, 1, markerWithEscape, 2, _marker.Length - 1);
+
+        while (true)
+        {
+            int pos = data.IndexOf(markerWithEscape);
+
+            if (pos != -1)
+            {
+                Array.Copy(data, pos + 2, data, pos + 1, data.Length - (pos + 2));
+                Array.Resize(ref data, data.Length - 1);
+            }
+            else
+            {
+                break;
+            }
+        }
     }
 
     private bool IsEndOfStream() => _inputStream.Position >= _inputStream.Length;
