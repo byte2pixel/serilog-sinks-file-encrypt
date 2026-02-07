@@ -32,10 +32,10 @@ public sealed class DecryptCommand(IAnsiConsole console, IFileSystem fileSystem)
         public string InputPath { get; init; } = string.Empty;
 
         /// <summary>
-        /// The path to the RSA private key file in XML format.
+        /// The path to the RSA private key file in XML or PEM format.
         /// </summary>
         [CommandOption("-k|--key <KEY>")]
-        [Description("The file containing the RSA private key in XML format")]
+        [Description("The file containing the RSA private key in XML or PEM format")]
         public string KeyFile { get; init; } = "private_key.xml";
 
         /// <summary>

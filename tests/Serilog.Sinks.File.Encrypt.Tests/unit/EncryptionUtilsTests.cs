@@ -1,18 +1,40 @@
+using Serilog.Sinks.File.Encrypt.Models;
+
 namespace Serilog.Sinks.File.Encrypt.Tests.unit;
 
 public class EncryptionUtilsTests : EncryptionTestBase
 {
     [Fact]
-    public void GenerateRsaKeyPair_ReturnsValidKeys()
+    public void GenerateRsaKeyPair_WithXmlFormat_ReturnsValidKeys()
     {
         // Arrange, Act
-        (string publicKey, string privateKey) = EncryptionUtils.GenerateRsaKeyPair();
+        (string publicKey, string privateKey) = EncryptionUtils.GenerateRsaKeyPair(format: KeyFormat.Xml);
 
         using RSA privateKeyRsa = RSA.Create();
         privateKeyRsa.FromXmlString(privateKey);
 
         using RSA publicKeyRsa = RSA.Create();
         publicKeyRsa.FromXmlString(publicKey);
+
+        byte[] data = "ABCD"u8.ToArray();
+        byte[] encryptedData = publicKeyRsa.Encrypt(data, RSAEncryptionPadding.Pkcs1);
+        byte[] decryptedData = privateKeyRsa.Decrypt(encryptedData, RSAEncryptionPadding.Pkcs1);
+
+        // Assert
+        decryptedData.ShouldBe(data);
+    }
+
+    [Fact]
+    public void GenerateRsaKeyPair_WithPemFormat_ReturnsValidKeys()
+    {
+        // Arrange, Act
+        (string publicKey, string privateKey) = EncryptionUtils.GenerateRsaKeyPair(format: KeyFormat.Pem);
+
+        using RSA privateKeyRsa = RSA.Create();
+        privateKeyRsa.ImportFromPem(privateKey);
+
+        using RSA publicKeyRsa = RSA.Create();
+        publicKeyRsa.ImportFromPem(publicKey);
 
         byte[] data = "ABCD"u8.ToArray();
         byte[] encryptedData = publicKeyRsa.Encrypt(data, RSAEncryptionPadding.Pkcs1);
@@ -61,16 +83,40 @@ public class EncryptionUtilsTests : EncryptionTestBase
     }
 
     [Fact]
-    public void GenerateRsaKeyPair_With4096BitKey_ReturnsValidKeys()
+    public void GenerateRsaKeyPair_With4096BitKey_WithXmlFormat_ReturnsValidKeys()
     {
         // Arrange & Act
-        (string publicKey, string privateKey) = EncryptionUtils.GenerateRsaKeyPair(keySize: 4096);
+        (string publicKey, string privateKey) = EncryptionUtils.GenerateRsaKeyPair(keySize: 4096, format: KeyFormat.Xml);
 
         using RSA privateKeyRsa = RSA.Create();
         privateKeyRsa.FromXmlString(privateKey);
 
         using RSA publicKeyRsa = RSA.Create();
         publicKeyRsa.FromXmlString(publicKey);
+
+        // Assert - Verify key size is 4096 bits
+        privateKeyRsa.KeySize.ShouldBe(4096);
+        publicKeyRsa.KeySize.ShouldBe(4096);
+
+        // Verify keys can encrypt and decrypt
+        byte[] data = "Test data for 4096-bit key"u8.ToArray();
+        byte[] encryptedData = publicKeyRsa.Encrypt(data, RSAEncryptionPadding.Pkcs1);
+        byte[] decryptedData = privateKeyRsa.Decrypt(encryptedData, RSAEncryptionPadding.Pkcs1);
+
+        decryptedData.ShouldBe(data);
+    }
+
+    [Fact]
+    public void GenerateRsaKeyPair_With4096BitKey_WithPemFormat_ReturnsValidKeys()
+    {
+        // Arrange & Act
+        (string publicKey, string privateKey) = EncryptionUtils.GenerateRsaKeyPair(keySize: 4096, format: KeyFormat.Pem);
+
+        using RSA privateKeyRsa = RSA.Create();
+        privateKeyRsa.ImportFromPem(privateKey);
+
+        using RSA publicKeyRsa = RSA.Create();
+        publicKeyRsa.ImportFromPem(publicKey);
 
         // Assert - Verify key size is 4096 bits
         privateKeyRsa.KeySize.ShouldBe(4096);
