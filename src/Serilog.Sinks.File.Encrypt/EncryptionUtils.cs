@@ -30,6 +30,43 @@ namespace Serilog.Sinks.File.Encrypt;
 public static class EncryptionUtils
 {
     /// <summary>
+    /// AES-GCM encryption requires a unique nonce for each encryption operation.
+    /// This method retrieves the current nonce value stored in the last 8 bytes of the data array.
+    /// </summary>
+    /// <param name="nonce">Nonce of any length >= 8</param>
+    /// <returns>The current nonce counter value.</returns>
+    internal static long GetNonce(this byte[] nonce)
+    {
+        ArgumentNullException.ThrowIfNull(nonce, nameof(nonce));
+
+        if (nonce.Length < 8)
+        {
+            throw new ArgumentException("Invalid nonce length", nameof(nonce));
+        }
+
+        return BitConverter.ToInt64(nonce, nonce.Length - sizeof(long));
+    }
+
+    /// <summary>
+    /// AES-GCM encryption requires a unique nonce for each encryption operation.
+    /// This method increments the nonce value stored in the last 8 bytes of the data array.
+    /// </summary>
+    /// <param name="nonce">Nonce of any length >= 8</param>
+    internal static void IncreaseNonce(this byte[] nonce)
+    {
+        ArgumentNullException.ThrowIfNull(nonce, nameof(nonce));
+
+        if (nonce.Length < 8)
+        {
+            throw new ArgumentException("Invalid nonce length", nameof(nonce));
+        }
+
+        long value = nonce.GetNonce() + 1 % long.MaxValue;
+        byte[] nonceBytes = BitConverter.GetBytes(value);
+        nonceBytes.CopyTo(nonce, nonce.Length - sizeof(long));
+    }
+
+    /// <summary>
     /// Generates a new RSA key pair for encryption and decryption operations.
     /// </summary>
     /// <param name="keySize">The size of the key in bits. Must be at least 2048. Recommended: 2048 (default) or 4096 for enhanced security.</param>

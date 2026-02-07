@@ -135,8 +135,8 @@ Key rotation is essential for long-term security:
 
 This library uses the .NET cryptographic libraries (`System.Security.Cryptography`) and relies on:
 
-- **RSA-OAEP-SHA256**: For encrypting AES keys and IVs
-- **AES-256-CBC**: For log content encryption with PKCS7 padding
+- **RSA-OAEP-SHA256**: For encrypting AES keys and nonce
+- **AES-256-GCM**: For log content encryption
 
 We monitor dependencies through:
 - GitHub Dependabot (automated PRs for dependency updates)

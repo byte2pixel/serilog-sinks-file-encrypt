@@ -3,18 +3,17 @@ using System.Security.Cryptography;
 namespace Serilog.Sinks.File.Encrypt;
 
 /// <summary>
-/// Encrypts data written to the underlying stream using hybrid AES-256 + RSA encryption.
+/// Encrypts data written to the underlying stream using hybrid AES-256 GCM + RSA encryption.
 /// </summary>
 /// <remarks>
 /// <para>
 /// This stream wraps an underlying stream and encrypts all data written to it using a hybrid encryption scheme:
-/// - AES-256 is used for data encryption (symmetric, fast)
-/// - RSA is used to encrypt the AES key and IV (asymmetric, secure key exchange)
+/// - AES-256 GCM is used for data encryption (symmetric, fast)
+/// - RSA is used to encrypt the AES key and nonce (asymmetric, secure key exchange)
 /// </para>
 /// <para>
 /// <b>Memory Usage:</b> Each call to <see cref="Flush"/> or <see cref="FlushAsync"/> creates a new encryption chunk.
-/// Data is buffered in memory until flushed. Typical chunk sizes range from 1KB to 64KB depending on logging patterns.
-/// The internal buffer is released after each flush operation.
+/// A chunk consists of one RSA header (symmetric AES key) and multiple AES-encrypted data blocks.
 /// </para>
 /// <para>
 /// <b>Thread Safety:</b> This class is NOT thread-safe. It is designed to be used by Serilog.Sinks.File
@@ -37,18 +36,24 @@ namespace Serilog.Sinks.File.Encrypt;
 public class EncryptedStream : Stream
 {
     // csharpier-ignore-start
-    private static readonly byte[] _headerMarker = [ 0xFF, 0xFE, 0x4C, 0x4F, 0x47, 0x48, 0x44, 0x00, 0x01 ];
-    private static readonly byte[] _chunkMarker =  [ 0xFF, 0xFE, 0x4C, 0x4F, 0x47, 0x42, 0x44, 0x00, 0x02 ];
+    private static readonly byte[] _marker = [0xFF, 0xFE, 0x4C, 0x4F, 0x47, 0x48, 0x44, 0x00, 0x01];
+    private static readonly byte _escapeMarker = 0x00;
     // csharpier-ignore-end
 
+    // length of the nonce in bytes (counter for the stream cypher)
+    private const int NONCE_LENGTH = 12;
+    // length of the AES session key in bytes
+    private const int SESSION_KEY_LENGTH = 32; // 256 bit
+    // tag (hmac) to confirm data integrity
+    private const int TAG_LENGTH = 12; // 96 bit
+
     private readonly Stream _underlyingStream;
-    private readonly ICryptoTransform _currentCryptoTransform;
-    private readonly Aes _aes;
+    private readonly RSA _rsaPublicKey;
+
+    private AesGcm? _aes;
 
     private bool _isDisposed;
-    private bool _needsNewChunk = true;
-    private MemoryStream? _bufferStream;
-    private CryptoStream? _currentCryptoStream;
+    private byte[] _nonce = [0];
 
     /// <summary>
     /// Creates a new instance of <see cref="EncryptedStream"/> that encrypts data written to the underlying stream.
@@ -63,96 +68,56 @@ public class EncryptedStream : Stream
     /// </remarks>
     public EncryptedStream(Stream underlyingStream, RSA rsaPublicKey)
     {
+        ArgumentNullException.ThrowIfNull(underlyingStream);
+        ArgumentNullException.ThrowIfNull(rsaPublicKey);
+
         _underlyingStream = underlyingStream;
-
-        // Generate a new random key and IV for this stream
-        _aes = Aes.Create();
-        byte[] currentKey = _aes.Key;
-        byte[] currentIv = _aes.IV;
-        _aes.Padding = PaddingMode.PKCS7;
-        _currentCryptoTransform = _aes.CreateEncryptor(currentKey, currentIv);
-
-        byte[] encryptedKey = rsaPublicKey.Encrypt(currentKey, RSAEncryptionPadding.OaepSHA256);
-        byte[] encryptedKeyLength = BitConverter.GetBytes(encryptedKey.Length);
-        byte[] encryptedIv = rsaPublicKey.Encrypt(currentIv, RSAEncryptionPadding.OaepSHA256);
-        byte[] encryptedIvLength = BitConverter.GetBytes(encryptedIv.Length);
-        _underlyingStream.Write(_headerMarker, 0, _headerMarker.Length);
-        _underlyingStream.Write(encryptedKeyLength, 0, sizeof(int));
-        _underlyingStream.Write(encryptedIvLength, 0, sizeof(int));
-        _underlyingStream.Write(encryptedKey, 0, encryptedKey.Length);
-        _underlyingStream.Write(encryptedIv, 0, encryptedIv.Length);
+        _rsaPublicKey = rsaPublicKey;
     }
 
     private void StartNewEncryptionChunk()
     {
-        // Create a memory buffer to hold the encrypted content
-        _bufferStream = new MemoryStream();
-        _currentCryptoStream = new CryptoStream(
-            _bufferStream,
-            _currentCryptoTransform,
-            CryptoStreamMode.Write,
-            leaveOpen: true
-        );
+        byte[] sessionKey = new byte[SESSION_KEY_LENGTH];
+        _nonce = new byte[NONCE_LENGTH];
+
+        RandomNumberGenerator.Fill(sessionKey);
+        RandomNumberGenerator.Fill(_nonce);
+
+        _aes = new AesGcm(sessionKey, TAG_LENGTH);
+
+        byte[] encryptedTagSize = _rsaPublicKey.Encrypt(BitConverter.GetBytes(TAG_LENGTH), RSAEncryptionPadding.OaepSHA256);
+        byte[] encryptedNonce = _rsaPublicKey.Encrypt(_nonce, RSAEncryptionPadding.OaepSHA256);
+        byte[] encryptedSessionKey = _rsaPublicKey.Encrypt(sessionKey, RSAEncryptionPadding.OaepSHA256);
+
+        byte[] encryptedTagSizeLength = BitConverter.GetBytes(encryptedTagSize.Length);
+        byte[] encryptedNonceLength = BitConverter.GetBytes(encryptedNonce.Length);
+        byte[] encryptedSessionKeyLength = BitConverter.GetBytes(encryptedSessionKey.Length);
+
+        byte[] messageHeader = [
+            ..encryptedTagSize,
+            ..encryptedNonce,
+            ..encryptedSessionKey];
+
+        Escape(ref messageHeader);
+
+        _underlyingStream.Write(_marker);
+        _underlyingStream.Write(encryptedTagSizeLength);
+        _underlyingStream.Write(encryptedNonceLength);
+        _underlyingStream.Write(encryptedSessionKeyLength);
+        _underlyingStream.Write(messageHeader);
     }
 
     /// <inheritdoc/>
     public override void Flush()
     {
-        if (_currentCryptoStream != null && _bufferStream != null)
-        {
-            // Finalize the encryption
-            _currentCryptoStream.FlushFinalBlock();
-            _currentCryptoStream.Dispose();
-            _currentCryptoStream = null;
-
-            // Get the encrypted data from the buffer
-            byte[] encryptedData = _bufferStream.ToArray();
-            _bufferStream.Dispose();
-            _bufferStream = null;
-
-            // Write the complete chunk: [MARKER][LENGTH][ENCRYPTED_DATA]
-            _underlyingStream.Write(_chunkMarker, 0, _chunkMarker.Length);
-            byte[] lengthBytes = BitConverter.GetBytes(encryptedData.Length);
-            _underlyingStream.Write(lengthBytes, 0, sizeof(int));
-            _underlyingStream.Write(encryptedData, 0, encryptedData.Length);
-
-            _needsNewChunk = true;
-        }
         _underlyingStream.Flush();
     }
 
     /// <inheritdoc/>
     public override async Task FlushAsync(CancellationToken cancellationToken)
     {
-        if (_currentCryptoStream != null && _bufferStream != null)
-        {
-            // Finalize the encryption
-            await _currentCryptoStream
-                .FlushFinalBlockAsync(cancellationToken)
-                .ConfigureAwait(false);
-            await _currentCryptoStream.DisposeAsync().ConfigureAwait(false);
-            _currentCryptoStream = null;
-
-            // Get the encrypted data from the buffer
-            byte[] encryptedData = _bufferStream.ToArray();
-            await _bufferStream.DisposeAsync().ConfigureAwait(false);
-            _bufferStream = null;
-
-            // Write the complete chunk: [MARKER][LENGTH][ENCRYPTED_DATA]
-            await _underlyingStream
-                .WriteAsync(_chunkMarker, cancellationToken)
-                .ConfigureAwait(false);
-            byte[] lengthBytes = BitConverter.GetBytes(encryptedData.Length);
-            await _underlyingStream
-                .WriteAsync(lengthBytes.AsMemory(0, sizeof(int)), cancellationToken)
-                .ConfigureAwait(false);
-            await _underlyingStream
-                .WriteAsync(encryptedData, cancellationToken)
-                .ConfigureAwait(false);
-
-            _needsNewChunk = true;
-        }
-        await _underlyingStream.FlushAsync(cancellationToken).ConfigureAwait(false);
+        await _underlyingStream.FlushAsync(cancellationToken)
+            .ConfigureAwait(false);
     }
 
     /// <summary>
@@ -193,14 +158,7 @@ public class EncryptedStream : Stream
     /// <inheritdoc/>
     public override void Write(byte[] buffer, int offset, int count)
     {
-        ObjectDisposedException.ThrowIf(_isDisposed, this);
-
-        if (_needsNewChunk || _currentCryptoStream == null)
-        {
-            StartNewEncryptionChunk();
-            _needsNewChunk = false;
-        }
-        _currentCryptoStream?.Write(buffer, offset, count);
+        Write(buffer[offset..(offset + count)].AsSpan());
     }
 
     /// <inheritdoc/>
@@ -208,12 +166,12 @@ public class EncryptedStream : Stream
     {
         ObjectDisposedException.ThrowIf(_isDisposed, this);
 
-        if (_needsNewChunk || _currentCryptoStream == null)
+        if (_aes == null)
         {
             StartNewEncryptionChunk();
-            _needsNewChunk = false;
         }
-        _currentCryptoStream?.Write(buffer);
+
+        _underlyingStream.Write(Transform(buffer));
     }
 
     /// <inheritdoc/>
@@ -223,16 +181,16 @@ public class EncryptedStream : Stream
     )
     {
         ObjectDisposedException.ThrowIf(_isDisposed, this);
-        if (_needsNewChunk || _currentCryptoStream == null)
+
+        if (_aes == null)
         {
             StartNewEncryptionChunk();
-            _needsNewChunk = false;
         }
 
-        if (_currentCryptoStream != null)
-        {
-            await _currentCryptoStream.WriteAsync(buffer, cancellationToken).ConfigureAwait(false);
-        }
+        await _underlyingStream.WriteAsync(
+            Transform(buffer.Span),
+            cancellationToken
+        ).ConfigureAwait(false);
     }
 
     /// <inheritdoc/>
@@ -270,7 +228,7 @@ public class EncryptedStream : Stream
         if (disposing)
         {
             // Flush any remaining data before disposing
-            if (_currentCryptoStream != null || _bufferStream != null)
+            if (_aes != null)
             {
                 try
                 {
@@ -288,14 +246,55 @@ public class EncryptedStream : Stream
                 {
                     // Encryption finalization error - safe to ignore during disposal
                 }
+                finally
+                {
+                    _aes.Dispose();
+                }
             }
 
-            _currentCryptoStream?.Dispose();
-            _bufferStream?.Dispose();
             _underlyingStream.Dispose();
-            _currentCryptoTransform.Dispose();
-            _aes.Dispose();
         }
+
         base.Dispose(disposing);
+    }
+
+    private byte[] Transform(ReadOnlySpan<byte> plainText)
+    {
+        byte[] cypherText = new byte[plainText.Length];
+        byte[] hmac = new byte[TAG_LENGTH];
+
+        _aes!.Encrypt(_nonce, plainText, cypherText, hmac);
+
+        // increase the nonce for next block
+        _nonce.IncreaseNonce();
+
+        // concat and escape message data
+        byte[] message = [.. cypherText, .. hmac];
+        Escape(ref message);
+
+        return [.. BitConverter.GetBytes(message.Length), .. message];
+    }
+
+    /// <summary>
+    /// Escapes occurrences of the specified marker in the data by inserting in-place an escape byte after each occurrence.
+    /// </summary>
+    /// <param name="data">The data to escape.</param>
+    private void Escape(ref byte[] data)
+    {
+        while (true)
+        {
+            int pos = data.IndexOf(_marker);
+
+            if (pos != -1)
+            {
+                Array.Resize(ref data, data.Length + 1);
+                Array.Copy(data, pos + 1, data, pos + 2, data.Length - (pos + 2));
+                data[pos + 1] = _escapeMarker;
+            }
+            else
+            {
+                break;
+            }
+        }
     }
 }

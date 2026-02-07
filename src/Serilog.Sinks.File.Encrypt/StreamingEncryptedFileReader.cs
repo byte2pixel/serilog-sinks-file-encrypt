@@ -11,10 +11,10 @@ namespace Serilog.Sinks.File.Encrypt;
 internal sealed class StreamingEncryptedFileReader : IDisposable, IAsyncDisposable
 {
     // csharpier-ignore-start
-    private static readonly byte[] _headerMarker = [0xFF, 0xFE, 0x4C, 0x4F, 0x47, 0x48, 0x44, 0x00, 0x01];
-    private static readonly byte[] _messageMarker = [0xFF, 0xFE, 0x4C, 0x4F, 0x47, 0x42, 0x44, 0x00, 0x02];
+    private static readonly byte[] _marker = [0xFF, 0xFE, 0x4C, 0x4F, 0x47, 0x48, 0x44, 0x00, 0x01];
+    private static readonly byte _escapeMarker = 0x00;
     // csharpier-ignore-end
-    private static readonly int _markerLength = _headerMarker.Length;
+    private static readonly int _markerLength = _marker.Length;
 
     private readonly Stream _inputStream;
     private readonly RSA _rsa;
@@ -173,6 +173,7 @@ internal sealed class StreamingEncryptedFileReader : IDisposable, IAsyncDisposab
     )
     {
         byte[]? markerBuffer = await ReadMarkerBufferAsync(cancellationToken);
+
         if (markerBuffer == null)
         {
             return;
@@ -180,15 +181,17 @@ internal sealed class StreamingEncryptedFileReader : IDisposable, IAsyncDisposab
 
         if (IsHeaderMarker(markerBuffer))
         {
-            await ProcessHeaderSectionAsync(markerBuffer, cancellationToken);
+            await ProcessHeaderSectionAsync(cancellationToken);
         }
-        else if (IsBodyMarker(markerBuffer))
+        else if (_context.HasKeys)
         {
             await ProcessBodySectionAsync(writer, cancellationToken);
         }
         else
         {
-            SkipUnknownData(markerBuffer);
+            // move the stream position forward by 1 byte to continue searching
+            // for the first valid header marker
+            _inputStream.Position += 1;
         }
     }
 
@@ -196,19 +199,10 @@ internal sealed class StreamingEncryptedFileReader : IDisposable, IAsyncDisposab
     /// Processes a header section to extract encryption keys
     /// </summary>
     private async Task ProcessHeaderSectionAsync(
-        byte[] markerBuffer,
         CancellationToken cancellationToken
     )
     {
-        long markerPosition = _inputStream.Position - markerBuffer.Length;
-
-        if (!await IsValidHeaderAsync(markerPosition, cancellationToken))
-        {
-            SkipUnknownData(markerBuffer);
-            return;
-        }
-
-        HeaderSection header = await ReadHeaderSectionAsync(markerPosition, cancellationToken);
+        HeaderSection header = await ReadHeaderSectionAsync(cancellationToken);
 
         // Mark that we found a valid header marker (before attempting decryption)
         // This way, if decryption fails with wrong key, we get a proper crypto error
@@ -226,12 +220,8 @@ internal sealed class StreamingEncryptedFileReader : IDisposable, IAsyncDisposab
         CancellationToken cancellationToken
     )
     {
-        if (!_context.HasKeys)
-        {
-            return;
-        }
-
         MessageSection body = await ReadMessageSectionAsync(cancellationToken);
+
         string decryptedText = await DecryptMessageContentAsync(
             body.MessageLength,
             cancellationToken
@@ -243,28 +233,33 @@ internal sealed class StreamingEncryptedFileReader : IDisposable, IAsyncDisposab
     /// Reads header section data from the input stream
     /// </summary>
     private async Task<HeaderSection> ReadHeaderSectionAsync(
-        long markerPosition,
         CancellationToken cancellationToken
     )
     {
-        _inputStream.Position = markerPosition + _markerLength;
+        // skip the header marker
+        _inputStream.Position += _markerLength;
 
-        // Read key and IV lengths
-        byte[] keyLengthBytes = new byte[4];
-        byte[] ivLengthBytes = new byte[4];
-        await _inputStream.ReadExactlyAsync(keyLengthBytes, cancellationToken);
-        await _inputStream.ReadExactlyAsync(ivLengthBytes, cancellationToken);
+        // Read the tag, nonce, and session key lengths
+        byte[] tagLengthBytes = new byte[sizeof(int)];
+        byte[] nonceLengthBytes = new byte[sizeof(int)];
+        byte[] sessionKeyLengthBytes = new byte[sizeof(int)];
+        await _inputStream.ReadExactlyAsync(tagLengthBytes, cancellationToken);
+        await _inputStream.ReadExactlyAsync(nonceLengthBytes, cancellationToken);
+        await _inputStream.ReadExactlyAsync(sessionKeyLengthBytes, cancellationToken);
 
-        int keyLength = BitConverter.ToInt32(keyLengthBytes, 0);
-        int ivLength = BitConverter.ToInt32(ivLengthBytes, 0);
+        int tagBytesLength = BitConverter.ToInt32(tagLengthBytes, 0);
+        int nonceLength = BitConverter.ToInt32(nonceLengthBytes, 0);
+        int sessionKeyLength = BitConverter.ToInt32(sessionKeyLengthBytes, 0);
 
-        // Read encrypted key and IV
-        byte[] encryptedKey = new byte[keyLength];
-        byte[] encryptedIv = new byte[ivLength];
-        await _inputStream.ReadExactlyAsync(encryptedKey, cancellationToken);
-        await _inputStream.ReadExactlyAsync(encryptedIv, cancellationToken);
+        byte[] headerSection = new byte[tagBytesLength + nonceLength + sessionKeyLength];
 
-        return new HeaderSection(encryptedKey, encryptedIv);
+        await _inputStream.ReadExactlyAsync(headerSection, cancellationToken);
+
+        Unescape(ref headerSection);
+
+        return new HeaderSection(headerSection[..tagBytesLength],
+            headerSection[tagBytesLength..^nonceLength],
+            headerSection[^sessionKeyLength..]);
     }
 
     /// <summary>
@@ -283,68 +278,56 @@ internal sealed class StreamingEncryptedFileReader : IDisposable, IAsyncDisposab
     /// </summary>
     private DecryptionContext DecryptKeys(HeaderSection header)
     {
-        byte[] key = _rsa.Decrypt(header.EncryptedKey, RSAEncryptionPadding.OaepSHA256);
-        byte[] iv = _rsa.Decrypt(header.EncryptedIv, RSAEncryptionPadding.OaepSHA256);
-        return new DecryptionContext(key, iv);
+        byte[] tagLengthBytes = _rsa.Decrypt(header.TagLength, RSAEncryptionPadding.OaepSHA256);
+        byte[] nonce = _rsa.Decrypt(header.Nonce, RSAEncryptionPadding.OaepSHA256);
+        byte[] sessionkey = _rsa.Decrypt(header.SessionKey, RSAEncryptionPadding.OaepSHA256);
+
+        int tag = BitConverter.ToInt32(tagLengthBytes);
+
+        return new DecryptionContext(tag, nonce, sessionkey);
     }
 
     /// <summary>
     /// Decrypts message content from the input stream using streaming
     /// </summary>
     private async Task<string> DecryptMessageContentAsync(
-        int dataLength,
+        int messageLength,
         CancellationToken cancellationToken
     )
     {
-        ValidateMessageSize(dataLength);
+        byte[] message = new byte[messageLength];
+        await _inputStream.ReadExactlyAsync(message, cancellationToken);
+        Unescape(ref message);
 
-        byte[] encryptedData = new byte[dataLength];
-        await _inputStream.ReadExactlyAsync(encryptedData, cancellationToken);
+        byte[] cypherText = message[..^_context.TagLength];
+        byte[] hmac = message[^_context.TagLength..];
 
-        return await DecryptDataAsync(encryptedData, _context.Key, _context.Iv, cancellationToken);
-    }
+        string plainText = DecryptData(cypherText, _context.SessionKey, _context.Nonce, hmac, _context.TagLength);
 
-    /// <summary>
-    /// Validates that the message size is reasonable
-    /// </summary>
-    private static void ValidateMessageSize(int dataLength)
-    {
-        const int MaxLogMessageSize = 10_000_000; // 10 MB should be more than enough for any single log message
-        if (dataLength > MaxLogMessageSize)
-        {
-            throw new InvalidOperationException(
-                $"Log message size ({dataLength} bytes) is unexpectedly large (>{MaxLogMessageSize} bytes). This may indicate file corruption."
-            );
-        }
+        _context.Nonce.IncreaseNonce();
+
+        return plainText;
     }
 
     /// <summary>
     /// Decrypts data using AES with the provided key and IV using streaming approach
     /// </summary>
-    private static async Task<string> DecryptDataAsync(
-        byte[] encryptedData,
-        byte[] key,
-        byte[] iv,
-        CancellationToken cancellationToken
+    private static string DecryptData(
+        byte[] cypherText,
+        byte[] sessionKey,
+        byte[] nonce,
+        byte[] hmac,
+        int tagLength
     )
     {
-        using Aes aes = Aes.Create();
-        aes.Key = key;
-        aes.IV = iv;
-        aes.Padding = PaddingMode.PKCS7;
+        using AesGcm aes = new AesGcm(sessionKey, tagLength);
+        using MemoryStream memoryStream = new();
 
-        using ICryptoTransform decryptor = aes.CreateDecryptor();
-        await using MemoryStream memoryStream = new();
-        await using CryptoStream cryptoStream = new(
-            memoryStream,
-            decryptor,
-            CryptoStreamMode.Write
-        );
+        byte[] plainText = new byte[cypherText.Length];
 
-        await cryptoStream.WriteAsync(encryptedData, cancellationToken);
-        await cryptoStream.FlushFinalBlockAsync(cancellationToken);
+        aes.Decrypt(nonce, cypherText, hmac, plainText);
 
-        return Encoding.UTF8.GetString(memoryStream.ToArray());
+        return Encoding.UTF8.GetString(plainText);
     }
 
     /// <summary>
@@ -463,19 +446,42 @@ internal sealed class StreamingEncryptedFileReader : IDisposable, IAsyncDisposab
     {
         byte[] markerBuffer = new byte[_markerLength];
         int bytesRead = await _inputStream.ReadAsync(markerBuffer, cancellationToken);
-        return bytesRead == markerBuffer.Length ? markerBuffer : null;
+        _inputStream.Position -= bytesRead != _markerLength ? 0 : _markerLength;
+        return bytesRead == _markerLength ? markerBuffer : null;
+    }
+
+    /// <summary>
+    /// Unescapes occurrences of the specified marker in the data by removing in-place the escape byte after each occurrence.
+    /// </summary>
+    /// <param name="data">The data to unescape.</param>
+    private void Unescape(ref byte[] data)
+    {
+        byte[] markerWithEscape = new byte[_marker.Length + 1];
+
+        markerWithEscape[0] = _marker[0];
+        markerWithEscape[1] = _escapeMarker;
+        Array.Copy(_marker, 1, markerWithEscape, 2, _marker.Length - 1);
+
+        while (true)
+        {
+            int pos = data.IndexOf(markerWithEscape);
+
+            if (pos != -1)
+            {
+                Array.Copy(data, pos + 2, data, pos + 1, data.Length - (pos + 2));
+                Array.Resize(ref data, data.Length - 1);
+            }
+            else
+            {
+                break;
+            }
+        }
     }
 
     private bool IsEndOfStream() => _inputStream.Position >= _inputStream.Length;
 
     private static bool IsHeaderMarker(byte[] markerBuffer) =>
-        markerBuffer.SequenceEqual(_headerMarker);
-
-    private static bool IsBodyMarker(byte[] markerBuffer) =>
-        markerBuffer.SequenceEqual(_messageMarker);
-
-    private void SkipUnknownData(byte[] markerBuffer) =>
-        _inputStream.Position -= markerBuffer.Length - 1;
+        markerBuffer.SequenceEqual(_marker);
 
     private async Task HandleErrorAsync(
         ChannelWriter<IDecryptionChunk> writer,
@@ -507,7 +513,7 @@ internal sealed class StreamingEncryptedFileReader : IDisposable, IAsyncDisposab
             }
 
             // Check if it's a valid marker
-            if (IsHeaderMarker(searchBuffer) || IsBodyMarker(searchBuffer))
+            if (IsHeaderMarker(searchBuffer))
             {
                 // Move back to start of marker
                 _inputStream.Position -= _markerLength;
@@ -516,66 +522,6 @@ internal sealed class StreamingEncryptedFileReader : IDisposable, IAsyncDisposab
 
             // Move back and advance by 1 byte to continue searching
             _inputStream.Position -= _markerLength - 1;
-        }
-    }
-
-    /// <summary>
-    /// Validates that a potential header marker is followed by reasonable key/IV length values
-    /// </summary>
-    private async Task<bool> IsValidHeaderAsync(
-        long markerPosition,
-        CancellationToken cancellationToken
-    )
-    {
-        long originalPosition = _inputStream.Position;
-        try
-        {
-            _inputStream.Position = markerPosition + _markerLength;
-
-            byte[] keyLengthBytes = new byte[4];
-            byte[] ivLengthBytes = new byte[4];
-
-            if (
-                await _inputStream.ReadAsync(keyLengthBytes, cancellationToken) != 4
-                || await _inputStream.ReadAsync(ivLengthBytes, cancellationToken) != 4
-            )
-            {
-                return false;
-            }
-
-            int keyLength = BitConverter.ToInt32(keyLengthBytes, 0);
-            int ivLength = BitConverter.ToInt32(ivLengthBytes, 0);
-
-            // Validate the lengths are reasonable for RSA encrypted AES keys/IVs
-            const int MinKeyIvLength = 256;
-            const int MaxKeyIvLength = 4096;
-            return keyLength is >= MinKeyIvLength and <= MaxKeyIvLength
-                && ivLength is >= MinKeyIvLength and <= MaxKeyIvLength;
-        }
-        catch (IOException)
-        {
-            // Stream read error - invalid header
-            return false;
-        }
-        catch (NotSupportedException)
-        {
-            // Stream doesn't support seeking/positioning - invalid header
-            return false;
-        }
-        catch (ObjectDisposedException)
-        {
-            // Stream was disposed - invalid header
-            return false;
-        }
-        catch (ArgumentException)
-        {
-            // Invalid position or BitConverter argument - invalid header
-            return false;
-        }
-        finally
-        {
-            // Restore original position so calling code can read the header data
-            _inputStream.Position = originalPosition;
         }
     }
 
