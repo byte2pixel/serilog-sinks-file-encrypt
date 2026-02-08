@@ -107,7 +107,7 @@ public class EncryptedStream : Stream
         // Combine all header data and check for markers once
         int headerUnescapedLength =
             encryptedTagSize.Length + encryptedNonce.Length + encryptedSessionKey.Length;
-        int maxHeaderSize = headerUnescapedLength * 2;
+        int maxHeaderSize = headerUnescapedLength + (headerUnescapedLength / _marker.Length) + 1;
         byte[] headerBuffer = ArrayPool<byte>.Shared.Rent(maxHeaderSize);
 
         try
@@ -319,50 +319,54 @@ public class EncryptedStream : Stream
     /// </remarks>
     private byte[] Transform(ReadOnlySpan<byte> plainText)
     {
-        int unescapedSize = plainText.Length + TagLength;
-        int maxEscapedSize = unescapedSize + unescapedSize; // Worst case: every byte needs escape
-        byte[] workBuffer = ArrayPool<byte>.Shared.Rent(sizeof(int) + maxEscapedSize);
+        // First, encrypt the data
+        int encryptedSize = plainText.Length + TagLength;
+        byte[] encryptedBuffer = ArrayPool<byte>.Shared.Rent(encryptedSize);
 
         try
         {
-            const int EncryptStart = sizeof(int);
-            Span<byte> cypherText = workBuffer.AsSpan(EncryptStart, plainText.Length);
-            Span<byte> hmac = workBuffer.AsSpan(EncryptStart + plainText.Length, TagLength);
+            Span<byte> cypherText = encryptedBuffer.AsSpan(0, plainText.Length);
+            Span<byte> hmac = encryptedBuffer.AsSpan(plainText.Length, TagLength);
 
             _aes!.Encrypt(_nonce, plainText, cypherText, hmac);
             _nonce.IncreaseNonce();
 
             // Fast path: check if escaping is needed
-            Span<byte> unescapedData = workBuffer.AsSpan(EncryptStart, unescapedSize);
-            int markerPos = unescapedData.IndexOf(_marker);
+            ReadOnlySpan<byte> encryptedData = encryptedBuffer.AsSpan(0, encryptedSize);
+            int markerPos = encryptedData.IndexOf(_marker);
 
-            if (markerPos == -1) // No markers, no escaping needed - just write length and return
+            if (markerPos == -1) // No markers, no escaping needed
             {
-                BitConverter.TryWriteBytes(workBuffer.AsSpan(0, sizeof(int)), unescapedSize);
-
-                byte[] result = new byte[sizeof(int) + unescapedSize];
-                workBuffer.AsSpan(0, sizeof(int) + unescapedSize).CopyTo(result);
+                byte[] result = new byte[sizeof(int) + encryptedSize];
+                BitConverter.TryWriteBytes(result.AsSpan(0, sizeof(int)), encryptedSize);
+                encryptedData.CopyTo(result.AsSpan(sizeof(int)));
                 return result;
             }
 
-            // Markers found, need to escape in-place.
-            int destPos = sizeof(int);
-            destPos += WriteEscapedSpanInPlace(
-                workBuffer.AsSpan(EncryptStart, unescapedSize),
-                workBuffer.AsSpan(destPos)
-            );
+            // Markers found, need to escape
+            int maxEscapedSize = encryptedSize + (encryptedSize / _marker.Length) + 1;
+            byte[] escapedBuffer = ArrayPool<byte>.Shared.Rent(sizeof(int) + maxEscapedSize);
 
-            int escapedLength = destPos - sizeof(int);
-            BitConverter.TryWriteBytes(workBuffer.AsSpan(0, sizeof(int)), escapedLength);
+            try
+            {
+                int escapedLength = WriteEscapedSpan(
+                    encryptedData,
+                    escapedBuffer.AsSpan(sizeof(int))
+                );
+                BitConverter.TryWriteBytes(escapedBuffer.AsSpan(0, sizeof(int)), escapedLength);
 
-            // Copy to exact-sized array
-            byte[] escapedResult = new byte[destPos];
-            workBuffer.AsSpan(0, destPos).CopyTo(escapedResult);
-            return escapedResult;
+                byte[] result = new byte[sizeof(int) + escapedLength];
+                escapedBuffer.AsSpan(0, sizeof(int) + escapedLength).CopyTo(result);
+                return result;
+            }
+            finally
+            {
+                ArrayPool<byte>.Shared.Return(escapedBuffer);
+            }
         }
         finally
         {
-            ArrayPool<byte>.Shared.Return(workBuffer);
+            ArrayPool<byte>.Shared.Return(encryptedBuffer);
         }
     }
 
@@ -370,26 +374,16 @@ public class EncryptedStream : Stream
     /// Writes a single span to the destination with escape sequences applied.
     /// </summary>
     /// <param name="source">The source data.</param>
-    /// <param name="destination">The destination buffer.</param>
+    /// <param name="destination">The destination buffer. Up to the caller to ensure this is large enough to hold the escaped data.</param>
     /// <returns>Number of bytes written to destination.</returns>
-    private static int WriteEscapedSpan(ReadOnlySpan<byte> source, Span<byte> destination)
+    internal static int WriteEscapedSpan(ReadOnlySpan<byte> source, Span<byte> destination)
     {
         int srcPos = 0;
         int destPos = 0;
 
         while (srcPos < source.Length)
         {
-            // Find next marker occurrence
-            int remaining = source.Length - srcPos;
-            int searchLength = Math.Min(remaining, destination.Length - destPos - _marker.Length);
-
-            if (searchLength < _marker.Length) // Not enough space for another marker, copy the rest
-            {
-                source[srcPos..].CopyTo(destination[destPos..]);
-                destPos += source.Length - srcPos;
-                break;
-            }
-
+            // Find next marker occurrence in remaining source
             int markerPos = source[srcPos..].IndexOf(_marker);
 
             if (markerPos == -1) // No more markers, copy the rest
@@ -399,78 +393,17 @@ public class EncryptedStream : Stream
                 break;
             }
 
+            // Copy data up to and including the marker
             int copyLength = markerPos + _marker.Length;
             source.Slice(srcPos, copyLength).CopyTo(destination[destPos..]);
             srcPos += copyLength;
             destPos += copyLength;
+
+            // Add escape byte after the marker
             destination[destPos] = EscapeMarker;
             destPos++;
         }
 
         return destPos;
-    }
-
-    /// <summary>
-    /// Applies escape sequences in-place by working backwards from the end of the buffer.
-    /// This method handles overlapping source and destination regions efficiently.
-    /// </summary>
-    /// <param name="source">The source data to escape (will be read from).</param>
-    /// <param name="destination">The destination buffer (must be large enough for escaped data).</param>
-    /// <returns>Number of bytes written to destination.</returns>
-    private static int WriteEscapedSpanInPlace(ReadOnlySpan<byte> source, Span<byte> destination)
-    {
-        // Quick check: if source doesn't contain marker, just copy
-        int firstMarker = source.IndexOf(_marker);
-        if (firstMarker == -1)
-        {
-            source.CopyTo(destination);
-            return source.Length;
-        }
-
-        // Copy source to temporary location if source and destination overlap
-        // This is necessary because we found markers and need to expand the data
-        byte[]? tempBuffer = null;
-        ReadOnlySpan<byte> sourceData = source;
-
-        if (source.Overlaps(destination))
-        {
-            tempBuffer = ArrayPool<byte>.Shared.Rent(source.Length);
-            source.CopyTo(tempBuffer);
-            sourceData = tempBuffer.AsSpan(0, source.Length);
-        }
-
-        try
-        {
-            int srcPos = 0;
-            int destPos = 0;
-
-            while (srcPos < sourceData.Length)
-            {
-                int markerPos = sourceData[srcPos..].IndexOf(_marker);
-
-                if (markerPos == -1)
-                {
-                    sourceData[srcPos..].CopyTo(destination[destPos..]);
-                    destPos += sourceData.Length - srcPos;
-                    break;
-                }
-
-                int copyLength = markerPos + _marker.Length;
-                sourceData.Slice(srcPos, copyLength).CopyTo(destination[destPos..]);
-                srcPos += copyLength;
-                destPos += copyLength;
-                destination[destPos] = EscapeMarker;
-                destPos++;
-            }
-
-            return destPos;
-        }
-        finally
-        {
-            if (tempBuffer is not null)
-            {
-                ArrayPool<byte>.Shared.Return(tempBuffer);
-            }
-        }
     }
 }
