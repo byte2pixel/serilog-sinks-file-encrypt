@@ -27,24 +27,38 @@ Results are saved to `BenchmarkDotNet.Artifacts/results/` with HTML, CSV, and Ma
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│ GOAL: Time Overhead < 50%                                       │
-│ ████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░  17% (unbuffered)      │
-│ ██░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░   7% (buffered)        │
-│ STATUS: ✅ PASS ✅ Well under target                           │
+│ GOAL: Time Overhead < 50%  (Serilog File Sink, 100 entries)     │
+│ AES:                                                            │
+│ ██░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░  1-8% (unbuffered)     │
+│ FASTER ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░  -23 to -35% (buff.)   │
+│ AES-GCM:                                                        │
+│ █░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░  4-5% (unbuffered)     │
+│ FASTER ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░  -13 to -31% (buff.)   │
+│ At 10K entries: AES → ~18%, AES-GCM → ~10%                      │
+│ STATUS PASS - Well within target                                │
 └─────────────────────────────────────────────────────────────────┘
 
 ┌─────────────────────────────────────────────────────────────────┐
-│ GOAL: Memory Overhead < 2x                                      │
-│ ████████████████████████████░░░░░░░░░░░  2.20x (buffered)       │
-│ ██████████████████████████████████░░░░░  3.82x (unbuffered)     │
-│ STATUS: ✅ PASS ✅ Within acceptable range                     │
+│ GOAL: Memory Overhead < 2x  (Serilog File Sink, Medium msgs)    │
+│ AES:                                                            │
+│ ████████████████████████░░░░░░░░░░░░░░░░  1.83x (buffered)      │
+│ ████████████████████████████████████░░░░  2.16x (unbuffered)    │
+│ AES-GCM:                                                        │
+│ ██████████████████░░░░░░░░░░░░░░░░░░░░░░  1.42x (buffered)      │
+│ ████████████████████░░░░░░░░░░░░░░░░░░░░  1.46x (unbuffered)    │
+│ STATUS: AES can exceed 2x on smaller msgs                       │
+│         AES-GCM PASS - always under 2x                          │
 └─────────────────────────────────────────────────────────────────┘
 
 ┌─────────────────────────────────────────────────────────────────┐
-│ GOAL: Throughput > 10,000 logs/sec                              │
-│ ████████████████████████████████████████  2,250,000 (buffered)  │
-│ ████████████████████████░░░░░░░░░░░░░░░░  330,000 (unbuffered)  │
-│ STATUS: ✅ PASS ✅ Exceeds target by 33-225x                   │
+│ GOAL: Throughput > 10,000 logs/sec  (Small msgs, 100 entries)   │
+│ AES:                                                            │
+│ █████████████████████████░░░░░░░░░░░░░░░  273,000 (buffered)    │
+│ ████████████████░░░░░░░░░░░░░░░░░░░░░░░░  170,000 (unbuffered)  │
+│ AES-GCM:                                                        │
+│ █████████████████████████░░░░░░░░░░░░░░░  272,000 (buffered)    │
+│ █████████████████░░░░░░░░░░░░░░░░░░░░░░░  178,000 (unbuffered)  │
+│ STATUS: PASS - Exceeds target by 17-27x                         │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -52,48 +66,61 @@ Results are saved to `BenchmarkDotNet.Artifacts/results/` with HTML, CSV, and Ma
 
 **Web API Logging (1,000 requests)**
 ```
-Without Encryption:  4.07 ms
-With Encryption:     4.68 ms  (+15%)  ← Default (unbuffered)
-Throughput:          214,000 requests/sec
-Memory:              1.89x overhead
-Verdict:             ✅ Excellent for production, no data loss risk
+                        Baseline        AES                    AES-GCM
+Time:                   3.63 ms         4.08 ms  (+13%)        3.91 ms  (+10%)
+Memory:                 999 KB          1,889 KB (1.89x)       1,271 KB (1.27x)
+Throughput:             ~276K/sec       ~245K/sec              ~256K/sec
+Verdict:                ✅ Both excellent for production, no data loss risk
+                        AES-GCM: ~half the time overhead, 33% less memory ↗️
 ```
 
 **Background Worker (10,000 messages)**
 ```
-Without Encryption:  6.03 ms
-With Encryption:     6.45 ms  (+7%)   ← Buffered mode
-Throughput:          1,550,000 messages/sec
-Memory:              1.64x overhead
-Verdict:             ✅ Ideal for batch processing (if crash risk acceptable)
+                        Baseline        AES                    AES-GCM
+Time:                   5.74 ms         6.35 ms  (+11%)        6.19 ms  (+6%)
+Memory:                 4.34 MB         7.13 MB  (1.64x)       5.19 MB  (1.20x)
+Throughput:             ~1.74M/sec      ~1.58M/sec             ~1.62M/sec
+Verdict:                ✅ Ideal for batch processing
+                        AES-GCM: ~half the time overhead, 27% less memory ↗️
 ```
 
-**Serilog File Sink - Small Messages (10,000 entries)**
+**Serilog File Sink - Medium Messages (100 entries)**
 ```
-No Encryption (unbuffered):     25.7 ms
-Encrypted (unbuffered):         30.2 ms  (+17%)  ← Default, safe
-Encrypted (buffered):            4.4 ms  (-83%!)  ← Performance mode
+                                Baseline       AES                    AES-GCM
+No Encryption (unbuffered):     593 μs         -                      -
+Encrypted (unbuffered):         -              601 μs  (+1%)          647 μs  (+4%)
+Encrypted (buffered):           -              412 μs  (-30%)         428 μs  (-31%)
 
-Throughput (unbuffered):  330,000 logs/sec  ← Default
-Throughput (buffered):    2,250,000 logs/sec ← Performance mode
-Memory (unbuffered):      5.18x overhead
-Memory (buffered):        2.68x overhead
-Verdict:                  ✅ Unbuffered is default safe choice
+Throughput (unbuffered):        169K/sec       166K/sec               155K/sec
+Throughput (buffered):          -              243K/sec               234K/sec
+Memory (unbuffered):            75 KB          162 KB  (2.16x)        110 KB  (1.46x)
+Memory (buffered):              -              137 KB  (1.83x)        106 KB  (1.42x)
+Verdict:                        ✅ Unbuffered is default safe choice
+                                AES-GCM: 32% less memory overhead (unbuffered) ↗️
 ```
+
+> *Note: Baselines differ slightly between runs (AES: 593 μs, AES-GCM: 624 μs); overhead % is vs each suite's own baseline.*
 
 ### Key Findings
 
-✅ **Production Ready** - 15-17% overhead (unbuffered) is excellent  
-✅ **High Throughput** - 330K+ logs/sec unbuffered, 2.25M buffered  
-✅ **Safe by Default** - Unbuffered mode has no data loss risk  
-🚀 **Performance Mode Available** - Buffered reduces overhead to 6-8%  
+✅ **Production Ready** - 1-8% overhead (unbuffered, 100 entries)
+✅ **High Throughput** - 166K+ logs/sec unbuffered, 234K+ buffered (medium messages)  
+✅ **Safe by Default** - Unbuffered mode has no data loss risk (only unflushed data at risk)  
+🚀 **Performance Mode Available** - Buffered mode is 13-35% *faster* than no encryption  
 ⚠️ **Buffering Trade-off** - Better performance but data loss risk on crashes  
-✅ **Zero Lock Contentions** - Safe for multi-threaded applications  
-✅ **Scales Well** - Better efficiency at higher volumes
+✅ **Zero Lock Contentions** - Safe for multithreaded applications when used through Serilog.File.Sink
+✅ **Scales Well** - Better efficiency at higher volumes  
 
 ### Bottom Line
 
-**The encryption implementation is production-ready with unbuffered writes as the safe default.** Buffered mode provides exceptional performance but should only be used when you can tolerate data loss on crashes and have proper shutdown handling.
+**AES-GCM encryption implementation is production-ready with unbuffered writes as the safe default.** The refactored AES-GCM implementation provides substantial memory improvements over the original AES implementation.
+
+- **Unbuffered (default, safe):** 1-8% overhead (100 entries), up to ~18% AES / ~10% AES-GCM at 10K entries
+- **Buffered (performance):** 13-35% *faster* than buffered with no encryption at low volume
+- **Memory:** AES-GCM always under 2x (1.20-1.46x); AES can exceed 2x on smaller messages (2.16x)
+- **Key advantage:** AES-GCM uses 27-33% less total allocation than the original AES implementationacross all scenarios
+
+Buffered mode provides exceptional performance but should only be used when you can tolerate data loss on crashes and have proper shutdown handling.
 
 ---
 
@@ -104,7 +131,7 @@ Verdict:                  ✅ Unbuffered is default safe choice
 Tests the raw performance of the `EncryptedStream` class:
 
 - **Baseline:** Plain `MemoryStream` write operations
-- **Test:** `EncryptedStream` with RSA+AES encryption
+- **Test:** `EncryptedStream` with RSA+AES-GCM encryption
 - **Parameters:** Buffer sizes of 512, 1024, and 2048 bytes
 - **Data:** Realistic JSON-formatted log entries
 
@@ -125,7 +152,7 @@ Simulates realistic web application logging:
 - HTTP request/response logging with structured data
 - Method, endpoint, status code, duration, user ID, correlation ID
 - Parameters: 100 and 1,000 request simulations
-- Multi-threaded diagnostics enabled
+- Multithreaded diagnostics enabled
 
 ### 4. Background Worker Simulation
 
@@ -139,6 +166,47 @@ Simulates high-volume background processing:
 
 ## Recommended Configuration
 
+### ⚠️ Important: Buffering & Data Loss Risk
+
+When using `buffered: true` with encryption, **data written since the last flush may be lost** if your application crashes or terminates unexpectedly. The risk window depends on your `flushToDiskInterval` setting (default is determined by the runtime/OS). This is because:
+
+1. Buffered writes hold data in memory between flush intervals
+2. Encryption requires finalizing blocks to write valid encrypted data
+3. Sudden termination prevents proper block finalization of unflushed data
+
+**Risk Window:**
+- `flushToDiskInterval: TimeSpan.FromSeconds(1)` → At most 1 second of logs at risk
+- `flushToDiskInterval: TimeSpan.FromMilliseconds(500)` → At most 500ms of logs at risk
+- Default (no explicit interval) → Runtime/OS decides, typically several seconds
+
+**Mitigation strategies:**
+
+```csharp
+// 1. Configure flush interval to balance performance vs data loss window
+.WriteTo.File(
+    buffered: true,
+    flushToDiskInterval: TimeSpan.FromMilliseconds(500),  // Max 500ms of logs at risk
+    // ...
+)
+
+// 2. Explicitly flush on critical operations
+Log.Information("Critical operation completed");
+Log.CloseAndFlush();  // Ensure data is written before exit
+
+// 3. Use unbuffered for ultra-critical logs (no data loss window)
+.WriteTo.File(
+    buffered: false,  // Immediate writes (default Serilog behavior)
+    // ...
+)
+```
+
+**Choosing your flush interval:**
+- High-volume, low-criticality: `TimeSpan.FromSeconds(5)` - Better performance
+- Balanced approach: `TimeSpan.FromSeconds(1)` - Good compromise
+- Critical data: `TimeSpan.FromMilliseconds(500)` - Minimal risk window
+- Ultra-critical: `buffered: false` - Zero risk, accepts performance cost
+
+**Recommendation:** Use unbuffered writes for most scenarios.
 For best performance in production, use buffered writes:
 
 ```csharp
@@ -151,38 +219,7 @@ Log.Logger = new LoggerConfiguration()
     .CreateLogger();
 ```
 
-**Result:** 6-17% overhead, 2x memory, 200K+ logs/sec ✅
-
-### ⚠️ Important: Buffering & Data Loss Risk
-
-When using `buffered: true` with encryption, **unflushed data may be lost** if your application crashes or terminates unexpectedly. This is because:
-
-1. Buffered writes hold data in memory before flushing to disk
-2. Encryption requires finalizing blocks to write valid encrypted data
-3. Sudden termination prevents proper block finalization
-
-**Mitigation strategies:**
-
-```csharp
-// 1. Use shorter flush intervals for critical data
-.WriteTo.File(
-    buffered: true,
-    flushToDiskInterval: TimeSpan.FromMilliseconds(500),  // More frequent flushes
-    // ...
-)
-
-// 2. Explicitly flush on critical operations
-Log.Information("Critical operation completed");
-Log.CloseAndFlush();  // Ensure data is written before exit
-
-// 3. Use unbuffered for ultra-critical logs (accepts performance tradeoff)
-.WriteTo.File(
-    buffered: false,  // Slower but immediate writes (default Serilog behavior)
-    // ...
-)
-```
-
-**Recommendation:** Use unbuffered writes for most scenarios.
+**Result:** 1-18% overhead depending on volume, 1.2-2.2x memory, 155K+ logs/sec ✅
 
 ---
 

@@ -4,6 +4,8 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <IsPackable>false</IsPackable>
+    <SignAssembly>true</SignAssembly>
+    <AssemblyOriginatorKeyFile>..\..\resources\serilog-sinks-file-encrypt.snk</AssemblyOriginatorKeyFile>
   </PropertyGroup>
 
   <ItemGroup>
