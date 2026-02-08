@@ -23,6 +23,12 @@ Task("Clean")
         ctx.CleanDirectory("./.coverage");
     });
 
+Task("Restore")
+    .Does(ctx =>
+    {
+        ctx.DotNetRestore(solution);
+    });
+
 Task("Lint")
     .Does(ctx =>
     {
@@ -31,6 +37,7 @@ Task("Lint")
 
 Task("Build")
     .IsDependentOn("Clean")
+    .IsDependentOn("Restore")
     .IsDependentOn("Lint")
     .Does(ctx =>
     {
@@ -142,6 +149,12 @@ Task("Publish-NuGet")
 Task("Publish").IsDependentOn("Publish-NuGet");
 
 Task("Default").IsDependentOn("Package");
+
+Teardown(ctx =>
+{
+    Information("Shutting down .NET core SDK tooling...");
+    DotNetBuildServerShutdown();
+});
 
 ////////////////////////////////////////////////////////////////
 // Execution
