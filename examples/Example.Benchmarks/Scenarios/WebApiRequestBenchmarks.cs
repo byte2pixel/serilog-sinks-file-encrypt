@@ -38,7 +38,12 @@ public class WebApiRequestBenchmarks
         using Logger logger = new LoggerConfiguration()
             .MinimumLevel.Information()
             .Enrich.FromLogContext()
-            .WriteTo.File(path: logPath, rollingInterval: RollingInterval.Infinite, buffered: false)
+            .WriteTo.File(
+                path: logPath,
+                rollingInterval: RollingInterval.Infinite,
+                buffered: true,
+                flushToDiskInterval: TimeSpan.FromSeconds(10)
+            )
             .CreateLogger();
 
         SimulateApiRequests(logger);
@@ -55,7 +60,8 @@ public class WebApiRequestBenchmarks
             .WriteTo.File(
                 path: logPath,
                 rollingInterval: RollingInterval.Infinite,
-                buffered: false,
+                buffered: true,
+                flushToDiskInterval: TimeSpan.FromSeconds(10),
                 hooks: new EncryptHooks(_publicKey)
             )
             .CreateLogger();

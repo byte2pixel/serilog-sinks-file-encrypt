@@ -182,4 +182,62 @@ public sealed class EncryptedStreamAsyncTests : EncryptionTestBase
         asyncDecrypted.ShouldBe(TestMessage);
         syncDecrypted.ShouldBe(TestMessage);
     }
+
+    [Fact]
+    public async Task WriteAsync_WritesDataAndFlushes()
+    {
+        // Arrange
+        (string publicKey, _) = EncryptionUtils.GenerateRsaKeyPair();
+        using MemoryStream fs = new();
+        using RSA rsa = RSA.Create();
+        rsa.FromXmlString(publicKey);
+        await using EncryptedStream encStream = new(fs, rsa);
+
+        byte[] data = "Hello Async"u8.ToArray();
+
+        // Act
+        await encStream.WriteAsync(data, TestContext.Current.CancellationToken);
+        await encStream.FlushAsync(TestContext.Current.CancellationToken);
+
+        // Assert
+        encStream.Position.ShouldBeGreaterThan(data.Length);
+    }
+
+    [Fact]
+    public async Task WriteAsync_ZeroBytes_DoesNot_WriteData()
+    {
+        // Arrange
+        (string publicKey, _) = EncryptionUtils.GenerateRsaKeyPair();
+        using MemoryStream fs = new();
+        using RSA rsa = RSA.Create();
+        rsa.FromXmlString(publicKey);
+        await using EncryptedStream encStream = new(fs, rsa);
+
+        // Act
+        await encStream.WriteAsync(Array.Empty<byte>(), TestContext.Current.CancellationToken);
+        await encStream.FlushAsync(TestContext.Current.CancellationToken);
+
+        // Assert
+        encStream.Position.ShouldBeEquivalentTo(0L);
+    }
+
+    [Fact]
+    public async Task WriteAsync_CancellationRequested_ThrowsOperationCanceledException()
+    {
+        // Arrange
+        (string publicKey, _) = EncryptionUtils.GenerateRsaKeyPair();
+        using MemoryStream fs = new();
+        using RSA rsa = RSA.Create();
+        rsa.FromXmlString(publicKey);
+        await using EncryptedStream encStream = new(fs, rsa);
+
+        byte[] data = "Hello Async"u8.ToArray();
+        using var cts = new CancellationTokenSource();
+        await cts.CancelAsync();
+
+        // Act & Assert
+        await Should.ThrowAsync<OperationCanceledException>(async () =>
+            await encStream.WriteAsync(data, cts.Token)
+        );
+    }
 }
