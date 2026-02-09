@@ -4,14 +4,17 @@ using System.Security.Cryptography;
 namespace Serilog.Sinks.File.Encrypt;
 
 /// <summary>
-/// Encrypts data written to the underlying stream using hybrid AES-256 GCM + RSA encryption.
+/// <para>
+/// EncryptedStream is a write-only stream that encrypts data using a hybrid encryption scheme combining AES-256 GCM
+/// for data encryption and RSA for secure key exchange. It is designed to be used with Serilog.Sinks.File to provide
+/// transparent encryption of log files while maintaining performance and security.
+/// </para>
+/// <para>
+/// Each call to Flush() finalizes the current encryption chunk, allowing for efficient memory usage and secure
+/// handling of log data.
+/// </para>
 /// </summary>
 /// <remarks>
-/// <para>
-/// This stream wraps an underlying stream and encrypts all data written to it using a hybrid encryption scheme:
-/// - AES-256 GCM is used for data encryption (symmetric, fast)
-/// - RSA is used to encrypt the AES key and nonce (asymmetric, secure key exchange)
-/// </para>
 /// <para>
 /// <b>Memory Usage:</b> Each call to <see cref="Flush"/> or <see cref="FlushAsync"/> creates a new encryption chunk.
 /// A chunk consists of one RSA header (symmetric AES key) and multiple AES-encrypted data blocks.
@@ -54,13 +57,22 @@ public class EncryptedStream : Stream
     /// <summary>
     /// tag (hmac) to confirm data integrity
     /// </summary>
-    private const int TagLength = 12; // 96 bit
+    private const int TagLength = 16; // 128 bit
+
+    /// <summary>
+    /// Length prefix size in bytes for each encrypted block (4 bytes for int32)
+    /// </summary>
+    private const int LengthPrefixSize = sizeof(int);
+
+    /// <summary>
+    /// Minimum RSA key size in bits required to securely encrypt the AES session key and nonce.
+    /// </summary>
+    private const int MinRsaKeySize = 2048;
 
     private readonly Stream _underlyingStream;
     private readonly RSA _rsaPublicKey;
 
     private AesGcm? _aes;
-
     private bool _isDisposed;
     private byte[] _nonce = [0];
 
@@ -75,6 +87,7 @@ public class EncryptedStream : Stream
     {
         ArgumentNullException.ThrowIfNull(underlyingStream);
         ArgumentNullException.ThrowIfNull(rsaPublicKey);
+        ArgumentOutOfRangeException.ThrowIfLessThan(rsaPublicKey.KeySize, MinRsaKeySize);
 
         _underlyingStream = underlyingStream;
         _rsaPublicKey = rsaPublicKey;
@@ -82,80 +95,178 @@ public class EncryptedStream : Stream
 
     private void StartNewEncryptionChunk()
     {
-        byte[] sessionKey = new byte[SessionKeyLength];
-        _nonce = new byte[NonceLength];
-
-        RandomNumberGenerator.Fill(sessionKey);
-        RandomNumberGenerator.Fill(_nonce);
-
-        _aes = new AesGcm(sessionKey, TagLength);
-
-        byte[] encryptedTagSize = _rsaPublicKey.Encrypt(
-            BitConverter.GetBytes(TagLength),
-            RSAEncryptionPadding.OaepSHA256
-        );
-        byte[] encryptedNonce = _rsaPublicKey.Encrypt(_nonce, RSAEncryptionPadding.OaepSHA256);
-        byte[] encryptedSessionKey = _rsaPublicKey.Encrypt(
-            sessionKey,
-            RSAEncryptionPadding.OaepSHA256
-        );
-
-        byte[] encryptedTagSizeLength = BitConverter.GetBytes(encryptedTagSize.Length);
-        byte[] encryptedNonceLength = BitConverter.GetBytes(encryptedNonce.Length);
-        byte[] encryptedSessionKeyLength = BitConverter.GetBytes(encryptedSessionKey.Length);
-
-        // Combine all header data and check for markers once
-        int headerUnescapedLength =
-            encryptedTagSize.Length + encryptedNonce.Length + encryptedSessionKey.Length;
-        int maxHeaderSize = headerUnescapedLength + (headerUnescapedLength / _marker.Length) + 1;
-        byte[] headerBuffer = ArrayPool<byte>.Shared.Rent(maxHeaderSize);
-
+        byte[] sessionKey = ArrayPool<byte>.Shared.Rent(SessionKeyLength);
         try
         {
-            int unescapedPos = 0;
-            encryptedTagSize.CopyTo(headerBuffer.AsSpan(unescapedPos));
-            unescapedPos += encryptedTagSize.Length;
-            encryptedNonce.CopyTo(headerBuffer.AsSpan(unescapedPos));
-            unescapedPos += encryptedNonce.Length;
-            encryptedSessionKey.CopyTo(headerBuffer.AsSpan(unescapedPos));
+            _nonce = new byte[NonceLength];
 
-            // Fast path: check if escaping is needed
-            Span<byte> unescapedHeader = headerBuffer.AsSpan(0, headerUnescapedLength);
-            int markerPos = unescapedHeader.IndexOf(_marker);
+            RandomNumberGenerator.Fill(sessionKey.AsSpan(0, SessionKeyLength));
+            RandomNumberGenerator.Fill(_nonce);
 
-            int finalHeaderLength;
-            if (markerPos == -1) // No markers, no escaping needed
+            _aes = new AesGcm(sessionKey.AsSpan(0, SessionKeyLength), TagLength);
+
+            byte[] encryptedTagSize = _rsaPublicKey.Encrypt(
+                BitConverter.GetBytes(TagLength),
+                RSAEncryptionPadding.OaepSHA256
+            );
+            byte[] encryptedNonce = _rsaPublicKey.Encrypt(_nonce, RSAEncryptionPadding.OaepSHA256);
+            byte[] encryptedSessionKey = _rsaPublicKey.Encrypt(
+                sessionKey.AsSpan(0, SessionKeyLength).ToArray(),
+                RSAEncryptionPadding.OaepSHA256
+            );
+
+            byte[] encryptedTagSizeLength = BitConverter.GetBytes(encryptedTagSize.Length);
+            byte[] encryptedNonceLength = BitConverter.GetBytes(encryptedNonce.Length);
+            byte[] encryptedSessionKeyLength = BitConverter.GetBytes(encryptedSessionKey.Length);
+
+            // Combine all header data and check for markers once
+            int headerUnescapedLength =
+                encryptedTagSize.Length + encryptedNonce.Length + encryptedSessionKey.Length;
+            int maxHeaderSize =
+                headerUnescapedLength + (headerUnescapedLength / _marker.Length) + 1;
+            byte[] finalHeaderBuffer = ArrayPool<byte>.Shared.Rent(maxHeaderSize);
+
+            try
             {
-                finalHeaderLength = headerUnescapedLength;
-            }
-            else
-            {
-                // Markers found, escape needed, rent a buffer.
-                byte[] tempBuffer = ArrayPool<byte>.Shared.Rent(headerUnescapedLength);
-                try
-                {
-                    unescapedHeader.CopyTo(tempBuffer);
-                    finalHeaderLength = WriteEscapedSpan(
-                        tempBuffer.AsSpan(0, headerUnescapedLength),
-                        headerBuffer.AsSpan(0)
-                    );
-                }
-                finally
-                {
-                    ArrayPool<byte>.Shared.Return(tempBuffer);
-                }
-            }
+                int unescapedPos = 0;
+                encryptedTagSize.CopyTo(finalHeaderBuffer.AsSpan(unescapedPos));
+                unescapedPos += encryptedTagSize.Length;
+                encryptedNonce.CopyTo(finalHeaderBuffer.AsSpan(unescapedPos));
+                unescapedPos += encryptedNonce.Length;
+                encryptedSessionKey.CopyTo(finalHeaderBuffer.AsSpan(unescapedPos));
 
-            _underlyingStream.Write(_marker);
-            _underlyingStream.Write(encryptedTagSizeLength);
-            _underlyingStream.Write(encryptedNonceLength);
-            _underlyingStream.Write(encryptedSessionKeyLength);
-            _underlyingStream.Write(headerBuffer.AsSpan(0, finalHeaderLength));
+                // Fast path: check if escaping is needed
+                Span<byte> unescapedHeader = finalHeaderBuffer.AsSpan(0, headerUnescapedLength);
+                int markerPos = unescapedHeader.IndexOf(_marker);
+
+                int finalHeaderLength =
+                    (markerPos == -1)
+                        ? headerUnescapedLength
+                        : EscapeMarkersInHeader(unescapedHeader, finalHeaderBuffer);
+
+                _underlyingStream.Write(_marker);
+                _underlyingStream.Write(encryptedTagSizeLength);
+                _underlyingStream.Write(encryptedNonceLength);
+                _underlyingStream.Write(encryptedSessionKeyLength);
+                _underlyingStream.Write(finalHeaderBuffer.AsSpan(0, finalHeaderLength));
+            }
+            finally
+            {
+                ArrayPool<byte>.Shared.Return(finalHeaderBuffer);
+            }
         }
         finally
         {
-            ArrayPool<byte>.Shared.Return(headerBuffer);
+            CryptographicOperations.ZeroMemory(sessionKey.AsSpan(0, SessionKeyLength));
+            ArrayPool<byte>.Shared.Return(sessionKey);
         }
+    }
+
+    private async Task StartNewEncryptionChunkAsync(CancellationToken cancellationToken = default)
+    {
+        byte[] sessionKey = ArrayPool<byte>.Shared.Rent(SessionKeyLength);
+        try
+        {
+            _nonce = new byte[NonceLength];
+
+            RandomNumberGenerator.Fill(sessionKey.AsSpan(0, SessionKeyLength));
+            RandomNumberGenerator.Fill(_nonce);
+
+            _aes = new AesGcm(sessionKey.AsSpan(0, SessionKeyLength), TagLength);
+
+            byte[] encryptedTagSize = _rsaPublicKey.Encrypt(
+                BitConverter.GetBytes(TagLength),
+                RSAEncryptionPadding.OaepSHA256
+            );
+            byte[] encryptedNonce = _rsaPublicKey.Encrypt(_nonce, RSAEncryptionPadding.OaepSHA256);
+            byte[] encryptedSessionKey = _rsaPublicKey.Encrypt(
+                sessionKey.AsSpan(0, SessionKeyLength).ToArray(),
+                RSAEncryptionPadding.OaepSHA256
+            );
+
+            byte[] encryptedTagSizeLength = BitConverter.GetBytes(encryptedTagSize.Length);
+            byte[] encryptedNonceLength = BitConverter.GetBytes(encryptedNonce.Length);
+            byte[] encryptedSessionKeyLength = BitConverter.GetBytes(encryptedSessionKey.Length);
+
+            // Combine all header data and check for markers once
+            int headerUnescapedLength =
+                encryptedTagSize.Length + encryptedNonce.Length + encryptedSessionKey.Length;
+            int maxHeaderSize =
+                headerUnescapedLength + (headerUnescapedLength / _marker.Length) + 1;
+            byte[] finalHeaderBuffer = ArrayPool<byte>.Shared.Rent(maxHeaderSize);
+
+            try
+            {
+                int unescapedPos = 0;
+                encryptedTagSize.CopyTo(finalHeaderBuffer.AsSpan(unescapedPos));
+                unescapedPos += encryptedTagSize.Length;
+                encryptedNonce.CopyTo(finalHeaderBuffer.AsSpan(unescapedPos));
+                unescapedPos += encryptedNonce.Length;
+                encryptedSessionKey.CopyTo(finalHeaderBuffer.AsSpan(unescapedPos));
+
+                // Fast path: check if escaping is needed
+                Span<byte> unescapedHeader = finalHeaderBuffer.AsSpan(0, headerUnescapedLength);
+                int markerPos = unescapedHeader.IndexOf(_marker);
+
+                int finalHeaderLength =
+                    (markerPos == -1)
+                        ? headerUnescapedLength
+                        : EscapeMarkersInHeader(unescapedHeader, finalHeaderBuffer);
+
+                await _underlyingStream
+                    .WriteAsync(_marker, cancellationToken)
+                    .ConfigureAwait(false);
+                await _underlyingStream
+                    .WriteAsync(encryptedTagSizeLength, cancellationToken)
+                    .ConfigureAwait(false);
+                await _underlyingStream
+                    .WriteAsync(encryptedNonceLength, cancellationToken)
+                    .ConfigureAwait(false);
+                await _underlyingStream
+                    .WriteAsync(encryptedSessionKeyLength, cancellationToken)
+                    .ConfigureAwait(false);
+                await _underlyingStream
+                    .WriteAsync(finalHeaderBuffer.AsMemory(0, finalHeaderLength), cancellationToken)
+                    .ConfigureAwait(false);
+            }
+            finally
+            {
+                ArrayPool<byte>.Shared.Return(finalHeaderBuffer);
+            }
+        }
+        finally
+        {
+            CryptographicOperations.ZeroMemory(sessionKey.AsSpan(0, SessionKeyLength));
+            ArrayPool<byte>.Shared.Return(sessionKey);
+        }
+    }
+
+    /// <summary>
+    /// Escapes marker sequences in the header data and writes the escaped result to the provided buffer.
+    /// The caller should ensure there is a marker to escape first and provide a finalHeaderBuffer that is
+    /// large enough to hold the escaped data (worst case is dataLen + (dataLen / makerLen) + 1).
+    /// </summary>
+    /// <param name="unescapedHeader"></param>
+    /// <param name="finalHeaderBuffer"></param>
+    /// <returns></returns>
+    internal static int EscapeMarkersInHeader(Span<byte> unescapedHeader, byte[] finalHeaderBuffer)
+    {
+        int finalHeaderLength;
+        byte[] tempBuffer = ArrayPool<byte>.Shared.Rent(unescapedHeader.Length);
+        try
+        {
+            unescapedHeader.CopyTo(tempBuffer);
+            finalHeaderLength = WriteEscapedSpan(
+                tempBuffer.AsSpan(0, unescapedHeader.Length),
+                finalHeaderBuffer.AsSpan(0)
+            );
+        }
+        finally
+        {
+            ArrayPool<byte>.Shared.Return(tempBuffer);
+        }
+
+        return finalHeaderLength;
     }
 
     /// <inheritdoc/>
@@ -216,12 +327,25 @@ public class EncryptedStream : Stream
     {
         ObjectDisposedException.ThrowIf(_isDisposed, this);
 
+        if (buffer.Length == 0)
+        {
+            return;
+        }
+
         if (_aes is null)
         {
             StartNewEncryptionChunk(); // Write the RSA-encrypted header for the new AES session
         }
 
-        _underlyingStream.Write(Transform(buffer));
+        (byte[] resultBuffer, int resultLength) = Transform(buffer);
+        try
+        {
+            _underlyingStream.Write(resultBuffer.AsSpan(0, resultLength));
+        }
+        finally
+        {
+            ArrayPool<byte>.Shared.Return(resultBuffer);
+        }
     }
 
     /// <inheritdoc/>
@@ -231,15 +355,27 @@ public class EncryptedStream : Stream
     )
     {
         ObjectDisposedException.ThrowIf(_isDisposed, this);
+        if (buffer.Span.Length == 0)
+        {
+            return;
+        }
 
         if (_aes is null)
         {
-            StartNewEncryptionChunk(); // Write the RSA-encrypted header for the new AES session
+            await StartNewEncryptionChunkAsync(cancellationToken).ConfigureAwait(false);
         }
 
-        await _underlyingStream
-            .WriteAsync(Transform(buffer.Span), cancellationToken)
-            .ConfigureAwait(false);
+        (byte[] resultBuffer, int resultLength) = Transform(buffer.Span);
+        try
+        {
+            await _underlyingStream
+                .WriteAsync(resultBuffer.AsMemory(0, resultLength), cancellationToken)
+                .ConfigureAwait(false);
+        }
+        finally
+        {
+            ArrayPool<byte>.Shared.Return(resultBuffer);
+        }
     }
 
     /// <inheritdoc/>
@@ -255,12 +391,13 @@ public class EncryptedStream : Stream
     public override long Length => throw new NotSupportedException();
 
     /// <summary>
-    /// This stream does not support getting or setting the position.
+    /// This stream does not support setting the position.
+    /// The getter returns the total number of bytes written to the write only stream.
     /// </summary>
     /// <exception cref="NotSupportedException"></exception>
     public override long Position
     {
-        get => throw new NotSupportedException();
+        get => _underlyingStream.Position;
         set => throw new NotSupportedException();
     }
 
@@ -311,14 +448,20 @@ public class EncryptedStream : Stream
     /// Transforms plaintext data into encrypted format with framing and escaping.
     /// </summary>
     /// <param name="plainText">The plaintext data to encrypt.</param>
-    /// <returns>Encrypted data with length prefix and escaping applied.</returns>
+    /// <returns>A tuple containing the rented buffer and the actual length of data written. Caller must return the buffer to ArrayPool.</returns>
     /// <remarks>
-    /// Uses ArrayPool for temporary buffers to reduce allocations and GC pressure.
+    /// Uses ArrayPool for all buffers to reduce allocations and GC pressure.
     /// The method performs encryption, adds integrity tags, applies escape sequences,
     /// and prepends the message length in a single-pass operation without pre-scanning.
     /// </remarks>
-    private byte[] Transform(ReadOnlySpan<byte> plainText)
+    /// <exception cref="InvalidOperationException">Thrown if the aes session was not initialized.</exception>
+    private (byte[] Buffer, int Length) Transform(ReadOnlySpan<byte> plainText)
     {
+        if (_aes is null)
+        {
+            throw new InvalidOperationException("Encryption session not initialized.");
+        }
+
         // First, encrypt the data
         int encryptedSize = plainText.Length + TagLength;
         byte[] encryptedBuffer = ArrayPool<byte>.Shared.Rent(encryptedSize);
@@ -328,41 +471,39 @@ public class EncryptedStream : Stream
             Span<byte> cypherText = encryptedBuffer.AsSpan(0, plainText.Length);
             Span<byte> hmac = encryptedBuffer.AsSpan(plainText.Length, TagLength);
 
-            _aes!.Encrypt(_nonce, plainText, cypherText, hmac);
+            _aes.Encrypt(_nonce, plainText, cypherText, hmac);
             _nonce.IncreaseNonce();
 
             // Fast path: check if escaping is needed
             ReadOnlySpan<byte> encryptedData = encryptedBuffer.AsSpan(0, encryptedSize);
             int markerPos = encryptedData.IndexOf(_marker);
 
+            byte[] resultBuffer;
+            int resultSize;
+
             if (markerPos == -1) // No markers, no escaping needed
             {
-                byte[] result = new byte[sizeof(int) + encryptedSize];
-                BitConverter.TryWriteBytes(result.AsSpan(0, sizeof(int)), encryptedSize);
-                encryptedData.CopyTo(result.AsSpan(sizeof(int)));
-                return result;
+                resultSize = LengthPrefixSize + encryptedSize;
+                resultBuffer = ArrayPool<byte>.Shared.Rent(resultSize);
+
+                BitConverter.TryWriteBytes(resultBuffer.AsSpan(0, LengthPrefixSize), encryptedSize);
+                encryptedData.CopyTo(resultBuffer.AsSpan(LengthPrefixSize));
             }
-
-            // Markers found, need to escape
-            int maxEscapedSize = encryptedSize + (encryptedSize / _marker.Length) + 1;
-            byte[] escapedBuffer = ArrayPool<byte>.Shared.Rent(sizeof(int) + maxEscapedSize);
-
-            try
+            else // Markers found, need to escape
             {
+                int maxEscapedSize = encryptedSize + (encryptedSize / _marker.Length) + 1;
+                resultBuffer = ArrayPool<byte>.Shared.Rent(LengthPrefixSize + maxEscapedSize);
+
                 int escapedLength = WriteEscapedSpan(
                     encryptedData,
-                    escapedBuffer.AsSpan(sizeof(int))
+                    resultBuffer.AsSpan(LengthPrefixSize)
                 );
-                BitConverter.TryWriteBytes(escapedBuffer.AsSpan(0, sizeof(int)), escapedLength);
+                BitConverter.TryWriteBytes(resultBuffer.AsSpan(0, LengthPrefixSize), escapedLength);
 
-                byte[] result = new byte[sizeof(int) + escapedLength];
-                escapedBuffer.AsSpan(0, sizeof(int) + escapedLength).CopyTo(result);
-                return result;
+                resultSize = LengthPrefixSize + escapedLength;
             }
-            finally
-            {
-                ArrayPool<byte>.Shared.Return(escapedBuffer);
-            }
+
+            return (resultBuffer, resultSize);
         }
         finally
         {
@@ -384,7 +525,7 @@ public class EncryptedStream : Stream
         while (srcPos < source.Length)
         {
             // Find next marker occurrence in remaining source
-            int markerPos = source[srcPos..].IndexOf(_marker);
+            int markerPos = source.Slice(srcPos).IndexOf(_marker);
 
             if (markerPos == -1) // No more markers, copy the rest
             {

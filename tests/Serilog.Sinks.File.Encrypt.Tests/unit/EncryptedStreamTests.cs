@@ -13,20 +13,19 @@ public class EncryptedStreamTests
         using EncryptedStream encStream = new(fs, rsa);
 
         // Act & Assert
-        Assert.False(encStream.CanRead);
-        Assert.False(encStream.CanSeek);
-        Assert.True(encStream.CanWrite);
+        encStream.CanRead.ShouldBeFalse();
+        encStream.CanSeek.ShouldBeFalse();
+        encStream.CanWrite.ShouldBeTrue();
 
-        Assert.Throws<NotSupportedException>(() => encStream.Length.ShouldBe(0));
-        Assert.Throws<NotSupportedException>(() => encStream.Position.ShouldBe(0));
-        Assert.Throws<NotSupportedException>(() => encStream.Position = 0);
-        Assert.Throws<NotSupportedException>(() => encStream.Read(new byte[1], 0, 1));
-        Assert.Throws<NotSupportedException>(() => encStream.Seek(0, SeekOrigin.Begin));
-        Assert.Throws<NotSupportedException>(() => encStream.SetLength(100));
+        Should.Throw<NotSupportedException>(() => encStream.Length.ShouldBe(0));
+        Should.Throw<NotSupportedException>(() => encStream.Position = 0);
+        Should.Throw<NotSupportedException>(() => encStream.Read(new byte[1], 0, 1));
+        Should.Throw<NotSupportedException>(() => encStream.Seek(0, SeekOrigin.Begin));
+        Should.Throw<NotSupportedException>(() => encStream.SetLength(100));
     }
 
     [Fact]
-    public void SingleFlush_DoesNotThrow()
+    public void WriteAndFlush_Moves_Position()
     {
         // Arrange
         (string publicKey, _) = EncryptionUtils.GenerateRsaKeyPair();
@@ -40,7 +39,7 @@ public class EncryptedStreamTests
         encStream.Flush();
 
         // Assert
-        Assert.True(encStream.CanWrite);
+        encStream.Position.ShouldBeGreaterThan(5);
     }
 
     [Fact]
@@ -62,7 +61,7 @@ public class EncryptedStreamTests
         encStream.Flush();
 
         // Assert
-        Assert.True(encStream.CanWrite);
+        encStream.Position.ShouldBeGreaterThan(3);
     }
 
     [Fact]
@@ -83,11 +82,11 @@ public class EncryptedStreamTests
         });
 
         // Assert
-        Assert.Null(exception);
+        exception.ShouldBeNull();
     }
 
     [Fact]
-    public void WritingZeroBytes_DoesNotThrowOrCorruptState()
+    public void WritingZeroBytes_DoesNot_WriteData()
     {
         // Arrange
         (string publicKey, _) = EncryptionUtils.GenerateRsaKeyPair();
@@ -96,12 +95,29 @@ public class EncryptedStreamTests
         rsa.FromXmlString(publicKey);
         using EncryptedStream encStream = new(fs, rsa);
 
+        long staringPosition = encStream.Position;
         // Act
         encStream.Write([], 0, 0);
         encStream.Flush();
 
         // Assert
-        Assert.True(encStream.CanWrite);
+        encStream.Position.ShouldBeEquivalentTo(staringPosition);
+    }
+
+    [Fact]
+    public void EscapeMarkersInHeader_EscapesMarkersCorrectly()
+    {
+        // Arrange
+        byte[] header = [0xFF, 0xFE, 0x4C, 0x4F, 0x47, 0x48, 0x44, 0x00, 0x01];
+        byte[] expectedEscaped = [0xFF, 0xFE, 0x4C, 0x4F, 0x47, 0x48, 0x44, 0x00, 0x01, 0x00];
+        byte[] finalBuffer = new byte[expectedEscaped.Length];
+
+        // Act
+        int bytesWritten = EncryptedStream.EscapeMarkersInHeader(header.AsSpan(), finalBuffer);
+
+        // Assert
+        bytesWritten.ShouldBeEquivalentTo(expectedEscaped.Length);
+        finalBuffer.ShouldBeEquivalentTo(expectedEscaped);
     }
 
     [Fact]
@@ -116,7 +132,7 @@ public class EncryptedStreamTests
         EncryptedStream.WriteEscapedSpan(input, actual);
 
         // Assert
-        Assert.Equal(expectedEscaped, actual);
+        actual.ToArray().ShouldBeEquivalentTo(expectedEscaped);
     }
 
     [Theory]
@@ -132,6 +148,41 @@ public class EncryptedStreamTests
         EncryptedStream.WriteEscapedSpan(input, actual);
 
         // Assert
-        Assert.Equal(input, actual);
+        actual.ToArray().ShouldBeEquivalentTo(input);
+    }
+
+    [Fact]
+    public void Ctor_NullStream_ThrowsArgumentNullException()
+    {
+        // Arrange
+        (string publicKey, _) = EncryptionUtils.GenerateRsaKeyPair();
+        using RSA rsa = RSA.Create();
+        rsa.FromXmlString(publicKey);
+
+        // Act & Assert
+        Should.Throw<ArgumentNullException>(() => new EncryptedStream(null!, rsa));
+    }
+
+    [Fact]
+    public void Ctor_NullRsa_ThrowsArgumentNullException()
+    {
+        // Arrange
+        using MemoryStream fs = new();
+
+        // Act & Assert
+        Should.Throw<ArgumentNullException>(() => new EncryptedStream(fs, null!));
+    }
+
+    [Fact]
+    public void Ctor_KeyTooShort_ThrowsArgumentException()
+    {
+        // Arrange
+        (string publicKey, _) = EncryptionUtils.GenerateRsaKeyPair(512); // Too short for OAEP
+        using MemoryStream fs = new();
+        using RSA rsa = RSA.Create();
+        rsa.FromXmlString(publicKey);
+
+        // Act & Assert
+        Should.Throw<ArgumentOutOfRangeException>(() => new EncryptedStream(fs, rsa));
     }
 }
