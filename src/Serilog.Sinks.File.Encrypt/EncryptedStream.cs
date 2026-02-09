@@ -139,16 +139,10 @@ public class EncryptedStream : Stream
                 Span<byte> unescapedHeader = finalHeaderBuffer.AsSpan(0, headerUnescapedLength);
                 int markerPos = unescapedHeader.IndexOf(_marker);
 
-                int finalHeaderLength;
-                if (markerPos == -1) // No markers, no escaping needed
-                {
-                    finalHeaderLength = headerUnescapedLength;
-                }
-                else
-                {
-                    // Markers found, escape needed, rent a buffer.
-                    finalHeaderLength = EscapeMarkersInHeader(unescapedHeader, finalHeaderBuffer);
-                }
+                int finalHeaderLength =
+                    (markerPos == -1)
+                        ? headerUnescapedLength
+                        : EscapeMarkersInHeader(unescapedHeader, finalHeaderBuffer);
 
                 _underlyingStream.Write(_marker);
                 _underlyingStream.Write(encryptedTagSizeLength);
@@ -214,16 +208,10 @@ public class EncryptedStream : Stream
                 Span<byte> unescapedHeader = finalHeaderBuffer.AsSpan(0, headerUnescapedLength);
                 int markerPos = unescapedHeader.IndexOf(_marker);
 
-                int finalHeaderLength;
-                if (markerPos == -1) // No markers, no escaping needed
-                {
-                    finalHeaderLength = headerUnescapedLength;
-                }
-                else
-                {
-                    // Markers found, escape needed, rent a buffer.
-                    finalHeaderLength = EscapeMarkersInHeader(unescapedHeader, finalHeaderBuffer);
-                }
+                int finalHeaderLength =
+                    (markerPos == -1)
+                        ? headerUnescapedLength
+                        : EscapeMarkersInHeader(unescapedHeader, finalHeaderBuffer);
 
                 await _underlyingStream
                     .WriteAsync(_marker, cancellationToken)
