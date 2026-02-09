@@ -47,6 +47,7 @@ public class EncryptHooks : FileLifecycleHooks
     /// </summary>
     /// <param name="rsaPublicKey">The RSA public key in XML or PEM format. Use <see cref="EncryptionUtils.GenerateRsaKeyPair"/> to generate keys.</param>
     /// <exception cref="ArgumentNullException">Thrown when <paramref name="rsaPublicKey"/> is null or whitespace.</exception>
+    /// <exception cref="FormatException">Thrown when <paramref name="rsaPublicKey"/> is in an invalid format.</exception>
     /// <exception cref="CryptographicException">Thrown when the format is invalid or cannot be parsed as an RSA public key.</exception>
     /// <remarks>
     /// The public key is loaded and validated during construction. Keep the corresponding private key secure

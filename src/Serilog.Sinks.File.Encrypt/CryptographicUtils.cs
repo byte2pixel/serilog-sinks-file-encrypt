@@ -10,7 +10,9 @@ public static class CryptographicUtils
     /// </summary>
     /// <param name="rsa">The <see cref="RSA"/> instance to import the key into.</param>
     /// <param name="key">The RSA key as a string.</param>
-    /// <exception cref="CryptographicException">Invalid RSA key format.</exception>
+    /// <exception cref="CryptographicException">Unknown or invalid key format.</exception>
+    /// <exception cref="FormatException">Invalid XML key format.</exception>
+    /// <exception cref="ArgumentException">Invalid PEM key format.</exception>
     public static void FromString(this RSA rsa, string key)
     {
         ArgumentNullException.ThrowIfNullOrEmpty(key, nameof(key));
