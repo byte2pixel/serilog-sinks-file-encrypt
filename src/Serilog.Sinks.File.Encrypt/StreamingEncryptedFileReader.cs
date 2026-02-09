@@ -32,7 +32,7 @@ internal sealed class StreamingEncryptedFileReader : IDisposable, IAsyncDisposab
     {
         _inputStream = inputStream;
         _rsa = RSA.Create();
-        _rsa.FromXmlString(rsaPrivateKey);
+        _rsa.FromString(rsaPrivateKey);
         _options = options;
         _context = DecryptionContext.Empty;
         _hasFoundValidHeader = false;

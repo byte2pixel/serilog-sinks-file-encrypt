@@ -70,7 +70,9 @@ public static class EncryptionUtils
     /// Generates a new RSA key pair for encryption and decryption operations.
     /// </summary>
     /// <param name="keySize">The size of the key in bits. Must be at least 2048. Recommended: 2048 (default) or 4096 for enhanced security.</param>
-    /// <returns>A tuple containing the public and private keys in XML format. The public key should be distributed to log producers, while the private key must be kept secure.</returns>
+    /// <param name="format">The format in which to export the keys. Default is XML.</param>
+    /// <returns>A tuple containing the public and private keys in XML or PEM format. The public key should be distributed to log producers, while the private key must be kept secure.</returns>
+    /// <exception cref="NotSupportedException">Thrown when the key format is not supported.</exception>
     /// <exception cref="CryptographicException">Thrown when key generation fails or the key size is invalid.</exception>
     /// <remarks>
     /// <para>
@@ -96,11 +98,24 @@ public static class EncryptionUtils
     /// // Use secure storage for private key (Azure Key Vault, etc.)
     /// </code>
     /// </example>
-    public static (string publicKey, string privateKey) GenerateRsaKeyPair(int keySize = 2048)
+    public static (string publicKey, string privateKey) GenerateRsaKeyPair(int keySize = 2048, KeyFormat format = KeyFormat.Xml)
     {
         using RSA rsa = RSA.Create(keySize);
-        string publicKey = rsa.ToXmlString(includePrivateParameters: false);
-        string privateKey = rsa.ToXmlString(includePrivateParameters: true);
+
+        string publicKey = format switch
+        {
+            KeyFormat.Xml => rsa.ToXmlString(includePrivateParameters: false),
+            KeyFormat.Pem => rsa.ExportRSAPublicKeyPem(),
+            _ => throw new NotSupportedException($"Unsupported key format: {format}")
+        };
+
+        string privateKey = format switch
+        {
+            KeyFormat.Xml => rsa.ToXmlString(includePrivateParameters: true),
+            KeyFormat.Pem => rsa.ExportRSAPrivateKeyPem(),
+            _ => throw new NotSupportedException($"Unsupported key format: {format}")
+        };
+
         return (publicKey, privateKey);
     }
 
@@ -109,7 +124,7 @@ public static class EncryptionUtils
     /// </summary>
     /// <param name="inputStream">Stream containing the encrypted log data. Must be readable and seekable.</param>
     /// <param name="outputStream">Stream where the decrypted content will be written. Must be writable.</param>
-    /// <param name="rsaPrivateKey">The XML representation of the RSA private key used for decryption. Must match the public key used for encryption.</param>
+    /// <param name="rsaPrivateKey">The RSA private key used for decryption. Must match the public key used for encryption.</param>
     /// <param name="options">Streaming options for the decryption process. If null, uses <see cref="StreamingOptions.Default"/>.</param>
     /// <param name="cancellationToken">Cancellation token to cancel the decryption operation.</param>
     /// <returns>A task representing the asynchronous decryption operation.</returns>
@@ -140,7 +155,7 @@ public static class EncryptionUtils
     /// await EncryptionUtils.DecryptLogFileAsync(
     ///     inputStream,
     ///     outputStream,
-    ///     privateKeyXml,
+    ///     privateKey,
     ///     cancellationToken: cts.Token
     /// );
     ///
@@ -157,7 +172,7 @@ public static class EncryptionUtils
     /// await EncryptionUtils.DecryptLogFileAsync(
     ///     inputStream,
     ///     outputStream,
-    ///     privateKeyXml,
+    ///     privateKey,
     ///     options,
     ///     cts.Token
     /// );
@@ -182,7 +197,7 @@ public static class EncryptionUtils
     /// </summary>
     /// <param name="encryptedFilePath">Path to the encrypted log file. File must exist and be readable.</param>
     /// <param name="outputFilePath">Path where the decrypted content will be written. Will be created or overwritten.</param>
-    /// <param name="rsaPrivateKey">The XML representation of the RSA private key used for decryption. Must match the public key used for encryption.</param>
+    /// <param name="rsaPrivateKey">The RSA private key used for decryption. Must match the public key used for encryption.</param>
     /// <param name="options">Streaming options for the decryption process. If null, uses <see cref="StreamingOptions.Default"/>.</param>
     /// <param name="cancellationToken">Cancellation token to cancel the decryption operation.</param>
     /// <returns>A task representing the asynchronous decryption operation.</returns>
@@ -202,7 +217,7 @@ public static class EncryptionUtils
     /// await EncryptionUtils.DecryptLogFileAsync(
     ///     "logs/encrypted.log",
     ///     "logs/decrypted.log",
-    ///     privateKeyXml
+    ///     privateKey
     /// );
     ///
     /// // Decrypt with error logging
@@ -215,7 +230,7 @@ public static class EncryptionUtils
     /// await EncryptionUtils.DecryptLogFileAsync(
     ///     "logs/encrypted.log",
     ///     "logs/decrypted.log",
-    ///     privateKeyXml,
+    ///     privateKey,
     ///     options,
     ///     cancellationToken
     /// );

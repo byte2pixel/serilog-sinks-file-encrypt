@@ -32,6 +32,8 @@ serilog-encrypt generate --output /path/to/keys
 
 **Options:**
 - `-o|--output <OUTPUT>` (required): The directory where the key files will be saved
+- `-k|--key-size <KEY_SIZE>` (optional): The size of the RSA key in bits (default: 2048)
+- `-f|--format <FORMAT>` (optional): The encoding format (Xml or Pem) for the RSA keys (default: Xml)
 
 This creates two files:
 - `private_key.xml`: The private key used for decryption (keep secure)
