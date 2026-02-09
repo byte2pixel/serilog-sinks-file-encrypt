@@ -54,8 +54,12 @@ public class EncryptedStream : Stream
     /// <summary>
     /// tag (hmac) to confirm data integrity
     /// </summary>
-    private const int TagLength = 12; // 96 bit
+    private const int TagLength = 16; // 128 bit
 
+    /// <summary>
+    /// Length prefix size in bytes for each encrypted block (4 bytes for int32)
+    /// </summary>
+    private const int LengthPrefixSize = sizeof(int);
     private readonly Stream _underlyingStream;
     private readonly RSA _rsaPublicKey;
 
@@ -154,6 +158,7 @@ public class EncryptedStream : Stream
         }
         finally
         {
+            CryptographicOperations.ZeroMemory(sessionKey.AsSpan(0, SessionKeyLength));
             ArrayPool<byte>.Shared.Return(headerBuffer);
         }
     }
@@ -317,8 +322,14 @@ public class EncryptedStream : Stream
     /// The method performs encryption, adds integrity tags, applies escape sequences,
     /// and prepends the message length in a single-pass operation without pre-scanning.
     /// </remarks>
+    /// <exception cref="InvalidOperationException">Thrown if the aes session was not initialized.</exception>
     private byte[] Transform(ReadOnlySpan<byte> plainText)
     {
+        if (_aes is null)
+        {
+            throw new InvalidOperationException("Encryption session not initialized.");
+        }
+
         // First, encrypt the data
         int encryptedSize = plainText.Length + TagLength;
         byte[] encryptedBuffer = ArrayPool<byte>.Shared.Rent(encryptedSize);
@@ -328,7 +339,7 @@ public class EncryptedStream : Stream
             Span<byte> cypherText = encryptedBuffer.AsSpan(0, plainText.Length);
             Span<byte> hmac = encryptedBuffer.AsSpan(plainText.Length, TagLength);
 
-            _aes!.Encrypt(_nonce, plainText, cypherText, hmac);
+            _aes.Encrypt(_nonce, plainText, cypherText, hmac);
             _nonce.IncreaseNonce();
 
             // Fast path: check if escaping is needed
@@ -337,26 +348,29 @@ public class EncryptedStream : Stream
 
             if (markerPos == -1) // No markers, no escaping needed
             {
-                byte[] result = new byte[sizeof(int) + encryptedSize];
-                BitConverter.TryWriteBytes(result.AsSpan(0, sizeof(int)), encryptedSize);
-                encryptedData.CopyTo(result.AsSpan(sizeof(int)));
+                byte[] result = new byte[LengthPrefixSize + encryptedSize];
+                BitConverter.TryWriteBytes(result.AsSpan(0, LengthPrefixSize), encryptedSize);
+                encryptedData.CopyTo(result.AsSpan(LengthPrefixSize));
                 return result;
             }
 
             // Markers found, need to escape
             int maxEscapedSize = encryptedSize + (encryptedSize / _marker.Length) + 1;
-            byte[] escapedBuffer = ArrayPool<byte>.Shared.Rent(sizeof(int) + maxEscapedSize);
+            byte[] escapedBuffer = ArrayPool<byte>.Shared.Rent(LengthPrefixSize + maxEscapedSize);
 
             try
             {
                 int escapedLength = WriteEscapedSpan(
                     encryptedData,
-                    escapedBuffer.AsSpan(sizeof(int))
+                    escapedBuffer.AsSpan(LengthPrefixSize)
                 );
-                BitConverter.TryWriteBytes(escapedBuffer.AsSpan(0, sizeof(int)), escapedLength);
+                BitConverter.TryWriteBytes(
+                    escapedBuffer.AsSpan(0, LengthPrefixSize),
+                    escapedLength
+                );
 
-                byte[] result = new byte[sizeof(int) + escapedLength];
-                escapedBuffer.AsSpan(0, sizeof(int) + escapedLength).CopyTo(result);
+                byte[] result = new byte[LengthPrefixSize + escapedLength];
+                escapedBuffer.AsSpan(0, LengthPrefixSize + escapedLength).CopyTo(result);
                 return result;
             }
             finally
@@ -384,7 +398,7 @@ public class EncryptedStream : Stream
         while (srcPos < source.Length)
         {
             // Find next marker occurrence in remaining source
-            int markerPos = source[srcPos..].IndexOf(_marker);
+            int markerPos = source.Slice(srcPos).IndexOf(_marker);
 
             if (markerPos == -1) // No more markers, copy the rest
             {
