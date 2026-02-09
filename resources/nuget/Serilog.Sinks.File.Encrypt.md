@@ -129,6 +129,11 @@ Log.CloseAndFlush();
 - You can tolerate loss of recent logs (up to `flushToDiskInterval`)
 - Performance is critical (background workers, high-volume systems)
 
+⚠️ **Minor Risks**
+- Theoretical nonce reuse on crash with corrupted header (extremely low probability)
+- Nonce counter wrapping not explicitly handled (would require 2^96 encryption per session)
+  - At 1 million logs/second, this would take 2.5 trillion years to reach.
+
 ### Programmatic Key Generation
 
 ```csharp
