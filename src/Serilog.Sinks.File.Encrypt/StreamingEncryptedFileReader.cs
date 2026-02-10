@@ -10,12 +10,6 @@ namespace Serilog.Sinks.File.Encrypt;
 /// </summary>
 internal sealed class StreamingEncryptedFileReader : IDisposable, IAsyncDisposable
 {
-    // csharpier-ignore-start
-    private static readonly byte[] _marker = [0xFF, 0xFE, 0x4C, 0x4F, 0x47, 0x48, 0x44, 0x00, 0x01];
-    private static readonly byte _escapeMarker = 0x00;
-    // csharpier-ignore-end
-    private static readonly int _markerLength = _marker.Length;
-
     private readonly Stream _inputStream;
     private readonly RSA _rsa;
     private readonly StreamingOptions _options;
@@ -24,15 +18,17 @@ internal sealed class StreamingEncryptedFileReader : IDisposable, IAsyncDisposab
     private bool _disposed;
     private bool _hasFoundValidHeader;
 
+    private int EncryptedHeaderSize => _rsa.KeySize / 8;
+
     public StreamingEncryptedFileReader(
         Stream inputStream,
-        string rsaPrivateKey,
+        string privateKey,
         StreamingOptions options
     )
     {
         _inputStream = inputStream;
         _rsa = RSA.Create();
-        _rsa.FromString(rsaPrivateKey);
+        _rsa.FromString(privateKey);
         _options = options;
         _context = DecryptionContext.Empty;
         _hasFoundValidHeader = false;
@@ -198,9 +194,7 @@ internal sealed class StreamingEncryptedFileReader : IDisposable, IAsyncDisposab
     /// <summary>
     /// Processes a header section to extract encryption keys
     /// </summary>
-    private async Task ProcessHeaderSectionAsync(
-        CancellationToken cancellationToken
-    )
+    private async Task ProcessHeaderSectionAsync(CancellationToken cancellationToken)
     {
         HeaderSection header = await ReadHeaderSectionAsync(cancellationToken);
 
@@ -232,34 +226,25 @@ internal sealed class StreamingEncryptedFileReader : IDisposable, IAsyncDisposab
     /// <summary>
     /// Reads header section data from the input stream
     /// </summary>
-    private async Task<HeaderSection> ReadHeaderSectionAsync(
-        CancellationToken cancellationToken
-    )
+    /// <exception cref="InvalidOperationException"></exception>
+    private async Task<HeaderSection> ReadHeaderSectionAsync(CancellationToken cancellationToken)
     {
         // skip the header marker
-        _inputStream.Position += _markerLength;
+        _inputStream.Position += EncryptionConstants.SizeOfInt;
 
         // Read the tag, nonce, and session key lengths
-        byte[] tagLengthBytes = new byte[sizeof(int)];
-        byte[] nonceLengthBytes = new byte[sizeof(int)];
-        byte[] sessionKeyLengthBytes = new byte[sizeof(int)];
-        await _inputStream.ReadExactlyAsync(tagLengthBytes, cancellationToken);
-        await _inputStream.ReadExactlyAsync(nonceLengthBytes, cancellationToken);
-        await _inputStream.ReadExactlyAsync(sessionKeyLengthBytes, cancellationToken);
-
-        int tagBytesLength = BitConverter.ToInt32(tagLengthBytes, 0);
-        int nonceLength = BitConverter.ToInt32(nonceLengthBytes, 0);
-        int sessionKeyLength = BitConverter.ToInt32(sessionKeyLengthBytes, 0);
-
-        byte[] headerSection = new byte[tagBytesLength + nonceLength + sessionKeyLength];
-
-        await _inputStream.ReadExactlyAsync(headerSection, cancellationToken);
-
-        Unescape(ref headerSection);
-
-        return new HeaderSection(headerSection[..tagBytesLength],
-            headerSection[tagBytesLength..^nonceLength],
-            headerSection[^sessionKeyLength..]);
+        byte[] versionBuffer = new byte[EncryptionConstants.Version.Length];
+        await _inputStream.ReadExactlyAsync(versionBuffer, cancellationToken);
+        if (!versionBuffer.SequenceEqual(EncryptionConstants.Version))
+        {
+            // Can refactor to support multiple versions in the future.
+            throw new InvalidOperationException(
+                $"Unsupported stream version: {BitConverter.ToString(versionBuffer)}"
+            );
+        }
+        byte[] encryptedHeader = new byte[EncryptedHeaderSize];
+        await _inputStream.ReadExactlyAsync(encryptedHeader, cancellationToken);
+        return new HeaderSection(encryptedHeader);
     }
 
     /// <summary>
@@ -267,7 +252,7 @@ internal sealed class StreamingEncryptedFileReader : IDisposable, IAsyncDisposab
     /// </summary>
     private async Task<MessageSection> ReadMessageSectionAsync(CancellationToken cancellationToken)
     {
-        byte[] lengthBytes = new byte[4];
+        byte[] lengthBytes = new byte[EncryptionConstants.SizeOfInt];
         await _inputStream.ReadExactlyAsync(lengthBytes, cancellationToken);
         int messageLength = BitConverter.ToInt32(lengthBytes, 0);
         return new MessageSection(messageLength);
@@ -278,13 +263,23 @@ internal sealed class StreamingEncryptedFileReader : IDisposable, IAsyncDisposab
     /// </summary>
     private DecryptionContext DecryptKeys(HeaderSection header)
     {
-        byte[] tagLengthBytes = _rsa.Decrypt(header.TagLength, RSAEncryptionPadding.OaepSHA256);
-        byte[] nonce = _rsa.Decrypt(header.Nonce, RSAEncryptionPadding.OaepSHA256);
-        byte[] sessionkey = _rsa.Decrypt(header.SessionKey, RSAEncryptionPadding.OaepSHA256);
+        byte[] decryptedHeader = _rsa.Decrypt(
+            header.EncryptedHeader,
+            RSAEncryptionPadding.OaepSHA256
+        );
+        byte[] tagLengthBytes = decryptedHeader[..EncryptionConstants.SizeOfInt];
+        byte[] nonce = decryptedHeader[
+            EncryptionConstants.SizeOfInt..(EncryptionConstants.HeaderSessionKeyOffset)
+        ];
+        byte[] sessionKey = decryptedHeader[
+            (EncryptionConstants.HeaderSessionKeyOffset)..(
+                EncryptionConstants.HeaderSessionKeyOffset + EncryptionConstants.SessionKeyLength
+            )
+        ];
 
         int tag = BitConverter.ToInt32(tagLengthBytes);
 
-        return new DecryptionContext(tag, nonce, sessionkey);
+        return new DecryptionContext(tag, nonce, sessionKey);
     }
 
     /// <summary>
@@ -297,12 +292,17 @@ internal sealed class StreamingEncryptedFileReader : IDisposable, IAsyncDisposab
     {
         byte[] message = new byte[messageLength];
         await _inputStream.ReadExactlyAsync(message, cancellationToken);
-        Unescape(ref message);
 
         byte[] cypherText = message[..^_context.TagLength];
         byte[] hmac = message[^_context.TagLength..];
 
-        string plainText = DecryptData(cypherText, _context.SessionKey, _context.Nonce, hmac, _context.TagLength);
+        string plainText = DecryptData(
+            cypherText,
+            _context.SessionKey,
+            _context.Nonce,
+            hmac,
+            _context.TagLength
+        );
 
         _context.Nonce.IncreaseNonce();
 
@@ -444,44 +444,16 @@ internal sealed class StreamingEncryptedFileReader : IDisposable, IAsyncDisposab
     // Helper methods
     private async Task<byte[]?> ReadMarkerBufferAsync(CancellationToken cancellationToken)
     {
-        byte[] markerBuffer = new byte[_markerLength];
+        byte[] markerBuffer = new byte[EncryptionConstants.SizeOfInt];
         int bytesRead = await _inputStream.ReadAsync(markerBuffer, cancellationToken);
-        _inputStream.Position -= bytesRead != _markerLength ? 0 : _markerLength;
-        return bytesRead == _markerLength ? markerBuffer : null;
-    }
-
-    /// <summary>
-    /// Unescapes occurrences of the specified marker in the data by removing in-place the escape byte after each occurrence.
-    /// </summary>
-    /// <param name="data">The data to unescape.</param>
-    private void Unescape(ref byte[] data)
-    {
-        byte[] markerWithEscape = new byte[_marker.Length + 1];
-
-        markerWithEscape[0] = _marker[0];
-        markerWithEscape[1] = _escapeMarker;
-        Array.Copy(_marker, 1, markerWithEscape, 2, _marker.Length - 1);
-
-        while (true)
-        {
-            int pos = data.IndexOf(markerWithEscape);
-
-            if (pos != -1)
-            {
-                Array.Copy(data, pos + 2, data, pos + 1, data.Length - (pos + 2));
-                Array.Resize(ref data, data.Length - 1);
-            }
-            else
-            {
-                break;
-            }
-        }
+        _inputStream.Position -= bytesRead != EncryptionConstants.SizeOfInt ? 0 : bytesRead;
+        return bytesRead == EncryptionConstants.SizeOfInt ? markerBuffer : null;
     }
 
     private bool IsEndOfStream() => _inputStream.Position >= _inputStream.Length;
 
     private static bool IsHeaderMarker(byte[] markerBuffer) =>
-        markerBuffer.SequenceEqual(_marker);
+        markerBuffer.SequenceEqual(EncryptionConstants.Marker);
 
     private async Task HandleErrorAsync(
         ChannelWriter<IDecryptionChunk> writer,
@@ -501,13 +473,13 @@ internal sealed class StreamingEncryptedFileReader : IDisposable, IAsyncDisposab
     private async Task TryRecoverAsync(CancellationToken cancellationToken)
     {
         // Try to find the next valid marker
-        byte[] searchBuffer = new byte[_markerLength];
+        byte[] searchBuffer = new byte[EncryptionConstants.SizeOfInt];
 
-        while (_inputStream.Position < _inputStream.Length - _markerLength)
+        while (_inputStream.Position < _inputStream.Length - EncryptionConstants.SizeOfInt)
         {
             // Read potential marker
             int bytesRead = await _inputStream.ReadAsync(searchBuffer, cancellationToken);
-            if (bytesRead < _markerLength)
+            if (bytesRead < EncryptionConstants.SizeOfInt)
             {
                 break;
             }
@@ -516,12 +488,12 @@ internal sealed class StreamingEncryptedFileReader : IDisposable, IAsyncDisposab
             if (IsHeaderMarker(searchBuffer))
             {
                 // Move back to start of marker
-                _inputStream.Position -= _markerLength;
+                _inputStream.Position -= EncryptionConstants.SizeOfInt;
                 return;
             }
 
             // Move back and advance by 1 byte to continue searching
-            _inputStream.Position -= _markerLength - 1;
+            _inputStream.Position -= EncryptionConstants.SizeOfInt - 1;
         }
     }
 

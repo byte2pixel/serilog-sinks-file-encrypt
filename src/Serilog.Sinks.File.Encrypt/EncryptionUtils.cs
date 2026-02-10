@@ -33,17 +33,10 @@ public static class EncryptionUtils
     /// AES-GCM encryption requires a unique nonce for each encryption operation.
     /// This method retrieves the current nonce value stored in the last 8 bytes of the data array.
     /// </summary>
-    /// <param name="nonce">Nonce of any length >= 8</param>
+    /// <param name="nonce">Nonce of any length >= 12</param>
     /// <returns>The current nonce counter value.</returns>
-    internal static long GetNonce(this byte[] nonce)
+    private static long GetNonce(this byte[] nonce)
     {
-        ArgumentNullException.ThrowIfNull(nonce, nameof(nonce));
-
-        if (nonce.Length < 8)
-        {
-            throw new ArgumentException("Invalid nonce length", nameof(nonce));
-        }
-
         return BitConverter.ToInt64(nonce, nonce.Length - sizeof(long));
     }
 
@@ -51,17 +44,19 @@ public static class EncryptionUtils
     /// AES-GCM encryption requires a unique nonce for each encryption operation.
     /// This method increments the nonce value stored in the last 8 bytes of the data array.
     /// </summary>
-    /// <param name="nonce">Nonce of any length >= 8</param>
+    /// <param name="nonce">Nonce of any length >= 12</param>
+    /// <exception cref="ArgumentNullException">
+    /// Thrown when <paramref name="nonce"/> is null.
+    /// </exception>
+    /// <exception cref="ArgumentOutOfRangeException">
+    /// Thrown when <paramref name="nonce"/> length is less than 12 bytes.
+    /// </exception>
     internal static void IncreaseNonce(this byte[] nonce)
     {
-        ArgumentNullException.ThrowIfNull(nonce, nameof(nonce));
+        ArgumentNullException.ThrowIfNull(nonce);
+        ArgumentOutOfRangeException.ThrowIfLessThan(nonce.Length, 12);
 
-        if (nonce.Length < 8)
-        {
-            throw new ArgumentException("Invalid nonce length", nameof(nonce));
-        }
-
-        long value = nonce.GetNonce() + 1 % long.MaxValue;
+        long value = nonce.GetNonce() + (1 % long.MaxValue);
         byte[] nonceBytes = BitConverter.GetBytes(value);
         nonceBytes.CopyTo(nonce, nonce.Length - sizeof(long));
     }
@@ -98,7 +93,10 @@ public static class EncryptionUtils
     /// // Use secure storage for private key (Azure Key Vault, etc.)
     /// </code>
     /// </example>
-    public static (string publicKey, string privateKey) GenerateRsaKeyPair(int keySize = 2048, KeyFormat format = KeyFormat.Xml)
+    public static (string publicKey, string privateKey) GenerateRsaKeyPair(
+        int keySize = 2048,
+        KeyFormat format = KeyFormat.Xml
+    )
     {
         using RSA rsa = RSA.Create(keySize);
 
@@ -106,14 +104,14 @@ public static class EncryptionUtils
         {
             KeyFormat.Xml => rsa.ToXmlString(includePrivateParameters: false),
             KeyFormat.Pem => rsa.ExportRSAPublicKeyPem(),
-            _ => throw new NotSupportedException($"Unsupported key format: {format}")
+            _ => throw new NotSupportedException($"Unsupported key format: {format}"),
         };
 
         string privateKey = format switch
         {
             KeyFormat.Xml => rsa.ToXmlString(includePrivateParameters: true),
             KeyFormat.Pem => rsa.ExportRSAPrivateKeyPem(),
-            _ => throw new NotSupportedException($"Unsupported key format: {format}")
+            _ => throw new NotSupportedException($"Unsupported key format: {format}"),
         };
 
         return (publicKey, privateKey);
