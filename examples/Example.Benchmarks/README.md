@@ -25,77 +25,96 @@ Results are saved to `BenchmarkDotNet.Artifacts/results/` with HTML, CSV, and Ma
 
 ### At a Glance
 
+#### Time Overhead Benchmark Summary
+The fuller the bar the more time overhead compared to baseline.
+(lower is better)
 ```
 ┌─────────────────────────────────────────────────────────────────┐
 │ GOAL: Time Overhead < 50%  (Serilog File Sink, 100 entries)     │
+| Baseline (no encryption): ~680 μs for 100 entries               │
 │ AES:                                                            │
-│ ██░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░  1-8% (unbuffered)     │
+│ █░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░  1-8% (unbuffered)     │
 │ FASTER ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░  -23 to -35% (buff.)   │
 │ AES-GCM:                                                        │
-│ █░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░  3-5% (unbuffered)     │
-│ FASTER ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░  -18 to -20% (buff.)   │
-│ At 10K entries: AES → ~18%, AES-GCM → ~9%                      │
+│ █░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░  0-8% (unbuffered)     │
+│ FASTER ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░  -25 to -45% (buff.)   │
+│ At 10K entries: AES → ~18%, AES-GCM → ~7-16%                    │
 │ STATUS PASS - Well within target                                │
 └─────────────────────────────────────────────────────────────────┘
+```
 
+#### Memory Overhead Benchmark Summary
+
+The fuller the bar the more memory used compared to baseline.
+(lower is better)
+```
 ┌─────────────────────────────────────────────────────────────────┐
-│ GOAL: Memory Overhead < 2x  (Serilog File Sink, Medium msgs)    │
+│ GOAL: Memory Overhead < 2x (Serilog File Sink, Medium msgs)     │
+│ Baseline (no encryption): ~652.49 KB for 1000 entries           │
 │ AES:                                                            │
-│ ███████████████████████████░░░░░░░░░░░░░  1.90x (unbuffered)    │
-│ ████████████████████████████████████░░░░  2.15x (buffered)      │
+│ ████████████████████████░░░░░░░░░░░░░░░░  2.15x (unbuffered)    │ 
+│ ███████████████████████░░░░░░░░░░░░░░░░░░  2.02x (buffered)     │
 │ AES-GCM:                                                        │
 │ ██░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░  1.06x (unbuffered)    │
 │ █░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░  1.02x (buffered)      │
 │ STATUS: AES can exceed 2x on smaller msgs                       │
 │         AES-GCM PASS ~5% more memory well under 2x              │
 └─────────────────────────────────────────────────────────────────┘
+```
+#### Throughput Benchmark Summary
 
+The fuller the bar the closer to matching baseline.
+(higher is better)
+```
 ┌─────────────────────────────────────────────────────────────────┐
 │ GOAL: Throughput > 1,500 logs/sec  (Serilog Sink, Small, 100)   │
 │ Full logging pipeline: Serilog formatting + file I/O + encrypt  │
+| Baseline (no encryption): ~1,760 logs/sec                       |
 │ AES:                                                            │
-│ ██████████████████████░░░░░░░░░░░░░░░░░░░  1,696 (unbuffered)   │
-│ ████████████████████████████████░░░░░░░░░  2,733 (buffered)     │
+│ ███████████████████████████████████████░  1,696 (unbuffered)    │
+│ FASTER ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░  2,733 (buffered)      │
 │ AES-GCM:                                                        │
-│ ███████████████████████░░░░░░░░░░░░░░░░░░  1,786 (unbuffered)   │
-│ █████████████████████████████████░░░░░░░░  2,859 (buffered)     │
-│ STATUS: PASS - Exceeds target by 1.1-1.9x                       │
-│ (Raw EncryptedStream: ~25K writes/sec - see stream bench)       │
+│ ████████████████████████████████████░░░░  1,534 (unbuffered)    │
+│ FASTER ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░  2,700 (buffered)      │
+│ STATUS: PASS - Exceeds 1,500/sec target by 1.1-1.9x             │
+│ (Raw EncryptedStream: ~70K writes/sec - see stream bench)       │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
 ### Real-World Scenarios
 
-**Serilog File Sink - Medium Messages (100 entries)**
+**Serilog File Sink - Medium Messages (1000 entries)**
 ```
                                               AES-GCM
-                   Baseline       Unnbuffered        Buffered
-No Encryption:     593 μs         636 μs  (+8%)      386 μs (-34%) 
-Memory:            75 KB          91 KB   (+22%)     92 KB (+22%)
-Throughput:        1,700/sec      1,573/sec (-7.47%) 2,588/sec (+52%)
+                   Baseline       Unbuffered        Buffered
+No Encryption:     3,000 μs       3,345 μs (+12%)   1,122 μs (-63%)
+Memory:            652 KB         696 KB   (+7%)    672 KB (+3%)
+Throughput:        1,760/sec      1,534/sec (-13%)  2,700/sec (+53%)
 Verdict:           ✅ Unbuffered is default safe choice
+Summary:           AES-GCM: +12% time overhead, +7% more memory, -13% throughput (unbuffered)
+                   Buffered mode: 63% faster, 3% more memory, 53% higher throughput
 ```
 
 **Background Worker (10,000 messages)**
 ```
 buffered: true
                         Baseline        AES-GCM
-Time:                   5.70 ms         6.12 ms  (+7.9%)
-Memory:                 4.34 MB         4.38 MB  (+1.0%)
-Throughput:             ~1,740/sec      ~1,632/sec (-7.25%)
+Time:                   5.70 ms         6.30 ms  (+10%)
+Memory:                 4.34 MB         4.38 MB  (+1%)
+Throughput:             ?/sec           ?/sec (-9.5%)
 Verdict:                ✅ Fine for batch processing and logging to file
-                        AES-GCM: ~half the time overhead, 27% less memory ↗️
+    AES-GCM: ~10% time overhead, < 1% more memory, ~10% less throughput
 ```
 
 **Web API Logging To File.Sink (1,000 requests)**
 ```
 buffered: true
                         Baseline       AES-GCM
-Time:                   1.4 ms         3.91 ms  (+10%)
-Memory:                 999 KB         1,049 KB (+05%)
-Throughput:             ~714 r/s       ~640 r/s (-10%)    
+Time:                   1.32 ms        1.50 ms  (+13%)
+Memory:                 1002 KB        1,020 KB (+2%)
+Throughput:             758 r/s        667 r/s (-12%)    
 Verdict:                ❌️ Writing to a file is not recommended in a Web API
-                        AES-GCM: +10% time overhead, +05% memory️
+    AES-GCM: +14% time overhead, +2% more memory, ~12% less throughput️
 ```
 
 ### Key Findings

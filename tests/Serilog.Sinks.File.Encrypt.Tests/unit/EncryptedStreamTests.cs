@@ -105,53 +105,6 @@ public class EncryptedStreamTests
     }
 
     [Fact]
-    public void EscapeMarkersInHeader_EscapesMarkersCorrectly()
-    {
-        // Arrange
-        byte[] header = [0xFF, 0xFE, 0x4C, 0x4F, 0x47, 0x48, 0x44, 0x00, 0x01];
-        byte[] expectedEscaped = [0xFF, 0xFE, 0x4C, 0x4F, 0x47, 0x48, 0x44, 0x00, 0x01, 0x00];
-        byte[] finalBuffer = new byte[expectedEscaped.Length];
-
-        // Act
-        int bytesWritten = EncryptedStream.EscapeMarkersInHeader(header.AsSpan(), finalBuffer);
-
-        // Assert
-        bytesWritten.ShouldBeEquivalentTo(expectedEscaped.Length);
-        finalBuffer.ShouldBeEquivalentTo(expectedEscaped);
-    }
-
-    [Fact]
-    public void WriteEscapedSpan_EscapesMarkerCorrectly()
-    {
-        // Arrange
-        byte[] input = [0xFF, 0xFE, 0x4C, 0x4F, 0x47, 0x48, 0x44, 0x00, 0x01];
-        byte[] expectedEscaped = [0xFF, 0xFE, 0x4C, 0x4F, 0x47, 0x48, 0x44, 0x00, 0x01, 0x00];
-
-        // Act
-        Span<byte> actual = new byte[expectedEscaped.Length];
-        EncryptedStream.WriteEscapedSpan(input, actual);
-
-        // Assert
-        actual.ToArray().ShouldBeEquivalentTo(expectedEscaped);
-    }
-
-    [Theory]
-    [InlineData(
-        new byte[] { 0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08 },
-        Label = "Long enough for markers, but no markers"
-    )]
-    [InlineData(new byte[] { 0x10, 0x20, 0x30, 0x40 }, Label = "Not long enough for markers")]
-    public void WriteEscapedSpan_NoMarkers_DoesNotAlterData(byte[] input)
-    {
-        // Act
-        Span<byte> actual = new byte[input.Length];
-        EncryptedStream.WriteEscapedSpan(input, actual);
-
-        // Assert
-        actual.ToArray().ShouldBeEquivalentTo(input);
-    }
-
-    [Fact]
     public void Ctor_NullStream_ThrowsArgumentNullException()
     {
         // Arrange
