@@ -181,13 +181,20 @@ internal sealed class StreamingEncryptedFileReader : IDisposable, IAsyncDisposab
         }
         else if (_context.HasKeys)
         {
-            await ProcessBodySectionAsync(writer, cancellationToken);
+            try
+            {
+                await ProcessBodySectionAsync(writer, cancellationToken);
+            }
+            catch (InvalidOperationException)
+            {
+                _inputStream.Position++; // Move forward assuming corrupted data
+            }
         }
         else
         {
             // move the stream position forward by 1 byte to continue searching
             // for the first valid header marker
-            _inputStream.Position += 1;
+            _inputStream.Position++;
         }
     }
 
@@ -250,12 +257,31 @@ internal sealed class StreamingEncryptedFileReader : IDisposable, IAsyncDisposab
     /// <summary>
     /// Reads body section metadata from the input stream
     /// </summary>
+    /// <exception cref="InvalidOperationException"></exception>
     private async Task<MessageSection> ReadMessageSectionAsync(CancellationToken cancellationToken)
     {
         byte[] lengthBytes = new byte[EncryptionConstants.SizeOfInt];
-        await _inputStream.ReadExactlyAsync(lengthBytes, cancellationToken);
-        int messageLength = BitConverter.ToInt32(lengthBytes, 0);
-        return new MessageSection(messageLength);
+        try
+        {
+            await _inputStream.ReadExactlyAsync(lengthBytes, cancellationToken);
+            int messageLength = BitConverter.ToInt32(lengthBytes, 0);
+            if (messageLength > 0) // not sure if this should allow zero-length messages
+            {
+                return new MessageSection(messageLength);
+            }
+
+            _inputStream.Position -= lengthBytes.Length;
+            throw new InvalidOperationException(
+                $"Invalid message length: {messageLength} at position {_inputStream.Position - EncryptionConstants.SizeOfInt}"
+            );
+        }
+        catch (EndOfStreamException ex)
+        {
+            throw new InvalidOperationException(
+                "Unexpected end of stream while reading message length.",
+                ex
+            );
+        }
     }
 
     /// <summary>

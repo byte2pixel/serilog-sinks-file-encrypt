@@ -37,11 +37,7 @@ public sealed class EncryptedStreamAsyncTests : EncryptionTestBase
         string[] messages = ["First async message", "Second async message", "Third async message"];
 
         // Act - Use async stream creation which calls FlushAsync
-        MemoryStream encryptedStream = await CreateEncryptedStreamAsync(
-            messages,
-            RsaKeyPair.publicKey,
-            TestContext.Current.CancellationToken
-        );
+        MemoryStream encryptedStream = await CreateEncryptedStreamAsync(messages);
 
         string decrypted = await DecryptStreamToStringAsync(
             encryptedStream,
@@ -89,17 +85,8 @@ public sealed class EncryptedStreamAsyncTests : EncryptionTestBase
         string largeMessage = new('X', 10000); // 10KB of X's
 
         // Act - Use async stream creation which calls FlushAsync
-        MemoryStream encryptedStream = await CreateEncryptedStreamAsync(
-            largeMessage,
-            RsaKeyPair.publicKey,
-            TestContext.Current.CancellationToken
-        );
-
-        string decrypted = await DecryptStreamToStringAsync(
-            encryptedStream,
-            RsaKeyPair.privateKey,
-            TestContext.Current.CancellationToken
-        );
+        MemoryStream encryptedStream = await CreateEncryptedStreamAsync(largeMessage);
+        string decrypted = await DecryptStreamToStringAsync(encryptedStream);
 
         // Assert
         decrypted.ShouldBe(largeMessage);
@@ -112,11 +99,7 @@ public sealed class EncryptedStreamAsyncTests : EncryptionTestBase
         string[] messages = ["Chunk 1", "Chunk 2", "Chunk 3", "Chunk 4", "Chunk 5"];
 
         // Act - Each message gets its own flush in CreateEncryptedStreamAsync
-        MemoryStream encryptedStream = await CreateEncryptedStreamAsync(
-            messages,
-            RsaKeyPair.publicKey,
-            TestContext.Current.CancellationToken
-        );
+        MemoryStream encryptedStream = await CreateEncryptedStreamAsync(messages);
 
         string decrypted = await DecryptStreamToStringAsync(
             encryptedStream,
@@ -139,8 +122,7 @@ public sealed class EncryptedStreamAsyncTests : EncryptionTestBase
         // Act - Create stream with a valid token
         MemoryStream encryptedStream = await CreateEncryptedStreamAsync(
             TestMessage,
-            RsaKeyPair.publicKey,
-            cts.Token
+            cancellationToken: cts.Token
         );
 
         // Assert - Should complete successfully
@@ -159,23 +141,11 @@ public sealed class EncryptedStreamAsyncTests : EncryptionTestBase
 # pragma warning disable S6966 // Suppress "Async method name should end with 'Async'" for test purpose
         MemoryStream syncStream = CreateEncryptedStream(TestMessage, RsaKeyPair.publicKey);
 # pragma warning restore S6966
-        string syncDecrypted = await DecryptStreamToStringAsync(
-            syncStream,
-            RsaKeyPair.privateKey,
-            TestContext.Current.CancellationToken
-        );
+        string syncDecrypted = await DecryptStreamToStringAsync(syncStream);
 
         // Create one with async FlushAsync
-        MemoryStream asyncStream = await CreateEncryptedStreamAsync(
-            TestMessage,
-            RsaKeyPair.publicKey,
-            TestContext.Current.CancellationToken
-        );
-        string asyncDecrypted = await DecryptStreamToStringAsync(
-            asyncStream,
-            RsaKeyPair.privateKey,
-            TestContext.Current.CancellationToken
-        );
+        MemoryStream asyncStream = await CreateEncryptedStreamAsync(TestMessage);
+        string asyncDecrypted = await DecryptStreamToStringAsync(asyncStream);
 
         // Assert - Both should decrypt to the same original message
         asyncDecrypted.ShouldBe(syncDecrypted);
