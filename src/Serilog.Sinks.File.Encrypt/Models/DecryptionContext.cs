@@ -3,20 +3,13 @@ namespace Serilog.Sinks.File.Encrypt.Models;
 /// <summary>
 /// Represents the current decryption context with active encryption keys
 /// </summary>
-internal class DecryptionContext
+internal class DecryptionContext(int tagLength, byte[] nonce, byte[] sessionKey)
 {
-    public DecryptionContext(int tagLength, byte[] nonce, byte[] sessionKey)
-    {
-        Nonce = nonce;
-        SessionKey = sessionKey;
-        TagLength = tagLength;
-    }
+    public int TagLength { get; } = tagLength;
 
-    public int TagLength { get; init; }
+    public byte[] SessionKey { get; } = sessionKey;
 
-    public byte[] SessionKey { get; init; }
-
-    public byte[] Nonce { get; private set; }
+    public byte[] Nonce { get; } = nonce;
 
     public static DecryptionContext Empty => new(0, [], []);
 

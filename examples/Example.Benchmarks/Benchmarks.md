@@ -27,6 +27,8 @@ The benchmarks show excellent performance with `buffered: true`, but be aware th
 
 ### Encrypted Stream Benchmarks
 
+#### Original: AES-CBC no Escaping
+
 Run 1:
 
 | Method                     | BufferSize |         Mean |      Error |     StdDev |    Ratio | RatioSD |   Gen0 |   Gen1 | Allocated | Alloc Ratio |
@@ -53,7 +55,7 @@ Run 2:
 | PlainMemoryStreamWrite     | 2048       |     62.74 ns |   1.272 ns |   2.358 ns |     1.00 |    0.05 | 0.0408 | 0.0001 |    2048 B |        1.00 |
 | EncryptedMemoryStreamWrite | 2048       | 28,190.59 ns |  99.900 ns |  88.559 ns |   449.90 |   16.43 | 0.2747 |      - |   14120 B |        6.89 |
 
-#### Refactored Encrypted Stream Benchmarks
+#### Refactored: AES-GCM /w Escaping
 
 Run 1:
 
@@ -81,7 +83,37 @@ Run 2:
 | **PlainMemoryStreamWrite** | **2048**   | **57.97 ns** | **0.175 ns** | **0.155 ns** | **1.00** | **0.00** | **0.0408** | **0.0001** | **2048 B** |    **1.00** |
 | EncryptedMemoryStreamWrite | 2048       | 38,903.03 ns |    48.255 ns |    42.776 ns |   671.14 |     1.88 |     0.1221 |          - |     7200 B |        3.52 |
 
+#### Refactored: AES-GCM w/o Escaping
+
+Run 1:
+
+| Method                     | BufferSize |         Mean |        Error |       StdDev |    Ratio |  RatioSD |       Gen0 |       Gen1 |  Allocated | Alloc Ratio |
+|----------------------------|------------|-------------:|-------------:|-------------:|---------:|---------:|-----------:|-----------:|-----------:|------------:|
+| **PlainMemoryStreamWrite** | **512**    | **23.20 ns** | **0.051 ns** | **0.048 ns** | **1.00** | **0.00** | **0.0105** |      **-** |  **528 B** |    **1.00** |
+| EncryptedMemoryStreamWrite | 512        | 13,592.41 ns |    18.290 ns |    17.109 ns |   585.98 |     1.37 |     0.0458 |          - |     3016 B |        5.71 |
+|                            |            |              |              |              |          |          |            |            |            |             |
+| **PlainMemoryStreamWrite** | **1024**   | **32.41 ns** | **0.096 ns** | **0.090 ns** | **1.00** | **0.00** | **0.0191** |      **-** |  **960 B** |    **1.00** |
+| EncryptedMemoryStreamWrite | 1024       | 13,669.05 ns |    29.925 ns |    27.992 ns |   421.76 |     1.41 |     0.0610 |          - |     3568 B |        3.72 |
+|                            |            |              |              |              |          |          |            |            |            |             |
+| **PlainMemoryStreamWrite** | **2048**   | **57.97 ns** | **0.134 ns** | **0.125 ns** | **1.00** | **0.00** | **0.0408** | **0.0001** | **2048 B** |    **1.00** |
+| EncryptedMemoryStreamWrite | 2048       | 13,872.49 ns |    19.956 ns |    16.664 ns |   239.29 |     0.57 |     0.1068 |          - |     5752 B |        2.81 |
+
+Run 2:
+
+| Method                     | BufferSize |         Mean |        Error |       StdDev |    Ratio |  RatioSD |       Gen0 |       Gen1 |  Allocated | Alloc Ratio |
+|----------------------------|------------|-------------:|-------------:|-------------:|---------:|---------:|-----------:|-----------:|-----------:|------------:|
+| **PlainMemoryStreamWrite** | **512**    | **23.31 ns** | **0.054 ns** | **0.051 ns** | **1.00** | **0.00** | **0.0105** |      **-** |  **528 B** |    **1.00** |
+| EncryptedMemoryStreamWrite | 512        | 13,600.19 ns |    42.163 ns |    37.376 ns |   583.49 |     1.98 |     0.0458 |          - |     3016 B |        5.71 |
+|                            |            |              |              |              |          |          |            |            |            |             |
+| **PlainMemoryStreamWrite** | **1024**   | **31.88 ns** | **0.108 ns** | **0.101 ns** | **1.00** | **0.00** | **0.0190** |      **-** |  **952 B** |    **1.00** |
+| EncryptedMemoryStreamWrite | 1024       | 13,706.63 ns |    16.332 ns |    15.277 ns |   429.95 |     1.40 |     0.0610 |          - |     3576 B |        3.76 |
+|                            |            |              |              |              |          |          |            |            |            |             |
+| **PlainMemoryStreamWrite** | **2048**   | **58.22 ns** | **0.211 ns** | **0.197 ns** | **1.00** | **0.00** | **0.0408** | **0.0001** | **2048 B** |    **1.00** |
+| EncryptedMemoryStreamWrite | 2048       | 13,946.36 ns |    20.492 ns |    19.168 ns |   239.56 |     0.85 |     0.1068 |          - |     5752 B |        2.81 |
+
 ### Serilog File Sink Benchmarks
+
+#### Original: AES-CBC no Escaping
 
 Run 1:
 
@@ -163,7 +195,7 @@ Run 2:
 | LogWithEncryption         | 10000         | Small       | 30,260.0 us | 206.22 us | 172.20 us | 30,234.8 us |  1.14 |    0.03 |                    - |                - |  156.2500 |         - |         - |  8151.39 KB |        5.18 |
 | LogWithEncryptionBuffered | 10000         | Small       |  4,415.2 us |  66.52 us |  51.93 us |  4,407.0 us |  0.17 |    0.00 |                    - |                - |  742.1875 |  742.1875 |  742.1875 |   4227.5 KB |        2.68 |
 
-#### Refactored Serilog File Sink Benchmarks
+#### Refactored: AES-GCM /w Escaping
 
 Run 1:
 
@@ -245,9 +277,93 @@ Run 2:
 | LogWithEncryption         | 10000         | Small       |     25,682.4 μs |     157.40 μs |     147.23 μs |     25,646.9 μs |     1.14 |     0.01 |      31.2500 |                    - |                - |       1901.1 KB |        1.21 |
 | LogWithEncryptionBuffered | 10000         | Small       |      4,146.8 μs |      79.17 μs |      88.00 μs |      4,102.4 μs |     0.18 |     0.00 |      31.2500 |                    - |                - |      1609.94 KB |        1.02 |
 
+#### Refactored: AES-GCM w/o Escaping
+
+Run 1:
+
+| Method                    | LogEntryCount | MessageSize |            Mean |         Error |        StdDev |          Median |    Ratio |  RatioSD |         Gen0 | Completed Work Items | Lock Contentions |       Allocated | Alloc Ratio |
+|---------------------------|---------------|-------------|----------------:|--------------:|--------------:|----------------:|---------:|---------:|-------------:|---------------------:|-----------------:|----------------:|------------:|
+| **LogWithoutEncryption**  | **100**       | **Large**   |    **787.7 μs** |   **9.83 μs** |   **8.21 μs** |    **788.0 μs** | **1.00** | **0.01** |   **3.9063** |                **-** |            **-** |   **235.19 KB** |    **1.00** |
+| LogWithEncryption         | 100           | Large       |        746.3 μs |      14.28 μs |      17.00 μs |        737.8 μs |     0.95 |     0.02 |       3.9063 |                    - |                - |       251.23 KB |        1.07 |
+| LogWithEncryptionBuffered | 100           | Large       |        587.1 μs |      11.45 μs |      28.51 μs |        586.0 μs |     0.75 |     0.04 |       3.9063 |                    - |                - |       249.47 KB |        1.06 |
+|                           |               |             |                 |               |               |                 |          |          |              |                      |                  |                 |             |
+| **LogWithoutEncryption**  | **100**       | **Medium**  |    **660.8 μs** |  **18.25 μs** |  **52.37 μs** |    **649.3 μs** | **1.01** | **0.11** |   **0.9766** |                **-** |            **-** |    **75.13 KB** |    **1.00** |
+| LogWithEncryption         | 100           | Medium      |        674.1 μs |       9.24 μs |       8.19 μs |        676.1 μs |     1.03 |     0.08 |            - |                    - |                - |        91.15 KB |        1.21 |
+| LogWithEncryptionBuffered | 100           | Medium      |        360.7 μs |       3.65 μs |       3.05 μs |        361.2 μs |     0.55 |     0.04 |       0.9766 |                    - |                - |        91.53 KB |        1.22 |
+|                           |               |             |                 |               |               |                 |          |          |              |                      |                  |                 |             |
+| **LogWithoutEncryption**  | **100**       | **Small**   |    **561.6 μs** |   **6.58 μs** |   **6.15 μs** |    **561.9 μs** | **1.00** | **0.01** |        **-** |                **-** |            **-** |    **28.11 KB** |    **1.00** |
+| LogWithEncryption         | 100           | Small       |        651.1 μs |       4.18 μs |       3.49 μs |        651.1 μs |     1.16 |     0.01 |            - |                    - |                - |        44.15 KB |        1.57 |
+| LogWithEncryptionBuffered | 100           | Small       |        400.7 μs |      31.54 μs |      87.39 μs |        367.0 μs |     0.71 |     0.16 |       0.4883 |                    - |                - |         44.2 KB |        1.57 |
+|                           |               |             |                 |               |               |                 |          |          |              |                      |                  |                 |             |
+| **LogWithoutEncryption**  | **1000**      | **Large**   |  **4,194.9 μs** |  **80.96 μs** |  **93.24 μs** |  **4,157.7 μs** | **1.00** | **0.03** |  **31.2500** |                **-** |            **-** |  **2225.83 KB** |    **1.00** |
+| LogWithEncryption         | 1000          | Large       |      4,500.0 μs |      88.87 μs |      95.09 μs |      4,463.3 μs |     1.07 |     0.03 |      31.2500 |                    - |                - |      2270.04 KB |        1.02 |
+| LogWithEncryptionBuffered | 1000          | Large       |      2,625.1 μs |      50.95 μs |      47.66 μs |      2,604.8 μs |     0.63 |     0.02 |      39.0625 |                    - |                - |      2252.68 KB |        1.01 |
+|                           |               |             |                 |               |               |                 |          |          |              |                      |                  |                 |             |
+| **LogWithoutEncryption**  | **1000**      | **Medium**  |  **3,547.6 μs** | **197.25 μs** | **543.29 μs** |  **3,244.5 μs** | **1.02** | **0.21** |   **7.8125** |                **-** |            **-** |   **652.49 KB** |    **1.00** |
+| LogWithEncryption         | 1000          | Medium      |      3,494.2 μs |      45.59 μs |      38.07 μs |      3,489.0 μs |     1.01 |     0.13 |            - |                    - |                - |       696.62 KB |        1.07 |
+| LogWithEncryptionBuffered | 1000          | Medium      |      1,189.7 μs |      23.06 μs |      41.59 μs |      1,173.7 μs |     0.34 |     0.05 |      11.7188 |                    - |                - |       672.77 KB |        1.03 |
+|                           |               |             |                 |               |               |                 |          |          |              |                      |                  |                 |             |
+| **LogWithoutEncryption**  | **1000**      | **Small**   |  **2,592.6 μs** |  **27.09 μs** |  **30.11 μs** |  **2,606.2 μs** | **1.00** | **0.02** |        **-** |                **-** |            **-** |   **168.74 KB** |    **1.00** |
+| LogWithEncryption         | 1000          | Small       |      2,981.4 μs |      58.32 μs |      51.70 μs |      2,955.7 μs |     1.15 |     0.02 |            - |                    - |                - |       212.91 KB |        1.26 |
+| LogWithEncryptionBuffered | 1000          | Small       |        673.2 μs |      12.35 μs |      13.72 μs |        673.6 μs |     0.26 |     0.01 |       1.9531 |                    - |                - |       186.48 KB |        1.11 |
+|                           |               |             |                 |               |               |                 |          |          |              |                      |                  |                 |             |
+| **LogWithoutEncryption**  | **10000**     | **Large**   | **39,276.2 μs** | **543.44 μs** | **508.34 μs** | **39,220.2 μs** | **1.00** | **0.02** | **363.6364** |                **-** |            **-** | **22265.03 KB** |    **1.00** |
+| LogWithEncryption         | 10000         | Large       |     42,032.1 μs |     593.86 μs |     495.90 μs |     42,202.6 μs |     1.07 |     0.02 |     416.6667 |                    - |                - |     22590.82 KB |        1.01 |
+| LogWithEncryptionBuffered | 10000         | Large       |     23,108.1 μs |     375.07 μs |     350.84 μs |     23,137.5 μs |     0.59 |     0.01 |     437.5000 |                    - |                - |     22417.65 KB |        1.01 |
+|                           |               |             |                 |               |               |                 |          |          |              |                      |                  |                 |             |
+| **LogWithoutEncryption**  | **10000**     | **Medium**  | **26,465.1 μs** | **186.26 μs** | **145.42 μs** | **26,467.0 μs** | **1.00** | **0.01** | **125.0000** |                **-** |            **-** |  **6558.78 KB** |    **1.00** |
+| LogWithEncryption         | 10000         | Medium      |     30,480.6 μs |     596.65 μs |     775.81 μs |     30,422.8 μs |     1.15 |     0.03 |     100.0000 |                    - |                - |      6884.36 KB |        1.05 |
+| LogWithEncryptionBuffered | 10000         | Medium      |      8,705.1 μs |     139.00 μs |     130.02 μs |      8,756.4 μs |     0.33 |     0.01 |     125.0000 |                    - |                - |      6618.98 KB |        1.01 |
+|                           |               |             |                 |               |               |                 |          |          |              |                      |                  |                 |             |
+| **LogWithoutEncryption**  | **10000**     | **Small**   | **22,581.4 μs** | **253.90 μs** | **212.02 μs** | **22,617.8 μs** | **1.00** | **0.01** |  **31.2500** |                **-** |            **-** |  **1575.01 KB** |    **1.00** |
+| LogWithEncryption         | 10000         | Small       |     26,095.6 μs |     228.35 μs |     190.68 μs |     26,166.2 μs |     1.16 |     0.01 |      31.2500 |                    - |                - |      1900.47 KB |        1.21 |
+| LogWithEncryptionBuffered | 10000         | Small       |      4,286.8 μs |      84.21 μs |     120.77 μs |      4,258.6 μs |     0.19 |     0.01 |      31.2500 |                    - |                - |      1609.31 KB |        1.02 |
+
+Run 2:
+
+| Method                    | LogEntryCount | MessageSize |            Mean |         Error |        StdDev |          Median |    Ratio |  RatioSD |         Gen0 | Completed Work Items | Lock Contentions |       Allocated | Alloc Ratio |
+|---------------------------|---------------|-------------|----------------:|--------------:|--------------:|----------------:|---------:|---------:|-------------:|---------------------:|-----------------:|----------------:|------------:|
+| **LogWithoutEncryption**  | **100**       | **Large**   |    **737.1 μs** |   **6.13 μs** |   **4.79 μs** |    **738.0 μs** | **1.00** | **0.01** |   **3.9063** |                **-** |            **-** |   **235.19 KB** |    **1.00** |
+| LogWithEncryption         | 100           | Large       |        742.8 μs |      14.70 μs |      24.56 μs |        736.7 μs |     1.01 |     0.03 |       3.9063 |                    - |                - |       251.21 KB |        1.07 |
+| LogWithEncryptionBuffered | 100           | Large       |        565.0 μs |      10.80 μs |      25.87 μs |        554.4 μs |     0.77 |     0.04 |       3.9063 |                    - |                - |       249.47 KB |        1.06 |
+|                           |               |             |                 |               |               |                 |          |          |              |                      |                  |                 |             |
+| **LogWithoutEncryption**  | **100**       | **Medium**  |    **600.1 μs** |   **9.40 μs** |   **7.85 μs** |    **598.1 μs** | **1.00** | **0.02** |   **0.9766** |                **-** |            **-** |    **75.13 KB** |    **1.00** |
+| LogWithEncryption         | 100           | Medium      |        683.0 μs |      10.92 μs |       9.68 μs |        681.1 μs |     1.14 |     0.02 |       0.9766 |                    - |                - |        91.16 KB |        1.21 |
+| LogWithEncryptionBuffered | 100           | Medium      |        360.8 μs |       4.26 μs |       3.33 μs |        360.6 μs |     0.60 |     0.01 |       0.9766 |                    - |                - |        91.47 KB |        1.22 |
+|                           |               |             |                 |               |               |                 |          |          |              |                      |                  |                 |             |
+| **LogWithoutEncryption**  | **100**       | **Small**   |    **572.4 μs** |   **8.76 μs** |   **7.31 μs** |    **571.1 μs** | **1.00** | **0.02** |        **-** |                **-** |            **-** |    **28.11 KB** |    **1.00** |
+| LogWithEncryption         | 100           | Small       |        652.6 μs |       3.96 μs |       3.31 μs |        652.2 μs |     1.14 |     0.01 |            - |                    - |                - |        44.07 KB |        1.57 |
+| LogWithEncryptionBuffered | 100           | Small       |        321.1 μs |       3.67 μs |       3.06 μs |        319.7 μs |     0.56 |     0.01 |            - |                    - |                - |        44.26 KB |        1.57 |
+|                           |               |             |                 |               |               |                 |          |          |              |                      |                  |                 |             |
+| **LogWithoutEncryption**  | **1000**      | **Large**   |  **4,139.5 μs** |  **43.76 μs** |  **36.54 μs** |  **4,141.4 μs** | **1.00** | **0.01** |  **31.2500** |                **-** |            **-** |  **2225.83 KB** |    **1.00** |
+| LogWithEncryption         | 1000          | Large       |      4,467.1 μs |      38.70 μs |      32.32 μs |      4,462.9 μs |     1.08 |     0.01 |      31.2500 |                    - |                - |      2269.96 KB |        1.02 |
+| LogWithEncryptionBuffered | 1000          | Large       |      2,609.9 μs |      17.43 μs |      14.56 μs |      2,615.3 μs |     0.63 |     0.01 |      39.0625 |                    - |                - |      2252.63 KB |        1.01 |
+|                           |               |             |                 |               |               |                 |          |          |              |                      |                  |                 |             |
+| **LogWithoutEncryption**  | **1000**      | **Medium**  |  **2,999.0 μs** |  **26.30 μs** |  **21.96 μs** |  **2,991.6 μs** | **1.00** | **0.01** |   **7.8125** |                **-** |            **-** |   **652.49 KB** |    **1.00** |
+| LogWithEncryption         | 1000          | Medium      |      3,345.0 μs |      10.81 μs |       9.03 μs |      3,343.5 μs |     1.12 |     0.01 |       7.8125 |                    - |                - |       696.66 KB |        1.07 |
+| LogWithEncryptionBuffered | 1000          | Medium      |      1,122.8 μs |       8.24 μs |       7.30 μs |      1,125.2 μs |     0.37 |     0.00 |      11.7188 |                    - |                - |       672.77 KB |        1.03 |
+|                           |               |             |                 |               |               |                 |          |          |              |                      |                  |                 |             |
+| **LogWithoutEncryption**  | **1000**      | **Small**   |  **2,603.5 μs** |  **17.11 μs** |  **13.36 μs** |  **2,601.7 μs** | **1.00** | **0.01** |        **-** |                **-** |            **-** |   **168.74 KB** |    **1.00** |
+| LogWithEncryption         | 1000          | Small       |      2,892.5 μs |      14.73 μs |      12.30 μs |      2,888.6 μs |     1.11 |     0.01 |            - |                    - |                - |       212.83 KB |        1.26 |
+| LogWithEncryptionBuffered | 1000          | Small       |        674.8 μs |      11.38 μs |       9.50 μs |        674.5 μs |     0.26 |     0.00 |       1.9531 |                    - |                - |       186.48 KB |        1.11 |
+|                           |               |             |                 |               |               |                 |          |          |              |                      |                  |                 |             |
+| **LogWithoutEncryption**  | **10000**     | **Large**   | **37,867.3 μs** | **178.52 μs** | **158.26 μs** | **37,859.9 μs** | **1.00** | **0.01** | **384.6154** |                **-** |            **-** | **22265.02 KB** |    **1.00** |
+| LogWithEncryption         | 10000         | Large       |     41,857.4 μs |     258.13 μs |     241.46 μs |     41,820.1 μs |     1.11 |     0.01 |     416.6667 |                    - |                - |     22590.87 KB |        1.01 |
+| LogWithEncryptionBuffered | 10000         | Large       |     22,820.3 μs |     132.80 μs |     117.73 μs |     22,846.4 μs |     0.60 |     0.00 |     437.5000 |                    - |                - |     22417.71 KB |        1.01 |
+|                           |               |             |                 |               |               |                 |          |          |              |                      |                  |                 |             |
+| **LogWithoutEncryption**  | **10000**     | **Medium**  | **26,168.1 μs** | **122.60 μs** |  **95.72 μs** | **26,161.9 μs** | **1.00** | **0.00** | **125.0000** |                **-** |            **-** |  **6558.78 KB** |    **1.00** |
+| LogWithEncryption         | 10000         | Medium      |     29,712.0 μs |     133.03 μs |     117.93 μs |     29,688.5 μs |     1.14 |     0.01 |      76.9231 |                    - |                - |       6884.3 KB |        1.05 |
+| LogWithEncryptionBuffered | 10000         | Medium      |      8,388.3 μs |      42.99 μs |      35.90 μs |      8,393.2 μs |     0.32 |     0.00 |     125.0000 |                    - |                - |      6618.98 KB |        1.01 |
+|                           |               |             |                 |               |               |                 |          |          |              |                      |                  |                 |             |
+| **LogWithoutEncryption**  | **10000**     | **Small**   | **22,344.8 μs** | **107.57 μs** |  **95.35 μs** | **22,326.0 μs** | **1.00** | **0.01** |        **-** |                **-** |            **-** |  **1575.05 KB** |    **1.00** |
+| LogWithEncryption         | 10000         | Small       |     25,526.2 μs |      81.35 μs |      67.93 μs |     25,515.2 μs |     1.14 |     0.01 |      31.2500 |                    - |                - |      1900.41 KB |        1.21 |
+| LogWithEncryptionBuffered | 10000         | Small       |      4,275.5 μs |      30.97 μs |      27.46 μs |      4,271.7 μs |     0.19 |     0.00 |      31.2500 |                    - |                - |      1609.29 KB |        1.02 |
+
 ### Simulated Scenario Benchmarks
 
 #### Web API Request Simulation
+
+##### Original: AES-CBC
 
 Run 1:
 
@@ -269,7 +385,7 @@ Run 2:
 | SimulateApiRequestsWithoutEncryption | 1000         | 4,460.7 us |  88.87 us | 185.51 us |  1.00 |    0.06 |                    - |                - | 15.6250 |   999.1 KB |        1.00 |
 | SimulateApiRequestsWithEncryption    | 1000         | 5,117.5 us | 101.66 us | 253.17 us |  1.15 |    0.07 |                    - |                - | 31.2500 | 1889.29 KB |        1.89 |
 
-##### Refactored Web API Request Simulation
+##### Refactored: AES-GCM /w Escaping
 
 Run 1:
 
@@ -291,7 +407,31 @@ Run 2:
 | **SimulateApiRequestsWithoutEncryption** | **1000**     | **3,556.7 μs** | **27.30 μs** | **26.82 μs** | **1.00** | **0.01** |      **-** |                **-** |            **-** | **999.11 KB** |    **1.00** |
 | SimulateApiRequestsWithEncryption        | 1000         |     4,017.7 μs |     26.66 μs |     23.64 μs |     1.13 |     0.01 |    15.6250 |                    - |                - |    1049.45 KB |        1.05 |
 
+##### Refactored: AES-GCM w/o Escaping
+
+Run 1:
+
+| Method                                   | RequestCount |           Mean |        Error |       StdDev |         Median |    Ratio |  RatioSD |        Gen0 | Completed Work Items | Lock Contentions |      Allocated | Alloc Ratio |
+|------------------------------------------|--------------|---------------:|-------------:|-------------:|---------------:|---------:|---------:|------------:|---------------------:|-----------------:|---------------:|------------:|
+| **SimulateApiRequestsWithoutEncryption** | **100**      |   **400.9 μs** | **15.34 μs** | **43.26 μs** |   **381.9 μs** | **1.01** | **0.14** |  **1.9531** |                **-** |            **-** |   **117.6 KB** |    **1.00** |
+| SimulateApiRequestsWithEncryption        | 100          |       441.1 μs |     15.37 μs |     42.58 μs |       424.8 μs |     1.11 |     0.15 |      1.9531 |                    - |                - |      131.08 KB |        1.11 |
+|                                          |              |                |              |              |                |          |          |             |                      |                  |                |             |
+| **SimulateApiRequestsWithoutEncryption** | **1000**     | **1,326.5 μs** | **22.42 μs** | **33.56 μs** | **1,320.8 μs** | **1.00** | **0.03** | **19.5313** |                **-** |            **-** | **1002.41 KB** |    **1.00** |
+| SimulateApiRequestsWithEncryption        | 1000         |     1,519.0 μs |     30.10 μs |     69.76 μs |     1,488.7 μs |     1.15 |     0.06 |     15.6250 |                    - |                - |     1020.69 KB |        1.02 |
+
+Run 2:
+
+| Method                                   | RequestCount |           Mean |        Error |       StdDev |         Median |    Ratio |  RatioSD |        Gen0 | Completed Work Items | Lock Contentions |      Allocated | Alloc Ratio |
+|------------------------------------------|--------------|---------------:|-------------:|-------------:|---------------:|---------:|---------:|------------:|---------------------:|-----------------:|---------------:|------------:|
+| **SimulateApiRequestsWithoutEncryption** | **100**      |   **374.4 μs** |  **8.68 μs** | **23.18 μs** |   **366.2 μs** | **1.00** | **0.08** |  **1.9531** |           **0.0010** |            **-** |   **117.6 KB** |    **1.00** |
+| SimulateApiRequestsWithEncryption        | 100          |       435.2 μs |     10.26 μs |     29.09 μs |       422.8 μs |     1.17 |     0.10 |      1.9531 |               0.0010 |                - |         131 KB |        1.11 |
+|                                          |              |                |              |              |                |          |          |             |                      |                  |                |             |
+| **SimulateApiRequestsWithoutEncryption** | **1000**     | **1,312.0 μs** | **25.71 μs** | **42.24 μs** | **1,291.5 μs** | **1.00** | **0.04** | **19.5313** |           **0.0039** |            **-** | **1002.41 KB** |    **1.00** |
+| SimulateApiRequestsWithEncryption        | 1000         |     1,481.6 μs |     26.31 μs |     67.92 μs |     1,457.5 μs |     1.13 |     0.06 |     15.6250 |                    - |                - |     1020.69 KB |        1.02 |
+
 #### Background Worker Simulation
+
+##### Original: AES-CBC
 
 Run 1:
 
@@ -313,7 +453,7 @@ Run 2:
 | SimulateBackgroundWorkerWithoutEncryption | 10000        | 6.025 ms | 0.1066 ms | 0.0890 ms |  1.00 |    0.02 |                    - |                - |  85.9375 |        - |        - |   4.34 MB |        1.00 |
 | SimulateBackgroundWorkerWithEncryption    | 10000        | 6.480 ms | 0.0676 ms | 0.0599 ms |  1.08 |    0.02 |                    - |                - | 757.8125 | 671.8750 | 671.8750 |   7.13 MB |        1.64 |
 
-##### Refactored Background Worker Simulation
+##### Refactored: AES-GCM /w Escaping Background Worker Simulation
 
 Run 1:
 
@@ -334,3 +474,25 @@ Run 2:
 |                                               |              |              |               |               |          |             |                      |                  |             |             |
 | **SimulateBackgroundWorkerWithoutEncryption** | **10000**    | **5.680 ms** | **0.0350 ms** | **0.0292 ms** | **1.00** | **85.9375** |                **-** |            **-** | **4.34 MB** |    **1.00** |
 | SimulateBackgroundWorkerWithEncryption        | 10000        |     6.128 ms |     0.0343 ms |     0.0304 ms |     1.08 |     85.9375 |                    - |                - |     4.38 MB |        1.01 |
+
+##### Refactored: AES-GCM w/o Escaping Background Worker Simulation
+
+Run 1:
+
+| Method                                        | MessageCount |         Mean |         Error |        StdDev |    Ratio |  RatioSD |        Gen0 | Completed Work Items | Lock Contentions |   Allocated | Alloc Ratio |
+|-----------------------------------------------|--------------|-------------:|--------------:|--------------:|---------:|---------:|------------:|---------------------:|-----------------:|------------:|------------:|
+| **SimulateBackgroundWorkerWithoutEncryption** | **5000**     | **3.032 ms** | **0.0574 ms** | **0.0805 ms** | **1.00** | **0.04** | **31.2500** |                **-** |            **-** | **2.18 MB** |    **1.00** |
+| SimulateBackgroundWorkerWithEncryption        | 5000         |     3.160 ms |     0.0307 ms |     0.0240 ms |     1.04 |     0.03 |     31.2500 |                    - |                - |      2.2 MB |        1.01 |
+|                                               |              |              |               |               |          |          |             |                      |                  |             |             |
+| **SimulateBackgroundWorkerWithoutEncryption** | **10000**    | **5.909 ms** | **0.0820 ms** | **0.0685 ms** | **1.00** | **0.02** | **85.9375** |                **-** |            **-** | **4.34 MB** |    **1.00** |
+| SimulateBackgroundWorkerWithEncryption        | 10000        |     6.337 ms |     0.0890 ms |     0.0743 ms |     1.07 |     0.02 |     85.9375 |                    - |                - |     4.38 MB |        1.01 |
+
+Run 2:
+
+| Method                                        | MessageCount |         Mean |         Error |        StdDev |    Ratio |        Gen0 | Completed Work Items | Lock Contentions |   Allocated | Alloc Ratio |
+|-----------------------------------------------|--------------|-------------:|--------------:|--------------:|---------:|------------:|---------------------:|-----------------:|------------:|------------:|
+| **SimulateBackgroundWorkerWithoutEncryption** | **5000**     | **3.015 ms** | **0.0270 ms** | **0.0240 ms** | **1.00** | **31.2500** |                **-** |            **-** | **2.18 MB** |    **1.00** |
+| SimulateBackgroundWorkerWithEncryption        | 5000         |     3.285 ms |     0.0170 ms |     0.0151 ms |     1.09 |     31.2500 |                    - |                - |      2.2 MB |        1.01 |
+|                                               |              |              |               |               |          |             |                      |                  |             |             |
+| **SimulateBackgroundWorkerWithoutEncryption** | **10000**    | **5.675 ms** | **0.0281 ms** | **0.0219 ms** | **1.00** | **85.9375** |                **-** |            **-** | **4.34 MB** |    **1.00** |
+| SimulateBackgroundWorkerWithEncryption        | 10000        |     6.256 ms |     0.0376 ms |     0.0333 ms |     1.10 |     85.9375 |                    - |                - |     4.38 MB |        1.01 |

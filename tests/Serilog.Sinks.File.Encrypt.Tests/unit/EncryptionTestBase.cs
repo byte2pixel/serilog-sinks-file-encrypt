@@ -54,23 +54,24 @@ public abstract class EncryptionTestBase : IDisposable, IAsyncDisposable
     /// </summary>
     protected async Task<MemoryStream> CreateEncryptedStreamAsync(
         string[] messages,
-        string publicKey,
-        CancellationToken cancellationToken = default
+        string? publicKey = null,
+        CancellationToken? cancellationToken = null
     )
     {
+        CancellationToken ct = cancellationToken ?? TestContext.Current.CancellationToken;
         MemoryStream memoryStream = new();
         _streamsToDispose.Add(memoryStream);
 
         using RSA rsa = RSA.Create();
-        rsa.FromXmlString(publicKey);
+        rsa.FromXmlString(publicKey ?? RsaKeyPair.publicKey);
 
         // Create EncryptedStream but don't dispose it - disposing would close the underlying MemoryStream
         EncryptedStream encryptedStream = new(memoryStream, rsa);
 
         foreach (byte[] message in messages.Select(m => Encoding.UTF8.GetBytes(m)))
         {
-            await encryptedStream.WriteAsync(message, cancellationToken);
-            await encryptedStream.FlushAsync(cancellationToken);
+            await encryptedStream.WriteAsync(message, ct);
+            await encryptedStream.FlushAsync(ct);
         }
 
         // Don't dispose encryptedStream here - let it be garbage collected
@@ -85,11 +86,28 @@ public abstract class EncryptionTestBase : IDisposable, IAsyncDisposable
     /// </summary>
     protected async Task<MemoryStream> CreateEncryptedStreamAsync(
         string message,
-        string publicKey,
-        CancellationToken cancellationToken = default
+        string? publicKey = null,
+        CancellationToken? cancellationToken = null
     )
     {
         return await CreateEncryptedStreamAsync([message], publicKey, cancellationToken);
+    }
+
+    protected async Task<MemoryStream> CreateAppendedMemoryStream(
+        MemoryStream memoryStream,
+        string message,
+        CancellationToken cancellationToken = default
+    )
+    {
+        using RSA rsa = RSA.Create();
+        rsa.FromXmlString(RsaKeyPair.publicKey);
+        memoryStream.Position = memoryStream.Length;
+        EncryptedStream encryptedStream = new(memoryStream, rsa);
+        byte[] messageBytes = Encoding.UTF8.GetBytes(message);
+        await encryptedStream.WriteAsync(messageBytes, cancellationToken);
+        await encryptedStream.FlushAsync(cancellationToken);
+        memoryStream.Position = 0;
+        return memoryStream;
     }
 
     /// <summary>
@@ -117,9 +135,9 @@ public abstract class EncryptionTestBase : IDisposable, IAsyncDisposable
     /// </summary>
     protected async Task<string> EncryptAndDecryptAsync(
         string[] messages,
-        string publicKey,
-        string privateKey,
-        CancellationToken cancellationToken = default
+        string? publicKey = null,
+        string? privateKey = null,
+        CancellationToken? cancellationToken = null
     )
     {
         MemoryStream encryptedStream = await CreateEncryptedStreamAsync(
@@ -135,9 +153,9 @@ public abstract class EncryptionTestBase : IDisposable, IAsyncDisposable
     /// </summary>
     protected async Task<string> EncryptAndDecryptAsync(
         string message,
-        string publicKey,
-        string privateKey,
-        CancellationToken cancellationToken = default
+        string? publicKey = null,
+        string? privateKey = null,
+        CancellationToken? cancellationToken = null
     )
     {
         return await EncryptAndDecryptAsync([message], publicKey, privateKey, cancellationToken);
@@ -148,22 +166,23 @@ public abstract class EncryptionTestBase : IDisposable, IAsyncDisposable
     /// </summary>
     protected async Task<string> DecryptStreamToStringAsync(
         Stream inputStream,
-        string privateKey,
-        CancellationToken cancellationToken = default
+        string? privateKey = null,
+        CancellationToken? cancellationToken = null
     )
     {
+        CancellationToken ct = cancellationToken ?? TestContext.Current.CancellationToken;
         MemoryStream outputStream = CreateMemoryStream();
 
         await EncryptionUtils.DecryptLogFileAsync(
             inputStream,
             outputStream,
-            privateKey,
-            cancellationToken: cancellationToken
+            privateKey ?? RsaKeyPair.privateKey,
+            cancellationToken: ct
         );
 
         outputStream.Position = 0;
         using StreamReader reader = new(outputStream, leaveOpen: true);
-        return await reader.ReadToEndAsync(cancellationToken);
+        return await reader.ReadToEndAsync(ct);
     }
 
     /// <summary>
@@ -171,24 +190,25 @@ public abstract class EncryptionTestBase : IDisposable, IAsyncDisposable
     /// </summary>
     protected async Task<string> DecryptStreamToStringAsync(
         Stream inputStream,
-        string privateKey,
         StreamingOptions options,
-        CancellationToken cancellationToken = default
+        string? privateKey = null,
+        CancellationToken? cancellationToken = null
     )
     {
+        CancellationToken ct = cancellationToken ?? TestContext.Current.CancellationToken;
         MemoryStream outputStream = CreateMemoryStream();
 
         await EncryptionUtils.DecryptLogFileAsync(
             inputStream,
             outputStream,
-            privateKey,
+            privateKey ?? RsaKeyPair.privateKey,
             options,
-            cancellationToken
+            ct
         );
 
         outputStream.Position = 0;
         using StreamReader reader = new(outputStream, leaveOpen: true);
-        return await reader.ReadToEndAsync(cancellationToken);
+        return await reader.ReadToEndAsync(ct);
     }
 
     /// <summary>
@@ -199,6 +219,27 @@ public abstract class EncryptionTestBase : IDisposable, IAsyncDisposable
         byte[] corrupted = new byte[data.Length];
         Array.Copy(data, corrupted, data.Length);
         corrupted[position] ^= 0xFF; // Flip all bits at position
+        return corrupted;
+    }
+
+    /// <summary>
+    /// Corrupts data by inserting specific marker bytes at the given position
+    /// </summary>
+    /// <param name="data">The data to corrupt</param>
+    /// <param name="position">The position to insert the marker</param>
+    /// <param name="marker">The marker to insert</param>
+    /// <returns>
+    /// The corrupted data with the marker inserted at the specified position
+    /// </returns>
+    protected static byte[] CorruptDataAddingMarker(byte[] data, byte[] marker, int position)
+    {
+        byte[] corrupted = new byte[data.Length];
+        Array.Copy(data, corrupted, data.Length);
+        // Insert marker at position
+        for (int i = 0; i < marker.Length && (position + i) < corrupted.Length; i++)
+        {
+            corrupted[position + i] = marker[i];
+        }
         return corrupted;
     }
 
