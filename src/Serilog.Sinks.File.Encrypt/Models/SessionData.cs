@@ -23,17 +23,7 @@ public class SessionData
     public byte[] Nonce { get; init; } = [];
 
     /// <summary>
-    /// Optional: identify which RSA public key was used
-    /// </summary>
-    public string? KeyId { get; init; }
-
-    /// <summary>
-    /// The version of the header format. This allows for future-proofing the format of the header, enabling backward compatibility.
-    /// </summary>
-    public int Version { get; init; } = 1;
-
-    /// <summary>
     /// Optional: metadata for debugging or future versions
     /// </summary>
-    public DateTimeOffset Timestamp { get; init; } = DateTimeOffset.UtcNow;
+    public DateTimeOffset Timestamp { get; } = DateTimeOffset.UtcNow;
 }

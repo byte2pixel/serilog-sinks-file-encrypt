@@ -40,7 +40,7 @@ public sealed class HeaderEncoderV1 : IHeaderEncoder
         using var bw = new BinaryWriter(ms);
 
         // KeyId length + KeyId (optional)
-        byte[] keyIdBytes = Encoding.UTF8.GetBytes(_keyId);
+        byte[] keyIdBytes = Encoding.UTF8.GetBytes(_keyId); // FIX: encode full KeyId
         bw.Write((byte)keyIdBytes.Length);
         bw.Write(keyIdBytes);
 

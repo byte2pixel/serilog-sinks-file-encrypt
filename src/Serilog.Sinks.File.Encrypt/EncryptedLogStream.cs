@@ -12,7 +12,6 @@ public sealed class EncryptedLogStream : Stream
     private readonly Stream _inner;
     private readonly ISessionWriter _writer;
     private readonly MemoryStream _buffer = new();
-    private readonly EncryptionOptions _options;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="EncryptedLogStream"/> class.
@@ -23,7 +22,6 @@ public sealed class EncryptedLogStream : Stream
     {
         _inner = inner;
         _writer = SessionWriterFactory.Create(options);
-        _options = options;
     }
 
     /// <summary>
@@ -95,8 +93,6 @@ public sealed class EncryptedLogStream : Stream
         {
             AesKey = RandomNumberGenerator.GetBytes(32),
             Plaintext = _buffer.ToArray(),
-            KeyId = _options.KeyId,
-            Version = _options.Version,
             Nonce = RandomNumberGenerator.GetBytes(12), // 96-bit nonce for AES-GCM
         };
 
