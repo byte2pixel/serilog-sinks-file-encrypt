@@ -18,8 +18,11 @@ public sealed class EncryptedLogStream : Stream
     /// </summary>
     /// <param name="inner">The underlying stream to which encrypted log data will be written.</param>
     /// <param name="options">The encryption options containing the info to use for encryption.</param>
+    /// <exception cref="ArgumentNullException">Thrown if either the inner stream or encryption options are null.</exception>
     public EncryptedLogStream(Stream inner, EncryptionOptions options)
     {
+        ArgumentNullException.ThrowIfNull(inner);
+        ArgumentNullException.ThrowIfNull(options);
         _inner = inner;
         _writer = SessionWriterFactory.Create(options);
     }

@@ -7,7 +7,7 @@ namespace Serilog.Sinks.File.Encrypt;
 /// <summary>
 /// Factory for creating session writers based on the specified version.
 /// </summary>
-public static class SessionWriterFactory
+internal static class SessionWriterFactory
 {
     /// <summary>
     /// Creates a session writer for the specified version.
@@ -17,11 +17,11 @@ public static class SessionWriterFactory
     /// <exception cref="NotSupportedException">
     /// Thrown when the specified version is not supported.
     /// </exception>
-    public static ISessionWriter Create(EncryptionOptions options)
+    internal static ISessionWriter Create(EncryptionOptions options)
     {
         return options.Version switch
         {
-            1 => new SessionWriterV1(new HeaderEncoderV1(options), new MessageEncryptorV1()),
+            1 => new SessionWriterV1(new HeaderEncryptorV1(options), new MessageEncryptorV1()),
             _ => throw new NotSupportedException(),
         };
     }

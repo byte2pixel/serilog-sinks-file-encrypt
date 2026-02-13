@@ -76,8 +76,10 @@ public class EncryptHooks : FileLifecycleHooks
     /// Creates a new instance of <see cref="EncryptHooks"/> with the provided <see cref="EncryptionOptions"/>.
     /// </summary>
     /// <param name="encryptionOptions">Options used to encrypt the stream.</param>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="encryptionOptions"/> is null.</exception>
     public EncryptHooks(EncryptionOptions encryptionOptions)
     {
+        ArgumentNullException.ThrowIfNull(encryptionOptions);
         _encryptionOptions = encryptionOptions;
     }
 
