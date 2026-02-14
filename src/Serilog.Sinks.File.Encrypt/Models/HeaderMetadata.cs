@@ -17,9 +17,6 @@ internal sealed class HeaderMetadata
     /// Gets the fixed overhead in bytes (excluding variable-length fields like KeyId).
     /// This includes length prefixes, fixed-size fields (AES key, nonce, timestamp), etc.
     /// </summary>
-    /// <remarks>
-    /// For V1: 1 (KeyId length) + 1 (AES key length) + 32 (AES key) + 1 (nonce length) + 12 (nonce) + 8 (timestamp) = 55 bytes
-    /// </remarks>
     public int FixedOverheadBytes { get; init; }
 
     /// <summary>
@@ -35,7 +32,7 @@ internal sealed class HeaderMetadata
     /// <summary>
     /// Gets a human-readable description of the fixed fields in this header format.
     /// </summary>
-    public string FieldDescription { get; init; } = string.Empty;
+    public string FieldDescription { get; private init; } = string.Empty;
 
     /// <summary>
     /// Calculates the maximum allowed size for variable-length fields (like KeyId).

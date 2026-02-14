@@ -11,6 +11,7 @@ namespace Serilog.Sinks.File.Encrypt.Writers;
 /// </summary>
 internal sealed class SessionWriterV1 : ISessionWriter
 {
+    private readonly IFrameWriter _frameWriter;
     private readonly IHeaderEncryptor _headerEncryptor;
     private readonly IMessageEncryptor _messageEncryptor;
 
@@ -19,8 +20,14 @@ internal sealed class SessionWriterV1 : ISessionWriter
     /// </summary>
     /// <param name="headerEncryptor">The header encoder responsible for encoding session metadata into the header format.</param>
     /// <param name="messageEncryptor">The message encryptor responsible for encrypting the log messages using AES-GCM.</param>
-    internal SessionWriterV1(IHeaderEncryptor headerEncryptor, IMessageEncryptor messageEncryptor)
+    /// <param name="frameWriter">The frame writer responsible for writing the framed session data to the output stream according to the specified format.</param>
+    internal SessionWriterV1(
+        IHeaderEncryptor headerEncryptor,
+        IMessageEncryptor messageEncryptor,
+        IFrameWriter? frameWriter = null
+    )
     {
+        _frameWriter = frameWriter ?? new FrameWriter();
         _headerEncryptor = headerEncryptor;
         _messageEncryptor = messageEncryptor;
     }
@@ -28,19 +35,27 @@ internal sealed class SessionWriterV1 : ISessionWriter
     /// <inheritdoc />
     public void WriteSession(Stream output, SessionData session)
     {
-        // 1. Encode header (RSA)
-        byte[] header = _headerEncryptor.Encrypt(session);
-        // 2. Encrypt logs
-        EncryptedMessage encryptedMessages = _messageEncryptor.Encrypt(
-            session.Plaintext,
-            session.AesKey,
-            session.Nonce
-        );
+        // 1. Encrypt header using spans
+        byte[] header = _headerEncryptor.Encrypt(session.AesKey, session.Nonce, session.Timestamp);
+
+        // 2. Calculate encrypted message length
+        int encryptedMessageLength = _messageEncryptor.GetEncryptedLength(session.Plaintext.Length);
+
         // 3. Compute session length
-        int sessionLength = header.Length + encryptedMessages.TotalLength;
-        // 4. Write framing
-        FrameWriter.WriteHeader(output, version: 1, header, sessionLength);
-        // 5. Write encrypted logs
-        FrameWriter.WriteMessage(output, encryptedMessages);
+        int sessionLength = header.Length + encryptedMessageLength;
+
+        // 4. Write framing header
+        _frameWriter.WriteHeader(output, 1, header, sessionLength);
+
+        // 5. Write encrypted message length (4 bytes, big-endian)
+        Span<byte> messageLengthBytes = stackalloc byte[4];
+        System.Buffers.Binary.BinaryPrimitives.WriteInt32BigEndian(
+            messageLengthBytes,
+            encryptedMessageLength
+        );
+        output.Write(messageLengthBytes);
+
+        // 6. Encrypt and write message directly to stream (no intermediate allocation)
+        _messageEncryptor.EncryptAndWrite(output, session.Plaintext, session.AesKey, session.Nonce);
     }
 }

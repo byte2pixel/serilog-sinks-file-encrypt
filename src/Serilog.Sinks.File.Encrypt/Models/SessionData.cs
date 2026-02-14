@@ -8,9 +8,10 @@ namespace Serilog.Sinks.File.Encrypt.Models;
 public class SessionData
 {
     /// <summary>
-    /// The raw plaintext bytes for this session (everything since last flush)
+    /// The raw plaintext bytes for this session (everything since last flush).
+    /// Using ReadOnlyMemory allows zero-copy access to MemoryStream's internal buffer.
     /// </summary>
-    public byte[] Plaintext { get; init; } = [];
+    public ReadOnlyMemory<byte> Plaintext { get; init; }
 
     /// <summary>
     /// The randomly generated AES session key (e.g., 256-bit)

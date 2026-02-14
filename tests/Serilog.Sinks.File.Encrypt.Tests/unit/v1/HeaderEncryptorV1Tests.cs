@@ -3,58 +3,151 @@ using Serilog.Sinks.File.Encrypt.Writers;
 
 namespace Serilog.Sinks.File.Encrypt.Tests.unit.v1;
 
-public class HeaderEncryptorV1Tests
+public class HeaderEncryptorV1Tests : V1EncryptionTestBase
 {
-    private readonly RSA _publicKey = RSA.Create();
-    private readonly string _keyId;
-    private readonly (string publicKey, string privateKey) _kp = EncryptionUtils.GenerateRsaKeyPair(
-        format: KeyFormat.Xml
-    );
-
-    public HeaderEncryptorV1Tests()
+    private HeaderEncryptorV1 GetSut(EncryptionOptions? options = null)
     {
-        _publicKey.FromString(_kp.publicKey);
-        _keyId = Guid.NewGuid().ToString();
-    }
-
-    private HeaderEncryptorV1 GetEncoder(EncryptionOptions? options = null)
-    {
-        var defaultOptions = new EncryptionOptions(_publicKey, _keyId);
-        return new HeaderEncryptorV1(options ?? defaultOptions);
+        return new HeaderEncryptorV1(options ?? CreateDefaultOptions());
     }
 
     [Fact]
     public void Encrypt_And_Decrypts_Correctly()
     {
         // Arrange
-        HeaderEncryptorV1 encryptor = GetEncoder();
-        var session = new SessionData
-        {
-            AesKey = RandomNumberGenerator.GetBytes(32),
-            Nonce = RandomNumberGenerator.GetBytes(12),
-            Plaintext = "Hello, World!"u8.ToArray(),
-        };
+        HeaderEncryptorV1 encryptor = GetSut();
+        SessionData session = CreateSessionData("Hello, World!");
 
         // Act
-        byte[] header = encryptor.Encrypt(session);
+        byte[] header = encryptor.Encrypt(session.AesKey, session.Nonce, session.Timestamp);
 
         // Assert - Verify encrypted header has correct size
         header.ShouldNotBeNull();
-        header.Length.ShouldBe(
-            _publicKey.KeySize / 8,
-            "Encrypted header should match RSA key size"
-        );
+        header.Length.ShouldBe(PublicKey.KeySize / 8, "Encrypted header should match RSA key size");
 
         // Decrypt and parse the header
         DecryptedHeaderV1 decryptedHeader = DecryptAndParseHeader(header);
 
         // Verify all fields match
-        decryptedHeader.KeyId.ShouldBe(_keyId);
+        decryptedHeader.KeyId.ShouldBe(KeyId);
         decryptedHeader.AesKey.ShouldBe(session.AesKey);
         decryptedHeader.Nonce.ShouldBe(session.Nonce);
-        decryptedHeader
-            .Timestamp.ToUnixTimeMilliseconds()
-            .ShouldBe(session.Timestamp.ToUnixTimeMilliseconds());
+        AssertTimestampEqual(session.Timestamp, decryptedHeader.Timestamp);
+    }
+
+    [Theory]
+    [InlineData(2048)]
+    [InlineData(4096)]
+    public void Constructor_WithValidKeyId_DoesNotThrow(int keySize)
+    {
+        // Arrange
+        using var rsa = RSA.Create(keySize);
+        var metadata = HeaderMetadata.CreateV1();
+        int maxKeyIdSize = metadata.GetMaxVariableFieldSize(keySize);
+        string validKeyId = new('A', maxKeyIdSize);
+        var options = new EncryptionOptions(rsa, validKeyId);
+
+        // Act & Assert
+        Should.NotThrow(() => new HeaderEncryptorV1(options));
+    }
+
+    [Theory]
+    [InlineData(2048)]
+    [InlineData(4096)]
+    public void Constructor_WithOversizedKeyId_ThrowsArgumentException(int keySize)
+    {
+        // Arrange
+        using var rsa = RSA.Create(keySize);
+        var metadata = HeaderMetadata.CreateV1();
+        int maxKeyIdSize = metadata.GetMaxVariableFieldSize(keySize);
+        string oversizedKeyId = new('A', maxKeyIdSize + 1);
+        var options = new EncryptionOptions(rsa, oversizedKeyId);
+
+        // Act & Assert
+        Should.Throw<ArgumentOutOfRangeException>(() => new HeaderEncryptorV1(options));
+    }
+
+    [Fact]
+    public void Constructor_WithNullKeyId_DoesNotThrow()
+    {
+        // Arrange
+        EncryptionOptions options = CreateOptionsWithKeyId(null);
+
+        // Act & Assert
+        Should.NotThrow(() => new HeaderEncryptorV1(options));
+    }
+
+    [Theory]
+    [InlineData(2048)]
+    [InlineData(4096)]
+    public void Encrypt_WithMaximumKeyIdSize_SuccessfullyEncrypts(int keySize)
+    {
+        // Arrange
+        using var rsa = RSA.Create(keySize);
+        var metadata = HeaderMetadata.CreateV1();
+        int maxKeyIdSize = metadata.GetMaxVariableFieldSize(keySize);
+        string maxKeyId = new('B', maxKeyIdSize);
+        EncryptionOptions options = CreateOptionsWithCustomKey(rsa, maxKeyId);
+        var encryptor = new HeaderEncryptorV1(options);
+        SessionData session = CreateSessionData();
+
+        // Act & Assert - Should not throw
+        byte[] header = Should.NotThrow(() =>
+            encryptor.Encrypt(session.AesKey, session.Nonce, session.Timestamp)
+        );
+        header.ShouldNotBeNull();
+        header.ShouldNotBeEmpty();
+    }
+
+    [Fact]
+    public void Encrypt_WithEmptyKeyId_SuccessfullyEncrypts()
+    {
+        // Arrange
+        EncryptionOptions options = CreateOptionsWithKeyId(string.Empty);
+        var encryptor = new HeaderEncryptorV1(options);
+        SessionData session = CreateSessionData();
+
+        // Act
+        byte[] header = encryptor.Encrypt(session.AesKey, session.Nonce, session.Timestamp);
+
+        // Assert
+        DecryptedHeaderV1 decryptedHeader = DecryptAndParseHeader(header);
+        decryptedHeader.KeyId.ShouldBe(string.Empty);
+        decryptedHeader.AesKey.ShouldBe(session.AesKey);
+        decryptedHeader.Nonce.ShouldBe(session.Nonce);
+    }
+
+    [Fact]
+    public void Encrypt_WithUnicodeKeyId_PreservesEncoding()
+    {
+        // Arrange
+        const string UnicodeKeyId = "key-🔐-测试-αβγ";
+        EncryptionOptions options = CreateOptionsWithKeyId(UnicodeKeyId);
+        var encryptor = new HeaderEncryptorV1(options);
+        SessionData session = CreateSessionData();
+
+        // Act
+        byte[] header = encryptor.Encrypt(session.AesKey, session.Nonce, session.Timestamp);
+
+        // Assert
+        DecryptedHeaderV1 decryptedHeader = DecryptAndParseHeader(header);
+        decryptedHeader.KeyId.ShouldBe(UnicodeKeyId);
+    }
+
+    [Fact]
+    public void Encrypt_PreservesTimestampAccurately()
+    {
+        // Arrange
+        HeaderEncryptorV1 encryptor = GetSut();
+        SessionData session = CreateSessionData();
+
+        // Act
+        byte[] header = encryptor.Encrypt(session.AesKey, session.Nonce, session.Timestamp);
+
+        // Assert
+        DecryptedHeaderV1 decryptedHeader = DecryptAndParseHeader(header);
+
+        // Verify it matches the session timestamp (compare as Unix milliseconds to avoid precision issues)
+        AssertTimestampEqual(session.Timestamp, decryptedHeader.Timestamp);
     }
 
     /// <summary>
@@ -63,9 +156,7 @@ public class HeaderEncryptorV1Tests
     /// </summary>
     private DecryptedHeaderV1 DecryptAndParseHeader(byte[] encryptedHeader)
     {
-        using var privateKey = RSA.Create();
-        privateKey.FromString(_kp.privateKey);
-        byte[] payload = privateKey.Decrypt(encryptedHeader, RSAEncryptionPadding.OaepSHA256);
+        byte[] payload = RsaDecrypt(encryptedHeader);
 
         payload.Length.ShouldBeGreaterThan(0);
 
@@ -98,147 +189,4 @@ public class HeaderEncryptorV1Tests
         byte[] Nonce,
         DateTimeOffset Timestamp
     );
-
-    [Theory]
-    [InlineData(2048)]
-    [InlineData(4096)]
-    public void Constructor_WithValidKeyId_DoesNotThrow(int keySize)
-    {
-        // Arrange
-        using var rsa = RSA.Create(keySize);
-        var metadata = HeaderMetadata.CreateV1();
-        int maxKeyIdSize = metadata.GetMaxVariableFieldSize(keySize);
-        string validKeyId = new('A', maxKeyIdSize);
-        var options = new EncryptionOptions(rsa, validKeyId);
-
-        // Act & Assert
-        Should.NotThrow(() => new HeaderEncryptorV1(options));
-    }
-
-    [Theory]
-    [InlineData(2048)]
-    [InlineData(4096)]
-    public void Constructor_WithOversizedKeyId_ThrowsArgumentException(int keySize)
-    {
-        // Arrange
-        using var rsa = RSA.Create(keySize);
-        var metadata = HeaderMetadata.CreateV1();
-        int maxKeyIdSize = metadata.GetMaxVariableFieldSize(keySize);
-        string oversizedKeyId = new('A', maxKeyIdSize + 1);
-        var options = new EncryptionOptions(rsa, oversizedKeyId);
-
-        // Act & Assert
-        ArgumentException ex = Should.Throw<ArgumentException>(() =>
-            new HeaderEncryptorV1(options)
-        );
-        ex.Message.ShouldContain($"KeyId length ({maxKeyIdSize + 1} bytes)");
-        ex.Message.ShouldContain($"recommended maximum ({maxKeyIdSize} bytes)");
-        ex.Message.ShouldContain($"RSA-{keySize}");
-    }
-
-    [Fact]
-    public void Constructor_WithNullKeyId_DoesNotThrow()
-    {
-        // Arrange
-        var options = new EncryptionOptions(_publicKey, null);
-
-        // Act & Assert
-        Should.NotThrow(() => new HeaderEncryptorV1(options));
-    }
-
-    [Theory]
-    [InlineData(2048)]
-    [InlineData(4096)]
-    public void Encrypt_WithMaximumKeyIdSize_SuccessfullyEncrypts(int keySize)
-    {
-        // Arrange
-        using var rsa = RSA.Create(keySize);
-        var metadata = HeaderMetadata.CreateV1();
-        int maxKeyIdSize = metadata.GetMaxVariableFieldSize(keySize);
-        string maxKeyId = new('B', maxKeyIdSize);
-        var options = new EncryptionOptions(rsa, maxKeyId);
-        var encryptor = new HeaderEncryptorV1(options);
-
-        var session = new SessionData
-        {
-            AesKey = RandomNumberGenerator.GetBytes(32),
-            Nonce = RandomNumberGenerator.GetBytes(12),
-            Plaintext = "Test"u8.ToArray(),
-        };
-
-        // Act & Assert - Should not throw
-        byte[] header = Should.NotThrow(() => encryptor.Encrypt(session));
-        header.ShouldNotBeNull();
-        header.ShouldNotBeEmpty();
-    }
-
-    [Fact]
-    public void Encrypt_WithEmptyKeyId_SuccessfullyEncrypts()
-    {
-        // Arrange
-        var options = new EncryptionOptions(_publicKey, string.Empty);
-        var encryptor = new HeaderEncryptorV1(options);
-        var session = new SessionData
-        {
-            AesKey = RandomNumberGenerator.GetBytes(32),
-            Nonce = RandomNumberGenerator.GetBytes(12),
-            Plaintext = "Test"u8.ToArray(),
-        };
-
-        // Act
-        byte[] header = encryptor.Encrypt(session);
-
-        // Assert
-        DecryptedHeaderV1 decryptedHeader = DecryptAndParseHeader(header);
-        decryptedHeader.KeyId.ShouldBe(string.Empty);
-        decryptedHeader.AesKey.ShouldBe(session.AesKey);
-        decryptedHeader.Nonce.ShouldBe(session.Nonce);
-    }
-
-    [Fact]
-    public void Encrypt_WithUnicodeKeyId_PreservesEncoding()
-    {
-        // Arrange
-        string unicodeKeyId = "key-🔐-测试-αβγ";
-        var options = new EncryptionOptions(_publicKey, unicodeKeyId);
-        var encryptor = new HeaderEncryptorV1(options);
-        var session = new SessionData
-        {
-            AesKey = RandomNumberGenerator.GetBytes(32),
-            Nonce = RandomNumberGenerator.GetBytes(12),
-            Plaintext = "Test"u8.ToArray(),
-        };
-
-        // Act
-        byte[] header = encryptor.Encrypt(session);
-
-        // Assert
-        DecryptedHeaderV1 decryptedHeader = DecryptAndParseHeader(header);
-        decryptedHeader.KeyId.ShouldBe(unicodeKeyId);
-    }
-
-    [Fact]
-    public void Encrypt_PreservesTimestampAccurately()
-    {
-        // Arrange
-        HeaderEncryptorV1 encryptor = GetEncoder();
-
-        var session = new SessionData
-        {
-            AesKey = RandomNumberGenerator.GetBytes(32),
-            Nonce = RandomNumberGenerator.GetBytes(12),
-            Plaintext = "Test"u8.ToArray(),
-        };
-
-        // Act
-        byte[] header = encryptor.Encrypt(session);
-
-        // Assert
-        DecryptedHeaderV1 decryptedHeader = DecryptAndParseHeader(header);
-
-        // Verify it matches the session timestamp (compare as Unix milliseconds to avoid precision issues)
-        decryptedHeader
-            .Timestamp.ToUnixTimeMilliseconds()
-            .ShouldBe(session.Timestamp.ToUnixTimeMilliseconds());
-    }
 }

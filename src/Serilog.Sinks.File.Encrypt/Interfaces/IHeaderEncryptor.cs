@@ -1,5 +1,3 @@
-using Serilog.Sinks.File.Encrypt.Models;
-
 namespace Serilog.Sinks.File.Encrypt.Interfaces;
 
 /// <summary>
@@ -8,18 +6,14 @@ namespace Serilog.Sinks.File.Encrypt.Interfaces;
 /// This header is essential for securely transmitting the session key and nonce to the decryption tool,
 /// allowing it to decrypt the log messages correctly.
 /// </summary>
-internal interface IHeaderEncryptor
+public interface IHeaderEncryptor
 {
-    /// <summary>
-    /// Gets the metadata about this header format's structure and requirements.
-    /// This information is used for validation and to provide helpful error messages.
-    /// </summary>
-    HeaderMetadata Metadata { get; }
-
     /// <summary>
     /// Encodes the session header information, which includes the RSA-encrypted session key and nonce.
     /// </summary>
-    /// <param name="session"></param>
+    /// <param name="aesKey">The AES session key.</param>
+    /// <param name="nonce">The AES-GCM nonce.</param>
+    /// <param name="timestamp">The session timestamp.</param>
     /// <returns></returns>
-    byte[] Encrypt(SessionData session);
+    byte[] Encrypt(ReadOnlySpan<byte> aesKey, ReadOnlySpan<byte> nonce, DateTimeOffset timestamp);
 }
