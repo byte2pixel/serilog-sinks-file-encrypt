@@ -25,12 +25,10 @@ public class HeaderEncryptorV1Tests : V1EncryptionTestBase
         SessionData session = CreateSessionData();
 
         // Act
-        byte[] header = encryptor.Encrypt(session.AesKey, session.Nonce, session.Timestamp);
+        ReadOnlySpan<byte> header = encryptor.Encrypt(session.AesKey, session.Nonce);
 
         // Assert - Verify encrypted header has correct size
-        header.ShouldNotBeNull();
-        int totalLen = PublicKey.KeySize / 8;
-
+        int totalLen = PublicRsa.KeySize / 8;
         header.Length.ShouldBe(totalLen, "Encrypted header should match RSA key size");
 
         // Decrypt and parse the header
@@ -40,7 +38,6 @@ public class HeaderEncryptorV1Tests : V1EncryptionTestBase
         decryptedHeader.KeyId.ShouldBe(KeyId);
         decryptedHeader.AesKey.ShouldBe(session.AesKey);
         decryptedHeader.Nonce.ShouldBe(session.Nonce);
-        AssertTimestampEqual(session.Timestamp, decryptedHeader.Timestamp);
     }
 
     /// <summary>
@@ -48,7 +45,7 @@ public class HeaderEncryptorV1Tests : V1EncryptionTestBase
     /// Format:
     /// RSA-Encrypted: AESKey(32) + Nonce(12) + Timestamp(8)
     /// </summary>
-    private DecryptedHeaderV1 DecryptAndParseHeader(byte[] header)
+    private DecryptedHeaderV1 DecryptAndParseHeader(ReadOnlySpan<byte> header)
     {
         byte[] decryptedPayload = RsaDecrypt(header);
 

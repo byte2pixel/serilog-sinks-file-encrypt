@@ -19,5 +19,10 @@ public interface IFrameWriter
     /// <param name="version">The version of the encrypted log format being used.</param>
     /// <param name="keyId">The key identifier for RSA key lookup during decryption.</param>
     /// <param name="header">The RSA encrypted header bytes containing the session metadata.</param>
-    void WriteHeader(Stream output, byte version, ReadOnlyMemory<byte> keyId, byte[] header);
+    void WriteHeader(
+        Stream output,
+        byte version,
+        ReadOnlySpan<byte> keyId,
+        ReadOnlySpan<byte> header
+    );
 }

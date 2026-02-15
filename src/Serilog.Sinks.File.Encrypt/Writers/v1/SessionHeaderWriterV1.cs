@@ -35,10 +35,10 @@ internal sealed class SessionHeaderWriterV1 : ISessionHeaderWriter
     public void WriteHeader(Stream output, SessionData session)
     {
         // 1. Encrypt header using RSA (contains AES key, nonce, timestamp)
-        byte[] header = _headerEncryptor.Encrypt(session.AesKey, session.Nonce, session.Timestamp);
+        ReadOnlySpan<byte> header = _headerEncryptor.Encrypt(session.AesKey, session.Nonce);
 
         // 2. Write the 32 byte keyId padded or throw if too long for the header format
-        var keyIdBytes = Encoding.UTF8.GetBytes(_keyId).AsSpan();
+        Span<byte> keyIdBytes = Encoding.UTF8.GetBytes(_keyId).AsSpan();
         if (keyIdBytes.Length > 32)
         {
             throw new InvalidOperationException(
@@ -50,6 +50,6 @@ internal sealed class SessionHeaderWriterV1 : ISessionHeaderWriter
         keyIdBytes.CopyTo(paddedKeyIdBytes);
 
         // 3. Write framing header (magic bytes + version + keyId + RSA payload)
-        _frameWriter.WriteHeader(output, 1, paddedKeyIdBytes.ToArray(), header);
+        _frameWriter.WriteHeader(output, 1, paddedKeyIdBytes, header);
     }
 }

@@ -2,7 +2,6 @@ using System.Buffers;
 using System.Buffers.Binary;
 using System.Security.Cryptography;
 using System.Text;
-using System.Threading.Channels;
 using Serilog.Sinks.File.Encrypt.Interfaces;
 using Serilog.Sinks.File.Encrypt.Models;
 using Serilog.Sinks.File.Encrypt.Readers;
@@ -37,97 +36,42 @@ internal sealed class EncryptedLogReader : IAsyncDisposable, IDisposable
         CancellationToken cancellationToken = default
     )
     {
-        var channel = Channel.CreateBounded<IDecryptionChunk>(
-            new BoundedChannelOptions(_options.QueueDepth)
-            {
-                FullMode = BoundedChannelFullMode.Wait,
-                SingleReader = true,
-                SingleWriter = true,
-            }
-        );
-
-        Task producer = ProduceDecryptionChunksAsync(channel.Writer, cancellationToken);
-        Task consumer = ConsumeDecryptionChunksAsync(channel.Reader, output, cancellationToken);
-
-        await Task.WhenAll(producer, consumer);
-    }
-
-    private async Task ProduceDecryptionChunksAsync(
-        ChannelWriter<IDecryptionChunk> writer,
-        CancellationToken cancellationToken
-    )
-    {
-        bool completedSuccessfully = false;
-        try
+        while (!IsEndOfStream() && !cancellationToken.IsCancellationRequested)
         {
-            while (!IsEndOfStream() && !cancellationToken.IsCancellationRequested)
+            try
             {
-                try
+                await ProcessNextSectionAsync(output, cancellationToken);
+            }
+            catch (Exception ex) when (_options.ContinueOnError)
+            {
+                await HandleErrorChunkAsync(ex, _input.Position, output, cancellationToken);
+                await TryRecoverAsync(cancellationToken);
+            }
+            catch (Exception ex) when (!_options.ContinueOnError)
+            {
+                if (_options.ErrorHandlingMode == ErrorHandlingMode.ThrowException)
                 {
-                    await ProcessNextSectionAsync(writer, cancellationToken);
-                }
-                catch (Exception ex) when (_options.ContinueOnError)
-                {
-                    await HandleErrorAsync(writer, ex, cancellationToken);
-                    await TryRecoverAsync(cancellationToken);
-                }
-                catch (Exception ex) when (!_options.ContinueOnError)
-                {
-                    // For ThrowException mode, throw immediately without writing to channel
-                    if (_options.ErrorHandlingMode == ErrorHandlingMode.ThrowException)
-                    {
-                        throw new CryptographicException(
-                            $"Decryption failed at position {_input.Position}: {ex.Message}",
-                            ex
-                        );
-                    }
-
-                    // For other modes, write error chunk and let consumer handle it
-                    await writer.WriteAsync(
-                        new DecryptionErrorChunk(ex.Message, _input.Position),
-                        cancellationToken
+                    throw new CryptographicException(
+                        $"Decryption failed at position {_input.Position}: {ex.Message}",
+                        ex
                     );
-                    writer.Complete();
-                    throw;
                 }
+                await HandleErrorChunkAsync(ex, _input.Position, output, cancellationToken);
+                throw;
             }
-
-            // Validate that we found at least one valid encryption header
-            if (!_hasFoundValidHeader)
-            {
-                // audit log?
-            }
-            completedSuccessfully = true;
         }
-        finally
+
+        if (!_hasFoundValidHeader)
         {
-            if (completedSuccessfully)
-            {
-                await writer.WriteAsync(EndOfStreamChunk.Instance, cancellationToken);
-            }
-            writer.Complete();
+            // audit log?
         }
+        await output.FlushAsync(cancellationToken);
     }
 
-    private async Task HandleErrorAsync(
-        ChannelWriter<IDecryptionChunk> writer,
-        Exception ex,
-        CancellationToken cancellationToken
-    )
-    {
-        await writer.WriteAsync(
-            new DecryptionErrorChunk(ex.Message, _input.Position),
-            cancellationToken
-        );
-    }
-
-    private async Task ProcessNextSectionAsync(
-        ChannelWriter<IDecryptionChunk> writer,
-        CancellationToken cancellationToken
-    )
+    private async Task ProcessNextSectionAsync(Stream output, CancellationToken cancellationToken)
     {
         // If we have an active session, try to read a message first
-        if (_currentSession != null && _currentSession.HasKeys)
+        if (_currentSession?.HasKeys == true)
         {
             // Peek to check if we're at a new session header
             byte[] peekBuffer = new byte[EncryptionConstants.MagicBytes.Length];
@@ -146,14 +90,14 @@ internal sealed class EncryptedLogReader : IAsyncDisposable, IDisposable
                 return;
             }
 
-            // Not a header - rewind and process as message
+            // Not a new session - reset position and process message
             _input.Position -= bytesRead;
-            await ProcessMessageAsync(writer, cancellationToken);
+            await ProcessMessageAsync(output, cancellationToken);
             return;
         }
 
         // No active session - look for a session header
-        byte[]? markerBuffer = await ReadMarkerBufferAsync(cancellationToken);
+        (byte[]? markerBuffer, int read) = await ReadMarkerBufferAsync(cancellationToken);
 
         if (markerBuffer == null)
         {
@@ -166,7 +110,8 @@ internal sealed class EncryptedLogReader : IAsyncDisposable, IDisposable
             return;
         }
 
-        // Not a header and no session - try to recover
+        // Not a header marker - reset position and try to recover
+        _input.Position -= read;
         await TryRecoverAsync(cancellationToken);
     }
 
@@ -174,11 +119,12 @@ internal sealed class EncryptedLogReader : IAsyncDisposable, IDisposable
     {
         try
         {
-            _input.Position += EncryptionConstants.MagicBytes.Length; // Move past the marker
-            (byte version, RSA rsa, ReadOnlyMemory<byte> header) = _frameReader.ReadHeader(
-                _input,
-                _options.DecryptionKeys
-            );
+            (byte version, RSA rsa, ReadOnlyMemory<byte> header) =
+                await _frameReader.ReadHeaderAsync(
+                    _input,
+                    _options.DecryptionKeys,
+                    cancellationToken
+                );
             ISessionReader sessionReader = SessionReaderFactory.GetSessionReader(version);
             _currentSession = sessionReader.ReadSession(rsa, header);
             _hasFoundValidHeader = true;
@@ -192,10 +138,7 @@ internal sealed class EncryptedLogReader : IAsyncDisposable, IDisposable
         }
     }
 
-    private async Task ProcessMessageAsync(
-        ChannelWriter<IDecryptionChunk> writer,
-        CancellationToken cancellationToken
-    )
+    private async Task ProcessMessageAsync(Stream output, CancellationToken cancellationToken)
     {
         if (_currentSession == null || !_currentSession.HasKeys)
         {
@@ -255,8 +198,8 @@ internal sealed class EncryptedLogReader : IAsyncDisposable, IDisposable
                 _currentSession.Nonce.IncreaseNonce();
 
                 // Write decrypted chunk
-                await writer.WriteAsync(
-                    new DecryptedMessageChunk(plaintext.AsMemory(0, ciphertextLength).ToArray()),
+                await output.WriteAsync(
+                    plaintext.AsMemory(0, ciphertextLength).ToArray(),
                     cancellationToken
                 );
             }
@@ -271,12 +214,16 @@ internal sealed class EncryptedLogReader : IAsyncDisposable, IDisposable
         }
     }
 
-    private async Task<byte[]?> ReadMarkerBufferAsync(CancellationToken cancellationToken)
+    private async Task<(byte[]?, int bytesRead)> ReadMarkerBufferAsync(
+        CancellationToken cancellationToken
+    )
     {
         byte[] markerBuffer = new byte[EncryptionConstants.MagicBytes.Length];
         int bytesRead = await _input.ReadAsync(markerBuffer, cancellationToken);
-        _input.Position -= bytesRead != EncryptionConstants.MagicBytes.Length ? 0 : bytesRead;
-        return bytesRead == EncryptionConstants.MagicBytes.Length ? markerBuffer : null;
+        return (
+            bytesRead == EncryptionConstants.MagicBytes.Length ? markerBuffer : null,
+            bytesRead
+        );
     }
 
     private static bool IsHeaderMarker(byte[] markerBuffer) =>
@@ -284,35 +231,13 @@ internal sealed class EncryptedLogReader : IAsyncDisposable, IDisposable
 
     private bool IsEndOfStream() => _input.Position >= _input.Length;
 
-    private async Task ConsumeDecryptionChunksAsync(
-        ChannelReader<IDecryptionChunk> channelReader,
-        Stream output,
-        CancellationToken cancellationToken
-    )
-    {
-        await foreach (IDecryptionChunk chunk in channelReader.ReadAllAsync(cancellationToken))
-        {
-            switch (chunk)
-            {
-                case DecryptedMessageChunk messageChunk:
-                    await output.WriteAsync(messageChunk.Data, cancellationToken);
-                    break;
-                case DecryptionErrorChunk errorChunk:
-                    await HandleErrorChunkAsync(errorChunk, output, cancellationToken);
-                    break;
-                case EndOfStreamChunk:
-                    await output.FlushAsync(cancellationToken);
-                    return;
-            }
-        }
-    }
-
     /// <summary>
     /// Handles an error chunk according to the configured error handling mode
     /// </summary>
     /// <exception cref="CryptographicException"></exception>
     private async Task HandleErrorChunkAsync(
-        DecryptionErrorChunk errorChunk,
+        Exception exception,
+        long position,
         Stream outputStream,
         CancellationToken cancellationToken
     )
@@ -321,18 +246,18 @@ internal sealed class EncryptedLogReader : IAsyncDisposable, IDisposable
         {
             case ErrorHandlingMode.WriteInline:
                 string errorMessage =
-                    $"[Decryption error at position {errorChunk.Position}: {errorChunk.ErrorMessage}]\n";
+                    $"[Decryption error at position {position}: {exception.Message}]\n";
                 byte[] errorBytes = Encoding.UTF8.GetBytes(errorMessage);
                 await outputStream.WriteAsync(errorBytes, cancellationToken);
                 break;
 
             case ErrorHandlingMode.WriteToErrorLog:
-                await WriteToErrorLogAsync(errorChunk, cancellationToken);
+                await WriteToErrorLogAsync(exception, position, cancellationToken);
                 break;
 
             case ErrorHandlingMode.ThrowException:
                 throw new CryptographicException(
-                    $"Decryption failed at position {errorChunk.Position}: {errorChunk.ErrorMessage}"
+                    $"Decryption failed at position {position}: {exception.Message}"
                 );
         }
     }
@@ -341,7 +266,8 @@ internal sealed class EncryptedLogReader : IAsyncDisposable, IDisposable
     /// Writes an error chunk to the error log file
     /// </summary>
     private async Task WriteToErrorLogAsync(
-        DecryptionErrorChunk errorChunk,
+        Exception exception,
+        long position,
         CancellationToken cancellationToken
     )
     {
@@ -349,7 +275,7 @@ internal sealed class EncryptedLogReader : IAsyncDisposable, IDisposable
 
         string timestamp = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss.fff");
         string logEntry =
-            $"[{timestamp}] Decryption error at position {errorChunk.Position}: {errorChunk.ErrorMessage}";
+            $"[{timestamp}] Decryption error at position {position}: {exception.Message}";
         await _auditLogWriter.WriteLineAsync(logEntry.AsMemory(), cancellationToken);
         await _auditLogWriter.FlushAsync(cancellationToken);
     }
@@ -418,6 +344,7 @@ internal sealed class EncryptedLogReader : IAsyncDisposable, IDisposable
     /// <summary>
     /// Tries to recover from decryption errors by seeking to the next valid marker
     /// </summary>
+    /// <param name="cancellationToken"></param>
     private async Task TryRecoverAsync(CancellationToken cancellationToken)
     {
         // Try to find the next valid marker

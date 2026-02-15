@@ -9,6 +9,9 @@ namespace Serilog.Sinks.File.Encrypt.Models;
 /// </summary>
 public class SessionData
 {
+    /// <summary>
+    /// The AesGcm session used to encrypt the log messages.
+    /// </summary>
     public required AesGcm AesGcm { get; init; }
 
     /// <summary>
@@ -20,9 +23,4 @@ public class SessionData
     /// The randomly generated AES-GCM nonce (96-bit recommended)
     /// </summary>
     public byte[] Nonce { get; init; } = [];
-
-    /// <summary>
-    /// Optional: metadata for debugging or future versions
-    /// </summary>
-    public DateTimeOffset Timestamp { get; init; } = DateTimeOffset.UtcNow;
 }

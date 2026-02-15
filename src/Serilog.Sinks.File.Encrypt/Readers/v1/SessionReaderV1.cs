@@ -22,10 +22,7 @@ public class SessionReaderV1 : ISessionReader
     public DecryptionContext ReadSession(RSA rsa, ReadOnlyMemory<byte> header)
     {
         // Decrypt the header to get the session key and nonce
-        (byte[] aesKey, byte[] nonce, DateTimeOffset timestamp) = _headerDecryptor.Decrypt(
-            rsa,
-            header
-        );
+        (byte[] aesKey, byte[] nonce) = _headerDecryptor.Decrypt(rsa, header);
 
         return new DecryptionContext(EncryptionConstants.TagLength, nonce, aesKey);
     }

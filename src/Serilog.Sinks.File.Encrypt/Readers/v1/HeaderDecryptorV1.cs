@@ -8,10 +8,7 @@ namespace Serilog.Sinks.File.Encrypt.Readers.v1;
 public class HeaderDecryptorV1 : IHeaderDecryptor
 {
     /// <inheritdoc />
-    public (byte[] AesKey, byte[] Nonce, DateTimeOffset Timestamp) Decrypt(
-        RSA rsa,
-        ReadOnlyMemory<byte> headerData
-    )
+    public (byte[] AesKey, byte[] Nonce) Decrypt(RSA rsa, ReadOnlyMemory<byte> headerData)
     {
         // Decrypt the RSA payload
         byte[] decryptedPayload = rsa.Decrypt(
@@ -38,17 +35,7 @@ public class HeaderDecryptorV1 : IHeaderDecryptor
         }
 
         byte[] nonce = decryptedPayload[offset..(offset + HeaderMetadataV1.NonceLength)];
-        offset += HeaderMetadataV1.NonceLength;
 
-        // Read timestamp
-        if (decryptedPayload.Length < offset + HeaderMetadataV1.TimestampLength)
-        {
-            throw new InvalidOperationException("Decrypted payload is too short to read timestamp");
-        }
-
-        long timestampMs = BitConverter.ToInt64(decryptedPayload, offset);
-        var timestamp = DateTimeOffset.FromUnixTimeMilliseconds(timestampMs);
-
-        return (aesKey, nonce, timestamp);
+        return (aesKey, nonce);
     }
 }

@@ -6,7 +6,12 @@ namespace Serilog.Sinks.File.Encrypt.Writers;
 internal class FrameWriter : IFrameWriter
 {
     /// <inheritdoc />
-    public void WriteHeader(Stream output, byte version, ReadOnlyMemory<byte> keyId, byte[] header)
+    public void WriteHeader(
+        Stream output,
+        byte version,
+        ReadOnlySpan<byte> keyId,
+        ReadOnlySpan<byte> header
+    )
     {
         // Write the magic bytes
         output.Write(EncryptionConstants.MagicBytes, 0, EncryptionConstants.MagicBytes.Length);
@@ -15,9 +20,9 @@ internal class FrameWriter : IFrameWriter
         output.WriteByte(version);
 
         // Write the key ID bytes
-        output.Write(keyId.Span);
+        output.Write(keyId);
 
         // Write the header bytes
-        output.Write(header, 0, header.Length);
+        output.Write(header);
     }
 }

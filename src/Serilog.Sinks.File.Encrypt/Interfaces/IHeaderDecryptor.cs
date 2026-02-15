@@ -14,8 +14,5 @@ public interface IHeaderDecryptor
     /// This is used to decrypt the AES session key and nonce from the header data.</param>
     /// <param name="headerData">The encrypted header data read from the log file.</param>
     /// <returns>A tuple containing the decrypted AES session key, nonce, and timestamp.</returns>
-    (byte[] AesKey, byte[] Nonce, DateTimeOffset Timestamp) Decrypt(
-        RSA rsa,
-        ReadOnlyMemory<byte> headerData
-    );
+    (byte[] AesKey, byte[] Nonce) Decrypt(RSA rsa, ReadOnlyMemory<byte> headerData);
 }

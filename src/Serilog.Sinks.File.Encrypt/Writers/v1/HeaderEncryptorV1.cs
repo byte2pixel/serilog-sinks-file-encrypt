@@ -25,11 +25,7 @@ internal sealed class HeaderEncryptorV1 : IHeaderEncryptor
     }
 
     /// <inheritdoc />
-    public byte[] Encrypt(
-        ReadOnlySpan<byte> aesKey,
-        ReadOnlySpan<byte> nonce,
-        DateTimeOffset timestamp
-    )
+    public ReadOnlySpan<byte> Encrypt(ReadOnlySpan<byte> aesKey, ReadOnlySpan<byte> nonce)
     {
         // Validate RSA payload size before encryption
         RsaEncryptionHelper.ValidatePayloadSize(
@@ -50,19 +46,14 @@ internal sealed class HeaderEncryptorV1 : IHeaderEncryptor
 
             // Write Nonce
             nonce.CopyTo(payload.AsSpan(offset));
-            offset += HeaderMetadataV1.NonceLength;
-
-            // Write timestamp
-            long timestampMs = timestamp.ToUnixTimeMilliseconds();
-            BitConverter.TryWriteBytes(payload.AsSpan(offset), timestampMs);
 
             // RSA encrypt the payload
             byte[] encryptedPayload = _rsa.Encrypt(
-                payload.AsSpan(0, HeaderMetadataV1.RsaPayloadLength).ToArray(),
+                payload.AsSpan(0, HeaderMetadataV1.RsaPayloadLength),
                 HeaderMetadata.Padding
             );
 
-            return encryptedPayload;
+            return encryptedPayload.AsSpan();
         }
         finally
         {

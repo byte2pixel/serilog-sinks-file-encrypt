@@ -15,7 +15,6 @@ public interface IHeaderEncryptor
     /// </summary>
     /// <param name="aesKey">The AES session key.</param>
     /// <param name="nonce">The AES-GCM nonce.</param>
-    /// <param name="timestamp">The session timestamp.</param>
     /// <returns></returns>
-    byte[] Encrypt(ReadOnlySpan<byte> aesKey, ReadOnlySpan<byte> nonce, DateTimeOffset timestamp);
+    ReadOnlySpan<byte> Encrypt(ReadOnlySpan<byte> aesKey, ReadOnlySpan<byte> nonce);
 }

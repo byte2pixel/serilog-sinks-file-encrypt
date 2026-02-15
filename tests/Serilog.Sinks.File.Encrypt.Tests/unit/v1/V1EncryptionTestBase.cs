@@ -7,17 +7,18 @@ namespace Serilog.Sinks.File.Encrypt.Tests.unit.v1;
 /// </summary>
 public abstract class V1EncryptionTestBase : IDisposable
 {
-    protected readonly RSA PublicKey = RSA.Create();
-    protected readonly RSA PrivateKey = RSA.Create();
+    protected readonly RSA PublicRsa = RSA.Create();
+    protected readonly RSA PrivateRsa = RSA.Create();
     protected readonly string KeyId;
+    private bool _disposed;
 
     protected V1EncryptionTestBase()
     {
         (string publicKey, string privateKey) keyPair = EncryptionUtils.GenerateRsaKeyPair(
             format: KeyFormat.Xml
         );
-        PublicKey.FromString(keyPair.publicKey);
-        PrivateKey.FromString(keyPair.privateKey);
+        PublicRsa.FromString(keyPair.publicKey);
+        PrivateRsa.FromString(keyPair.privateKey);
         KeyId = Guid.NewGuid().ToString();
     }
 
@@ -26,7 +27,7 @@ public abstract class V1EncryptionTestBase : IDisposable
     /// </summary>
     protected EncryptionOptions CreateDefaultOptions()
     {
-        return new EncryptionOptions(PublicKey, KeyId);
+        return new EncryptionOptions(PublicRsa, KeyId);
     }
 
     /// <summary>
@@ -47,23 +48,20 @@ public abstract class V1EncryptionTestBase : IDisposable
     /// <summary>
     /// Decrypts RSA-encrypted data using the private key.
     /// </summary>
-    protected byte[] RsaDecrypt(byte[] encryptedData)
+    protected byte[] RsaDecrypt(ReadOnlySpan<byte> encryptedData)
     {
-        return PrivateKey.Decrypt(encryptedData, RSAEncryptionPadding.OaepSHA256);
-    }
-
-    /// <summary>
-    /// Encrypts data using the public key.
-    /// </summary>
-    protected byte[] RsaEncrypt(byte[] data)
-    {
-        return PublicKey.Encrypt(data, RSAEncryptionPadding.OaepSHA256);
+        return PrivateRsa.Decrypt(encryptedData, RSAEncryptionPadding.OaepSHA256);
     }
 
     /// <summary>
     /// Decrypts AES-GCM encrypted data.
     /// </summary>
-    protected byte[] AesGcmDecrypt(byte[] ciphertext, byte[] key, byte[] nonce, byte[]? tag = null)
+    protected static byte[] AesGcmDecrypt(
+        byte[] ciphertext,
+        byte[] key,
+        byte[] nonce,
+        byte[]? tag = null
+    )
     {
         using var aesGcm = new AesGcm(key, EncryptionConstants.TagLength);
 
@@ -85,46 +83,25 @@ public abstract class V1EncryptionTestBase : IDisposable
         return decrypted;
     }
 
-    /// <summary>
-    /// Encrypts data using AES-GCM and returns ciphertext with tag appended.
-    /// </summary>
-    protected byte[] AesGcmEncrypt(byte[] plaintext, byte[] key, byte[] nonce)
-    {
-        using var aesGcm = new AesGcm(key, EncryptionConstants.TagLength);
-
-        byte[] ciphertext = new byte[plaintext.Length];
-        byte[] tag = new byte[EncryptionConstants.TagLength];
-
-        aesGcm.Encrypt(nonce, plaintext, ciphertext, tag);
-
-        // Return ciphertext with tag appended
-        byte[] result = new byte[ciphertext.Length + tag.Length];
-        Buffer.BlockCopy(ciphertext, 0, result, 0, ciphertext.Length);
-        Buffer.BlockCopy(tag, 0, result, ciphertext.Length, tag.Length);
-
-        return result;
-    }
-
-    /// <summary>
-    /// Validates that two byte arrays are equal.
-    /// </summary>
-    protected static void AssertBytesEqual(byte[] expected, byte[] actual, string? message = null)
-    {
-        actual.ShouldBe(expected, message);
-    }
-
-    /// <summary>
-    /// Validates that a timestamp matches (comparing as Unix milliseconds to avoid precision issues).
-    /// </summary>
-    protected static void AssertTimestampEqual(DateTimeOffset expected, DateTimeOffset actual)
-    {
-        actual.ToUnixTimeMilliseconds().ShouldBe(expected.ToUnixTimeMilliseconds());
-    }
-
     public void Dispose()
     {
-        PublicKey?.Dispose();
-        PrivateKey?.Dispose();
+        Dispose(true);
         GC.SuppressFinalize(this);
+    }
+
+    protected virtual void Dispose(bool disposing)
+    {
+        // Cleanup
+        if (_disposed)
+        {
+            return;
+        }
+
+        if (disposing)
+        {
+            PublicRsa.Dispose();
+            PrivateRsa.Dispose();
+        }
+        _disposed = true;
     }
 }

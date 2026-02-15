@@ -18,7 +18,7 @@ public class FrameWriterTests
         using var ms = new MemoryStream();
 
         // Act
-        ReadOnlyMemory<byte> keyIdBytes = Guid.NewGuid().ToByteArray().AsMemory();
+        ReadOnlySpan<byte> keyIdBytes = Guid.NewGuid().ToByteArray().AsSpan();
         frameWriter.WriteHeader(ms, Version, keyIdBytes, header);
 
         // Assert
