@@ -1,3 +1,5 @@
+using Serilog.Sinks.File.Encrypt.Models;
+
 namespace Serilog.Sinks.File.Encrypt.Tests.unit;
 
 public class EncryptedStreamTests
@@ -10,7 +12,8 @@ public class EncryptedStreamTests
         using MemoryStream fs = new();
         using RSA rsa = RSA.Create();
         rsa.FromXmlString(publicKey);
-        using EncryptedStream encStream = new(fs, rsa);
+        EncryptionOptions options = new(rsa);
+        using EncryptedLogStream encStream = new(fs, options);
 
         // Act & Assert
         encStream.CanRead.ShouldBeFalse();
@@ -32,7 +35,8 @@ public class EncryptedStreamTests
         using MemoryStream fs = new();
         using RSA rsa = RSA.Create();
         rsa.FromXmlString(publicKey);
-        using EncryptedStream encStream = new(fs, rsa);
+        EncryptionOptions options = new(rsa);
+        using EncryptedLogStream encStream = new(fs, options);
 
         // Act
         encStream.Write("Hello"u8.ToArray(), 0, 5);
@@ -50,7 +54,8 @@ public class EncryptedStreamTests
         using MemoryStream fs = new();
         using RSA rsa = RSA.Create();
         rsa.FromXmlString(publicKey);
-        using EncryptedStream encStream = new(fs, rsa);
+        EncryptionOptions options = new(rsa);
+        using EncryptedLogStream encStream = new(fs, options);
 
         // Act
         encStream.Write([0x00], 0, 1);
@@ -72,7 +77,8 @@ public class EncryptedStreamTests
         using MemoryStream fs = new();
         using RSA rsa = RSA.Create();
         rsa.FromXmlString(publicKey);
-        EncryptedStream encStream = new(fs, rsa);
+        EncryptionOptions options = new(rsa);
+        using EncryptedLogStream encStream = new(fs, options);
 
         // Act
         Exception? exception = Record.Exception(() =>
@@ -93,7 +99,8 @@ public class EncryptedStreamTests
         using MemoryStream fs = new();
         using RSA rsa = RSA.Create();
         rsa.FromXmlString(publicKey);
-        using EncryptedStream encStream = new(fs, rsa);
+        EncryptionOptions options = new(rsa);
+        using EncryptedLogStream encStream = new(fs, options);
 
         long staringPosition = encStream.Position;
         // Act
@@ -111,9 +118,9 @@ public class EncryptedStreamTests
         (string publicKey, _) = EncryptionUtils.GenerateRsaKeyPair();
         using RSA rsa = RSA.Create();
         rsa.FromXmlString(publicKey);
-
+        EncryptionOptions options = new(rsa);
         // Act & Assert
-        Should.Throw<ArgumentNullException>(() => new EncryptedStream(null!, rsa));
+        Should.Throw<ArgumentNullException>(() => new EncryptedLogStream(null!, options));
     }
 
     [Fact]
@@ -123,7 +130,7 @@ public class EncryptedStreamTests
         using MemoryStream fs = new();
 
         // Act & Assert
-        Should.Throw<ArgumentNullException>(() => new EncryptedStream(fs, null!));
+        Should.Throw<ArgumentNullException>(() => new EncryptedLogStream(fs, null!));
     }
 
     [Fact]
@@ -134,8 +141,8 @@ public class EncryptedStreamTests
         using MemoryStream fs = new();
         using RSA rsa = RSA.Create();
         rsa.FromXmlString(publicKey);
-
+        EncryptionOptions options = new(rsa);
         // Act & Assert
-        Should.Throw<ArgumentOutOfRangeException>(() => new EncryptedStream(fs, rsa));
+        Should.Throw<ArgumentOutOfRangeException>(() => new EncryptedLogStream(fs, options));
     }
 }

@@ -15,7 +15,7 @@ public static class CryptographicUtils
     /// <exception cref="ArgumentException">Invalid PEM key format.</exception>
     public static void FromString(this RSA rsa, string key)
     {
-        ArgumentNullException.ThrowIfNullOrEmpty(key, nameof(key));
+        ArgumentException.ThrowIfNullOrEmpty(key);
 
         switch (key[0])
         {
@@ -26,7 +26,9 @@ public static class CryptographicUtils
                 rsa.ImportFromPem(key);
                 break;
             default:
-                throw new CryptographicException("Invalid RSA key format. Key must be in XML or PEM format.");
+                throw new CryptographicException(
+                    "Invalid RSA key format. Key must be in XML or PEM format."
+                );
         }
     }
 }

@@ -1,4 +1,5 @@
 using System.Diagnostics.CodeAnalysis;
+using Serilog.Sinks.File.Encrypt.Models;
 
 namespace Serilog.Sinks.File.Encrypt.Tests.unit;
 
@@ -161,7 +162,8 @@ public sealed class EncryptedStreamAsyncTests : EncryptionTestBase
         using MemoryStream fs = new();
         using RSA rsa = RSA.Create();
         rsa.FromXmlString(publicKey);
-        await using EncryptedStream encStream = new(fs, rsa);
+        EncryptionOptions options = new(rsa);
+        await using EncryptedLogStream encStream = new(fs, options);
 
         byte[] data = "Hello Async"u8.ToArray();
 
@@ -181,7 +183,8 @@ public sealed class EncryptedStreamAsyncTests : EncryptionTestBase
         using MemoryStream fs = new();
         using RSA rsa = RSA.Create();
         rsa.FromXmlString(publicKey);
-        await using EncryptedStream encStream = new(fs, rsa);
+        EncryptionOptions options = new(rsa);
+        await using EncryptedLogStream encStream = new(fs, options);
 
         // Act
         await encStream.WriteAsync(Array.Empty<byte>(), TestContext.Current.CancellationToken);
@@ -199,7 +202,8 @@ public sealed class EncryptedStreamAsyncTests : EncryptionTestBase
         using MemoryStream fs = new();
         using RSA rsa = RSA.Create();
         rsa.FromXmlString(publicKey);
-        await using EncryptedStream encStream = new(fs, rsa);
+        EncryptionOptions options = new(rsa);
+        await using EncryptedLogStream encStream = new(fs, options);
 
         byte[] data = "Hello Async"u8.ToArray();
         using var cts = new CancellationTokenSource();

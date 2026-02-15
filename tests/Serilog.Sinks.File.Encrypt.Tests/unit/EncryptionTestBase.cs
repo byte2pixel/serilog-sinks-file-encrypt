@@ -115,8 +115,10 @@ public abstract class EncryptionTestBase : IDisposable, IAsyncDisposable
     {
         using RSA rsa = RSA.Create();
         rsa.FromXmlString(RsaKeyPair.publicKey);
+        EncryptionOptions options = new(rsa);
         memoryStream.Position = memoryStream.Length;
-        EncryptedStream encryptedStream = new(memoryStream, rsa);
+
+        EncryptedLogStream encryptedStream = new(memoryStream, options);
         byte[] messageBytes = Encoding.UTF8.GetBytes(message);
         await encryptedStream.WriteAsync(messageBytes, cancellationToken);
         await encryptedStream.FlushAsync(cancellationToken);

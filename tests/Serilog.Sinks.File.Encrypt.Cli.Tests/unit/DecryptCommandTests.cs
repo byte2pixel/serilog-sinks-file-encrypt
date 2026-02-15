@@ -14,7 +14,9 @@ public class DecryptCommandTests : CommandTestBase
         string encryptedFilePath = Path.Join("logs", "encrypted.log");
         string decryptedFilePath = Path.Join("logs", "decrypted.log");
 
-        (string publicKey, string privateKey) = EncryptionUtils.GenerateRsaKeyPair(format: KeyFormat.Pem);
+        (string publicKey, string privateKey) = EncryptionUtils.GenerateRsaKeyPair(
+            format: KeyFormat.Pem
+        );
 
         byte[] encryptedContent = CreateEncryptedLogFile(TestLogContent, publicKey);
 
@@ -61,7 +63,9 @@ public class DecryptCommandTests : CommandTestBase
         string encryptedFilePath = Path.Join("logs", "encrypted.log");
         string decryptedFilePath = Path.Join("logs", "decrypted.log");
 
-        (string publicKey, string privateKey) = EncryptionUtils.GenerateRsaKeyPair(format: KeyFormat.Xml);
+        (string publicKey, string privateKey) = EncryptionUtils.GenerateRsaKeyPair(
+            format: KeyFormat.Xml
+        );
 
         byte[] encryptedContent = CreateEncryptedLogFile(TestLogContent, publicKey);
 
@@ -1101,8 +1105,9 @@ public class DecryptCommandTests : CommandTestBase
         using MemoryStream memoryStream = new();
         using RSA rsa = RSA.Create();
         rsa.FromString(rsaPublicKey);
+        EncryptionOptions options = new(rsa);
 
-        using (EncryptedStream encryptedStream = new(memoryStream, rsa))
+        using (EncryptedLogStream encryptedStream = new(memoryStream, options))
         {
             byte[] logBytes = Encoding.UTF8.GetBytes(logContent);
             encryptedStream.Write(logBytes, 0, logBytes.Length);

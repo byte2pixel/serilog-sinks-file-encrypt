@@ -13,8 +13,6 @@ Console.WriteLine("3. Web API Request Simulation");
 Console.WriteLine("4. Background Worker Simulation");
 Console.WriteLine("5. Run All Benchmarks");
 Console.WriteLine("======================================");
-Console.WriteLine("Refactored Benchmarks:");
-Console.WriteLine("6. Encrypted Log Stream (Low-level)");
 Console.WriteLine("0. Exit");
 Console.WriteLine();
 Console.Write("Enter selection: ");
@@ -24,7 +22,7 @@ string? input = Console.ReadLine();
 switch (input)
 {
     case "1":
-        BenchmarkRunner.Run<EncryptedStreamBenchmarks>();
+        BenchmarkRunner.Run<EncryptedLogStreamBenchmarks>();
         break;
     case "2":
         BenchmarkRunner.Run<SerilogFileSinkBenchmarks>();
@@ -36,13 +34,10 @@ switch (input)
         BenchmarkRunner.Run<BackgroundWorkerBenchmarks>();
         break;
     case "5":
-        BenchmarkRunner.Run<EncryptedStreamBenchmarks>();
+        BenchmarkRunner.Run<EncryptedLogStreamBenchmarks>();
         BenchmarkRunner.Run<SerilogFileSinkBenchmarks>();
         BenchmarkRunner.Run<WebApiRequestBenchmarks>();
         BenchmarkRunner.Run<BackgroundWorkerBenchmarks>();
-        break;
-    case "6":
-        BenchmarkRunner.Run<EncryptedLogStreamBenchmarks>();
         break;
     case "0":
         Console.WriteLine("Exiting...");
