@@ -2,7 +2,7 @@ using Serilog.Sinks.File.Encrypt.Models;
 
 namespace Serilog.Sinks.File.Encrypt.Tests.unit;
 
-public class EncryptedStreamTests
+public class EncryptedLogStreamTests
 {
     [Fact]
     public void StreamContract_PropertiesAndUnsupportedMethods_ThrowOrReturnExpected()

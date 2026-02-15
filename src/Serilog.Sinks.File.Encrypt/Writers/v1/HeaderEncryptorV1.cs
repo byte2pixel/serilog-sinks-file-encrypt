@@ -3,7 +3,7 @@ using System.Security.Cryptography;
 using Serilog.Sinks.File.Encrypt.Interfaces;
 using Serilog.Sinks.File.Encrypt.Models;
 
-namespace Serilog.Sinks.File.Encrypt.Writers;
+namespace Serilog.Sinks.File.Encrypt.Writers.v1;
 
 /// <summary>
 /// Version 1 header encoder that constructs a header containing the AES session key, nonce, and optional KeyId,
@@ -31,7 +31,7 @@ internal sealed class HeaderEncryptorV1 : IHeaderEncryptor
         RsaEncryptionHelper.ValidatePayloadSize(
             HeaderMetadataV1.RsaPayloadLength,
             _rsa.KeySize,
-            HeaderMetadata.Padding
+            HeaderMetadataV1.Padding
         );
 
         // Rent buffer from pool for RSA payload
@@ -40,7 +40,7 @@ internal sealed class HeaderEncryptorV1 : IHeaderEncryptor
         {
             int offset = 0;
 
-            // Write AES key length + key
+            // Write AES key
             aesKey.CopyTo(payload.AsSpan(offset));
             offset += HeaderMetadataV1.AesKeyLength;
 
@@ -50,7 +50,7 @@ internal sealed class HeaderEncryptorV1 : IHeaderEncryptor
             // RSA encrypt the payload
             byte[] encryptedPayload = _rsa.Encrypt(
                 payload.AsSpan(0, HeaderMetadataV1.RsaPayloadLength),
-                HeaderMetadata.Padding
+                HeaderMetadataV1.Padding
             );
 
             return encryptedPayload.AsSpan();

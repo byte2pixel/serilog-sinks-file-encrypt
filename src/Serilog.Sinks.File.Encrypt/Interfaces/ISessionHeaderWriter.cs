@@ -15,5 +15,5 @@ public interface ISessionHeaderWriter
     /// </summary>
     /// <param name="output">The stream to write the header to.</param>
     /// <param name="session">The session data containing the AES key, nonce, and other session information.</param>
-    void WriteHeader(Stream output, SessionData session);
+    void WriteHeader(Stream output, ReadOnlySpan<byte> aesKey, ReadOnlySpan<byte> nonce);
 }

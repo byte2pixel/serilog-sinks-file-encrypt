@@ -13,8 +13,10 @@ public interface ISessionReader
     /// Reads the session information from the given header, using the provided RSA instance to decrypt the session key and nonce.
     /// Messages following the header are read separately using IMessageDecryptor.
     /// </summary>
-    /// <param name="rsa">The RSA used to encrypt the header</param>
-    /// <param name="header">The header to be decrypted</param>
     /// <returns>A DecryptionContext containing the AES key, nonce, and timestamp for decrypting subsequent messages.</returns>
-    DecryptionContext ReadSession(RSA rsa, ReadOnlyMemory<byte> header);
+    Task<DecryptionContext> ReadSessionAsync(
+        Stream input,
+        Dictionary<string, RSA> keyMap,
+        CancellationToken cancellationToken
+    );
 }

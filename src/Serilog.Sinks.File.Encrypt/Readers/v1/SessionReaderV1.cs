@@ -19,11 +19,29 @@ public class SessionReaderV1 : ISessionReader
     }
 
     /// <inheritdoc />
-    public DecryptionContext ReadSession(RSA rsa, ReadOnlyMemory<byte> header)
+    public async Task<DecryptionContext> ReadSessionAsync(
+        Stream input,
+        Dictionary<string, RSA> keyMap,
+        CancellationToken cancellationToken
+    )
     {
-        // Decrypt the header to get the session key and nonce
-        (byte[] aesKey, byte[] nonce) = _headerDecryptor.Decrypt(rsa, header);
+        // Read the header from the input stream
+        Memory<byte> keyId = new byte[HeaderMetadataV1.KeyIdLength];
+        // lookup the RSA key based on the keyId in the header
+        await input.ReadExactlyAsync(keyId, cancellationToken);
+        string keyIdStr = System.Text.Encoding.UTF8.GetString(keyId.Span).TrimEnd('\0');
+        if (!keyMap.TryGetValue(keyIdStr, out RSA? rsa))
+        {
+            throw new CryptographicException($"No RSA private key found for KeyId: '{keyIdStr}'.");
+        }
 
-        return new DecryptionContext(EncryptionConstants.TagLength, nonce, aesKey);
+        int headerSize = rsa.KeySize / 8;
+        Memory<byte> header = new byte[headerSize];
+        await input.ReadExactlyAsync(header, cancellationToken);
+
+        // Decrypt the header to get the session key and nonce
+        (byte[] aesKey, byte[] nonce) = _headerDecryptor.Decrypt(rsa, header.Span);
+
+        return new DecryptionContext(nonce, aesKey);
     }
 }

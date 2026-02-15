@@ -12,6 +12,7 @@ public interface IHeaderEncryptor
 {
     /// <summary>
     /// Encodes the session header information, which includes the RSA-encrypted session key and nonce.
+    /// Versioned implementations are free to expand on additional metadata that can fit within the header.
     /// </summary>
     /// <param name="aesKey">The AES session key.</param>
     /// <param name="nonce">The AES-GCM nonce.</param>

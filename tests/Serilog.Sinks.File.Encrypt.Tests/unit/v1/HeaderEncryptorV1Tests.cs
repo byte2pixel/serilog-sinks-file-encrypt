@@ -1,5 +1,6 @@
 using Serilog.Sinks.File.Encrypt.Models;
 using Serilog.Sinks.File.Encrypt.Writers;
+using Serilog.Sinks.File.Encrypt.Writers.v1;
 
 namespace Serilog.Sinks.File.Encrypt.Tests.unit.v1;
 
@@ -22,10 +23,10 @@ public class HeaderEncryptorV1Tests : V1EncryptionTestBase
     {
         // Arrange
         HeaderEncryptorV1 encryptor = GetSut();
-        SessionData session = CreateSessionData();
+        (byte[] aesKey, byte[] nonce) = CreateSessionData();
 
         // Act
-        ReadOnlySpan<byte> header = encryptor.Encrypt(session.AesKey, session.Nonce);
+        ReadOnlySpan<byte> header = encryptor.Encrypt(aesKey, nonce);
 
         // Assert - Verify encrypted header has correct size
         int totalLen = PublicRsa.KeySize / 8;
@@ -36,8 +37,8 @@ public class HeaderEncryptorV1Tests : V1EncryptionTestBase
 
         // Verify all fields match
         decryptedHeader.KeyId.ShouldBe(KeyId);
-        decryptedHeader.AesKey.ShouldBe(session.AesKey);
-        decryptedHeader.Nonce.ShouldBe(session.Nonce);
+        decryptedHeader.AesKey.ShouldBe(aesKey);
+        decryptedHeader.Nonce.ShouldBe(nonce);
     }
 
     /// <summary>

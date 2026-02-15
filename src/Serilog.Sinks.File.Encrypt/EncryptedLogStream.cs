@@ -1,3 +1,5 @@
+using System.Buffers;
+using System.Buffers.Binary;
 using System.Security.Cryptography;
 using Serilog.Sinks.File.Encrypt.Interfaces;
 using Serilog.Sinks.File.Encrypt.Models;
@@ -13,7 +15,6 @@ public sealed class EncryptedLogStream : Stream
 {
     private readonly Stream _inner;
     private readonly ISessionHeaderWriter _headerWriter;
-    private readonly IMessageEncryptor _messageEncryptor;
     private readonly byte[] _aesKey = new byte[32]; // Reusable buffer for AES key
     private readonly byte[] _nonce = new byte[12]; // Reusable buffer for nonce
     private AesGcm? _aesGcm; // Reusable AES-GCM instance
@@ -31,7 +32,6 @@ public sealed class EncryptedLogStream : Stream
         ArgumentNullException.ThrowIfNull(options);
         _inner = inner;
         _headerWriter = SessionHeaderWriterFactory.Create(options);
-        _messageEncryptor = MessageEncryptorFactory.Create(options);
     }
 
     /// <summary>
@@ -73,24 +73,46 @@ public sealed class EncryptedLogStream : Stream
         // Write session header only once per session
         if (!_sessionHeaderWritten)
         {
-            SessionData session = new SessionData
-            {
-                AesGcm = _aesGcm!,
-                AesKey = _aesKey,
-                Nonce = _nonce,
-            };
-            _headerWriter.WriteHeader(_inner, session);
+            _headerWriter.WriteHeader(_inner, _aesKey, _nonce);
             _sessionHeaderWritten = true;
         }
 
-        // Write message directly using message encryptor (no RSA overhead)
-        SessionData messageSession = new SessionData
+        int plaintextLength = buffer.Length;
+        int encryptedPayloadLength = plaintextLength + EncryptionConstants.TagLength;
+
+        // Rent buffers from pool
+        byte[] ciphertext = ArrayPool<byte>.Shared.Rent(plaintextLength);
+        byte[] tag = ArrayPool<byte>.Shared.Rent(EncryptionConstants.TagLength);
+
+        try
         {
-            AesGcm = _aesGcm!,
-            AesKey = _aesKey,
-            Nonce = _nonce,
-        };
-        _messageEncryptor.EncryptAndWrite(_inner, messageSession, buffer);
+            // Encrypt directly into pooled buffers
+            _aesGcm?.Encrypt(
+                _nonce,
+                buffer,
+                ciphertext.AsSpan(0, plaintextLength),
+                tag.AsSpan(0, EncryptionConstants.TagLength),
+                associatedData: null
+            );
+
+            _nonce.IncreaseNonce();
+
+            // Write 4-byte length prefix (big-endian) for self-framing
+            Span<byte> lengthBytes = stackalloc byte[sizeof(int)];
+            BinaryPrimitives.WriteInt32BigEndian(lengthBytes, encryptedPayloadLength);
+            _inner.Write(lengthBytes);
+
+            // Write encrypted data directly to stream from pooled buffers
+            _inner.Write(ciphertext, 0, plaintextLength);
+            _inner.Write(tag, 0, EncryptionConstants.TagLength);
+        }
+        finally
+        {
+            // Clear and return buffers to pool
+            Array.Clear(ciphertext, 0, plaintextLength);
+            ArrayPool<byte>.Shared.Return(ciphertext);
+            ArrayPool<byte>.Shared.Return(tag);
+        }
     }
 
     private void StartNewSession()

@@ -5,7 +5,7 @@ namespace Serilog.Sinks.File.Encrypt;
 
 internal static class SessionReaderFactory
 {
-    public static ISessionReader GetSessionReader(byte version)
+    public static ISessionReader GetSessionReader(int version)
     {
         return version switch
         {

@@ -29,7 +29,7 @@ public class DecryptedLogReaderTests
         // Arrange
         await using var inputStream = new FileStream(LogFilePath, FileMode.Open, FileAccess.Read);
         using var outputStream = new MemoryStream();
-        var decryptedLogReader = new EncryptedLogReader(inputStream, _options, new FrameReader());
+        var decryptedLogReader = new EncryptedLogReader(inputStream, _options);
         await decryptedLogReader.DecryptToStreamAsync(
             outputStream,
             TestContext.Current.CancellationToken

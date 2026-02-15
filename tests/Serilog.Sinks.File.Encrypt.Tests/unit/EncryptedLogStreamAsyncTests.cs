@@ -4,9 +4,9 @@ using Serilog.Sinks.File.Encrypt.Models;
 namespace Serilog.Sinks.File.Encrypt.Tests.unit;
 
 /// <summary>
-/// Tests for EncryptedStream async operations, specifically FlushAsync
+/// Tests for EncryptedLogStream async operations, specifically FlushAsync
 /// </summary>
-public sealed class EncryptedStreamAsyncTests : EncryptionTestBase
+public sealed class EncryptedLogStreamAsyncTests : EncryptionTestBase
 {
     [Fact]
     public async Task FlushAsync_WithSingleMessage_EncryptsAndDecryptsCorrectly()

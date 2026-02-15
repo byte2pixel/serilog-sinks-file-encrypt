@@ -8,13 +8,10 @@ namespace Serilog.Sinks.File.Encrypt.Readers.v1;
 public class HeaderDecryptorV1 : IHeaderDecryptor
 {
     /// <inheritdoc />
-    public (byte[] AesKey, byte[] Nonce) Decrypt(RSA rsa, ReadOnlyMemory<byte> headerData)
+    public (byte[] AesKey, byte[] Nonce) Decrypt(RSA rsa, ReadOnlySpan<byte> headerData)
     {
         // Decrypt the RSA payload
-        byte[] decryptedPayload = rsa.Decrypt(
-            headerData.ToArray(),
-            RSAEncryptionPadding.OaepSHA256
-        );
+        byte[] decryptedPayload = rsa.Decrypt(headerData, RSAEncryptionPadding.OaepSHA256);
         // Read AES key length + key
         if (decryptedPayload.Length < 1)
         {

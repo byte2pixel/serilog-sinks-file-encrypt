@@ -14,6 +14,10 @@ public class BackgroundWorkerBenchmarks
     private string _logDirectory = string.Empty;
     private string _publicKey = string.Empty;
 
+    [Params(true, false)]
+    [SuppressMessage("ReSharper", "UnusedAutoPropertyAccessor.Global")]
+    public bool Buffered { get; set; }
+
     [Params(5000, 10000)]
     [SuppressMessage("ReSharper", "UnusedAutoPropertyAccessor.Global")]
     public int MessageCount { get; set; }
@@ -37,7 +41,11 @@ public class BackgroundWorkerBenchmarks
 
         using Logger logger = new LoggerConfiguration()
             .MinimumLevel.Debug()
-            .WriteTo.File(path: logPath, rollingInterval: RollingInterval.Infinite, buffered: true)
+            .WriteTo.File(
+                path: logPath,
+                rollingInterval: RollingInterval.Infinite,
+                buffered: Buffered
+            )
             .CreateLogger();
 
         SimulateBackgroundWorker(logger);
@@ -53,7 +61,7 @@ public class BackgroundWorkerBenchmarks
             .WriteTo.File(
                 path: logPath,
                 rollingInterval: RollingInterval.Infinite,
-                buffered: true,
+                buffered: Buffered,
                 hooks: new EncryptHooks(_publicKey)
             )
             .CreateLogger();
