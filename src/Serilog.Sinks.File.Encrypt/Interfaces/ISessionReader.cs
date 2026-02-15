@@ -10,15 +10,11 @@ namespace Serilog.Sinks.File.Encrypt.Interfaces;
 public interface ISessionReader
 {
     /// <summary>
-    /// Reads the session information from the given header and payload, using the provided RSA instance to decrypt the session key and nonce.
+    /// Reads the session information from the given header, using the provided RSA instance to decrypt the session key and nonce.
+    /// Messages following the header are read separately using IMessageDecryptor.
     /// </summary>
     /// <param name="rsa">The RSA used to encrypt the header</param>
     /// <param name="header">The header to be decrypted</param>
-    /// <param name="payload">The payload</param>
-    /// <returns></returns>
-    public DecryptionSessionChunk ReadSession(
-        RSA rsa,
-        ReadOnlyMemory<byte> header,
-        ReadOnlyMemory<byte> payload
-    );
+    /// <returns>A DecryptionContext containing the AES key, nonce, and timestamp for decrypting subsequent messages.</returns>
+    DecryptionContext ReadSession(RSA rsa, ReadOnlyMemory<byte> header);
 }

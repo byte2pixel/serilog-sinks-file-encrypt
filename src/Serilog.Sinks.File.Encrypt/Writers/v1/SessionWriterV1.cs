@@ -43,13 +43,7 @@ internal sealed class SessionWriterV1 : ISessionWriter
         // 1. Encrypt header using spans
         byte[] header = _headerEncryptor.Encrypt(session.AesKey, session.Nonce, session.Timestamp);
 
-        // 2. Calculate encrypted message length
-        int encryptedMessageLength = _messageEncryptor.GetEncryptedLength(buffer.Length);
-
-        // 3. Compute session length
-        int sessionLength = header.Length + encryptedMessageLength;
-
-        // 4. Write the 32 byte keyId padded or throw if too long for the header format
+        // 2. Write the 32 byte keyId padded or throw if too long for the header format
         var keyIdBytes = Encoding.UTF8.GetBytes(_keyId).AsSpan();
         if (keyIdBytes.Length > 32)
         {
@@ -61,10 +55,10 @@ internal sealed class SessionWriterV1 : ISessionWriter
         Span<byte> paddedKeyIdBytes = stackalloc byte[32];
         keyIdBytes.CopyTo(paddedKeyIdBytes);
 
-        // 4. Write framing header
-        _frameWriter.WriteHeader(output, 1, paddedKeyIdBytes.ToArray(), header, sessionLength);
+        // 3. Write framing header (magic bytes + version + keyId + RSA payload)
+        _frameWriter.WriteHeader(output, 1, paddedKeyIdBytes.ToArray(), header);
 
-        // 5. Encrypt and write message directly to stream (no intermediate allocation)
+        // 4. Encrypt and write message directly to stream (no intermediate allocation)
         _messageEncryptor.EncryptAndWrite(output, session, buffer);
     }
 }

@@ -40,11 +40,6 @@ public class SessionWriterV1Tests : V1EncryptionTestBase
         frameWriter.WriteHeaderCallCount.ShouldBe(1);
         frameWriter.CapturedVersion.ShouldBe((byte)1);
         frameWriter.CapturedHeader.ShouldBe(headerEncryptor.ReturnedHeader);
-
-        int expectedSessionLength =
-            headerEncryptor.ReturnedHeader.Length
-            + messageEncryptor.GetEncryptedLength(buffer.Length);
-        frameWriter.CapturedSessionLength.ShouldBe(expectedSessionLength);
     }
 
     // Test doubles that can capture span parameters
@@ -79,11 +74,6 @@ public class SessionWriterV1Tests : V1EncryptionTestBase
         private readonly byte[] _testCiphertext = [5, 6, 7, 8];
         private readonly byte[] _testTag = [9, 10, 11, 12];
 
-        public int GetEncryptedLength(int plaintextLength)
-        {
-            return plaintextLength + EncryptionConstants.TagLength;
-        }
-
         public void EncryptAndWrite(Stream output, SessionData session, ReadOnlySpan<byte> buffer)
         {
             WasCalled = true;
@@ -102,25 +92,17 @@ public class SessionWriterV1Tests : V1EncryptionTestBase
         public int WriteHeaderCallCount { get; private set; }
         public byte CapturedVersion { get; private set; }
         public byte[]? CapturedHeader { get; private set; }
-        public int CapturedSessionLength { get; private set; }
 
         public void WriteHeader(
             Stream output,
             byte version,
             ReadOnlyMemory<byte> keyId,
-            byte[] header,
-            int sessionLength
+            byte[] header
         )
         {
             WriteHeaderCallCount++;
             CapturedVersion = version;
             CapturedHeader = header;
-            CapturedSessionLength = sessionLength;
         }
-
-        // public void WriteMessage(Stream output, EncryptedMessage encryptedMessage)
-        // {
-        //     // Not used in new implementation
-        // }
     }
 }

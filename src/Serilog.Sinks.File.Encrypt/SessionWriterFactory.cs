@@ -1,6 +1,7 @@
 using Serilog.Sinks.File.Encrypt.Interfaces;
 using Serilog.Sinks.File.Encrypt.Models;
 using Serilog.Sinks.File.Encrypt.Writers;
+using Serilog.Sinks.File.Encrypt.Writers.v1;
 
 namespace Serilog.Sinks.File.Encrypt;
 

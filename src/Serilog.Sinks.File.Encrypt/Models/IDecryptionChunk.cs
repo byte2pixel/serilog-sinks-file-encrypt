@@ -6,11 +6,6 @@ namespace Serilog.Sinks.File.Encrypt.Models;
 internal interface IDecryptionChunk;
 
 /// <summary>
-/// A successfully decrypted message chunk
-/// </summary>
-internal record DecryptedMessageChunk(string Content) : IDecryptionChunk;
-
-/// <summary>
 /// An error that occurred during decryption
 /// </summary>
 internal record DecryptionErrorChunk(string ErrorMessage, long Position) : IDecryptionChunk;

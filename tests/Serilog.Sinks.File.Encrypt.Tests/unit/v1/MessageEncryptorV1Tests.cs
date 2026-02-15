@@ -1,5 +1,6 @@
 using Serilog.Sinks.File.Encrypt.Models;
 using Serilog.Sinks.File.Encrypt.Writers;
+using Serilog.Sinks.File.Encrypt.Writers.v1;
 
 namespace Serilog.Sinks.File.Encrypt.Tests.unit.v1;
 
@@ -161,24 +162,6 @@ public class MessageEncryptorV1Tests : V1EncryptionTestBase
 
         // Assert - Different nonce should produce different ciphertexts
         encrypted1[..buffer.Length].ShouldNotBe(encrypted2[..buffer.Length]);
-    }
-
-    [Fact]
-    public void Encrypt_TotalLength_EqualsPlaintextPlusTagLength()
-    {
-        // Arrange
-        MessageEncryptorV1 encryptor = GetSut();
-        SessionData session = CreateSessionData();
-        ReadOnlySpan<byte> buffer = "Test message for length verification"u8;
-
-        // Act
-        int expectedLength = encryptor.GetEncryptedLength(buffer.Length);
-
-        // Assert
-        expectedLength.ShouldBe(
-            buffer.Length + EncryptionConstants.TagLength,
-            "TotalLength should equal ciphertext length plus tag length"
-        );
     }
 
     [Theory]

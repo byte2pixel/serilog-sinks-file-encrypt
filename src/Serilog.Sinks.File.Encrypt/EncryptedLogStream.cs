@@ -6,14 +6,18 @@ namespace Serilog.Sinks.File.Encrypt;
 
 /// <summary>
 /// A stream wrapper that encrypts log data before writing it to the underlying stream.
+/// Uses a hybrid encryption scheme: RSA for session key exchange (once per session),
+/// AES-GCM for data encryption (per message).
 /// </summary>
 public sealed class EncryptedLogStream : Stream
 {
     private readonly Stream _inner;
-    private readonly ISessionWriter _writer;
+    private readonly ISessionHeaderWriter _headerWriter;
+    private readonly IMessageEncryptor _messageEncryptor;
     private readonly byte[] _aesKey = new byte[32]; // Reusable buffer for AES key
     private readonly byte[] _nonce = new byte[12]; // Reusable buffer for nonce
     private AesGcm? _aesGcm; // Reusable AES-GCM instance
+    private bool _sessionHeaderWritten;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="EncryptedLogStream"/> class.
@@ -26,7 +30,8 @@ public sealed class EncryptedLogStream : Stream
         ArgumentNullException.ThrowIfNull(inner);
         ArgumentNullException.ThrowIfNull(options);
         _inner = inner;
-        _writer = SessionWriterFactory.Create(options);
+        _headerWriter = SessionHeaderWriterFactory.Create(options);
+        _messageEncryptor = MessageEncryptorFactory.Create(options);
     }
 
     /// <summary>
@@ -49,11 +54,7 @@ public sealed class EncryptedLogStream : Stream
     /// <inheritdoc />
     public override void Write(byte[] buffer, int offset, int count)
     {
-        if (_aesGcm == null)
-        {
-            StartNewSession();
-        }
-        Write(buffer[offset..(offset + count)].AsSpan());
+        Write(buffer.AsSpan(offset, count));
     }
 
     /// <inheritdoc />
@@ -68,13 +69,28 @@ public sealed class EncryptedLogStream : Stream
         {
             StartNewSession();
         }
-        SessionData session = new SessionData
+
+        // Write session header only once per session
+        if (!_sessionHeaderWritten)
+        {
+            SessionData session = new SessionData
+            {
+                AesGcm = _aesGcm!,
+                AesKey = _aesKey,
+                Nonce = _nonce,
+            };
+            _headerWriter.WriteHeader(_inner, session);
+            _sessionHeaderWritten = true;
+        }
+
+        // Write message directly using message encryptor (no RSA overhead)
+        SessionData messageSession = new SessionData
         {
             AesGcm = _aesGcm!,
             AesKey = _aesKey,
             Nonce = _nonce,
         };
-        _writer.WriteSession(_inner, session, buffer);
+        _messageEncryptor.EncryptAndWrite(_inner, messageSession, buffer);
     }
 
     private void StartNewSession()

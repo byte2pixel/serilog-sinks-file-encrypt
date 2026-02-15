@@ -1,4 +1,3 @@
-using System.Buffers;
 using System.Security.Cryptography;
 using Serilog.Sinks.File.Encrypt.Interfaces;
 using Serilog.Sinks.File.Encrypt.Models;
@@ -20,32 +19,14 @@ public class SessionReaderV1 : ISessionReader
     }
 
     /// <inheritdoc />
-    public DecryptionSessionChunk ReadSession(
-        RSA rsa,
-        ReadOnlyMemory<byte> header,
-        ReadOnlyMemory<byte> payload
-    )
+    public DecryptionContext ReadSession(RSA rsa, ReadOnlyMemory<byte> header)
     {
-        try
-        {
-            // Decrypt the header to get the session key and IV
-            (byte[] aesKey, byte[] nonce, DateTimeOffset timestamp) = _headerDecryptor.Decrypt(
-                rsa,
-                header
-            );
+        // Decrypt the header to get the session key and nonce
+        (byte[] aesKey, byte[] nonce, DateTimeOffset timestamp) = _headerDecryptor.Decrypt(
+            rsa,
+            header
+        );
 
-            return new DecryptionSessionChunk(
-                Version: 1,
-                AesKey: aesKey,
-                Nonce: nonce,
-                Timestamp: timestamp,
-                Payload: payload
-            );
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine("Error reading session: " + ex);
-            throw;
-        }
+        return new DecryptionContext(EncryptionConstants.TagLength, nonce, aesKey);
     }
 }

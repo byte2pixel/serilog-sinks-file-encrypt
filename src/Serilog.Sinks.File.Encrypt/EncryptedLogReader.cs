@@ -1,10 +1,11 @@
+using System.Buffers;
+using System.Buffers.Binary;
 using System.Security.Cryptography;
 using System.Text;
 using System.Threading.Channels;
 using Serilog.Sinks.File.Encrypt.Interfaces;
 using Serilog.Sinks.File.Encrypt.Models;
 using Serilog.Sinks.File.Encrypt.Readers;
-using Serilog.Sinks.File.Encrypt.Readers.v1;
 
 namespace Serilog.Sinks.File.Encrypt;
 
@@ -16,6 +17,7 @@ internal sealed class EncryptedLogReader : IAsyncDisposable, IDisposable
     private StreamWriter? _auditLogWriter;
     private bool _disposed;
     private bool _hasFoundValidHeader;
+    private DecryptionContext? _currentSession;
 
     public EncryptedLogReader(
         Stream input,
@@ -124,6 +126,33 @@ internal sealed class EncryptedLogReader : IAsyncDisposable, IDisposable
         CancellationToken cancellationToken
     )
     {
+        // If we have an active session, try to read a message first
+        if (_currentSession != null && _currentSession.HasKeys)
+        {
+            // Peek to check if we're at a new session header
+            byte[] peekBuffer = new byte[EncryptionConstants.MagicBytes.Length];
+            int bytesRead = await _input.ReadAsync(peekBuffer, cancellationToken);
+
+            if (bytesRead < EncryptionConstants.MagicBytes.Length)
+            {
+                return; // EOF
+            }
+
+            // Check if this is a new session header
+            if (IsHeaderMarker(peekBuffer))
+            {
+                // New session - process it
+                await ProcessSessionHeaderAsync(cancellationToken);
+                return;
+            }
+
+            // Not a header - rewind and process as message
+            _input.Position -= bytesRead;
+            await ProcessMessageAsync(writer, cancellationToken);
+            return;
+        }
+
+        // No active session - look for a session header
         byte[]? markerBuffer = await ReadMarkerBufferAsync(cancellationToken);
 
         if (markerBuffer == null)
@@ -133,26 +162,26 @@ internal sealed class EncryptedLogReader : IAsyncDisposable, IDisposable
 
         if (IsHeaderMarker(markerBuffer))
         {
-            await ProcessSessionAsync(writer, cancellationToken);
+            await ProcessSessionHeaderAsync(cancellationToken);
             return;
         }
+
+        // Not a header and no session - try to recover
         await TryRecoverAsync(cancellationToken);
     }
 
-    private async Task ProcessSessionAsync(
-        ChannelWriter<IDecryptionChunk> writer,
-        CancellationToken cancellationToken
-    )
+    private async Task ProcessSessionHeaderAsync(CancellationToken cancellationToken)
     {
         try
         {
             _input.Position += EncryptionConstants.MagicBytes.Length; // Move past the marker
-            (byte version, RSA rsa, ReadOnlyMemory<byte> header, ReadOnlyMemory<byte> payload) =
-                _frameReader.ReadHeader(_input, _options.DecryptionKeys);
+            (byte version, RSA rsa, ReadOnlyMemory<byte> header) = _frameReader.ReadHeader(
+                _input,
+                _options.DecryptionKeys
+            );
             ISessionReader sessionReader = SessionReaderFactory.GetSessionReader(version);
-            DecryptionSessionChunk session = sessionReader.ReadSession(rsa, header, payload);
+            _currentSession = sessionReader.ReadSession(rsa, header);
             _hasFoundValidHeader = true;
-            await writer.WriteAsync(session, cancellationToken);
         }
         catch (Exception ex)
         {
@@ -160,6 +189,85 @@ internal sealed class EncryptedLogReader : IAsyncDisposable, IDisposable
                 $"Failed to process session at position {_input.Position}: {ex.Message}",
                 ex
             );
+        }
+    }
+
+    private async Task ProcessMessageAsync(
+        ChannelWriter<IDecryptionChunk> writer,
+        CancellationToken cancellationToken
+    )
+    {
+        if (_currentSession == null || !_currentSession.HasKeys)
+        {
+            throw new InvalidOperationException("No active session for message decryption");
+        }
+
+        // Read 4-byte length prefix (big-endian)
+        byte[] lengthBuffer = new byte[sizeof(int)];
+        int bytesRead = await _input.ReadAsync(lengthBuffer, cancellationToken);
+        if (bytesRead < sizeof(int))
+        {
+            return; // EOF
+        }
+
+        int messageLength = BinaryPrimitives.ReadInt32BigEndian(lengthBuffer);
+
+        // Sanity check on message length
+        if (messageLength <= 0 || messageLength > 100 * 1024 * 1024) // Max 100MB per message
+        {
+            throw new InvalidDataException($"Invalid message length: {messageLength}");
+        }
+
+        // Read the encrypted message (ciphertext + tag)
+        byte[] encryptedMessage = ArrayPool<byte>.Shared.Rent(messageLength);
+        try
+        {
+            bytesRead = await _input.ReadAsync(
+                encryptedMessage.AsMemory(0, messageLength),
+                cancellationToken
+            );
+            if (bytesRead < messageLength)
+            {
+                throw new EndOfStreamException(
+                    $"Unexpected end of stream. Expected {messageLength} bytes, got {bytesRead}"
+                );
+            }
+
+            // Decrypt the message
+            int ciphertextLength = messageLength - _currentSession.TagLength;
+            if (ciphertextLength < 0)
+            {
+                throw new InvalidDataException("Message too short to contain authentication tag");
+            }
+
+            byte[] plaintext = ArrayPool<byte>.Shared.Rent(ciphertextLength);
+            try
+            {
+                using var aes = new AesGcm(_currentSession.SessionKey, _currentSession.TagLength);
+                aes.Decrypt(
+                    _currentSession.Nonce,
+                    encryptedMessage.AsSpan(0, ciphertextLength),
+                    encryptedMessage.AsSpan(ciphertextLength, _currentSession.TagLength),
+                    plaintext.AsSpan(0, ciphertextLength)
+                );
+
+                // Increment nonce for next message
+                _currentSession.Nonce.IncreaseNonce();
+
+                // Write decrypted chunk
+                await writer.WriteAsync(
+                    new DecryptedMessageChunk(plaintext.AsMemory(0, ciphertextLength).ToArray()),
+                    cancellationToken
+                );
+            }
+            finally
+            {
+                ArrayPool<byte>.Shared.Return(plaintext);
+            }
+        }
+        finally
+        {
+            ArrayPool<byte>.Shared.Return(encryptedMessage);
         }
     }
 
@@ -186,8 +294,8 @@ internal sealed class EncryptedLogReader : IAsyncDisposable, IDisposable
         {
             switch (chunk)
             {
-                case DecryptionSessionChunk sessionChunk:
-                    await WriteDecryptedSessionAsync(sessionChunk, output, cancellationToken);
+                case DecryptedMessageChunk messageChunk:
+                    await output.WriteAsync(messageChunk.Data, cancellationToken);
                     break;
                 case DecryptionErrorChunk errorChunk:
                     await HandleErrorChunkAsync(errorChunk, output, cancellationToken);
@@ -197,19 +305,6 @@ internal sealed class EncryptedLogReader : IAsyncDisposable, IDisposable
                     return;
             }
         }
-    }
-
-    private static async Task WriteDecryptedSessionAsync(
-        DecryptionSessionChunk sessionChunk,
-        Stream output,
-        CancellationToken cancellationToken
-    )
-    {
-        IMessageDecryptor decryptor = MessageDecryptorFactory.GetMessageDecryptor(
-            sessionChunk.Version
-        );
-        ReadOnlyMemory<byte> decrypted = decryptor.ReadAndDecrypt(sessionChunk);
-        await output.WriteAsync(decrypted, cancellationToken);
     }
 
     /// <summary>

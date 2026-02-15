@@ -8,13 +8,6 @@ namespace Serilog.Sinks.File.Encrypt.Interfaces;
 public interface IMessageEncryptor
 {
     /// <summary>
-    /// Gets the total length of encrypted output for a given plaintext length.
-    /// </summary>
-    /// <param name="plaintextLength">The length of the plaintext.</param>
-    /// <returns>The total length of the encrypted message (ciphertext + tag)</returns>
-    int GetEncryptedLength(int plaintextLength);
-
-    /// <summary>
     /// Encrypts the plaintext and writes the encrypted message (ciphertext + tag) directly to the output stream.
     /// </summary>
     /// <param name="output">The stream to write the encrypted data to.</param>

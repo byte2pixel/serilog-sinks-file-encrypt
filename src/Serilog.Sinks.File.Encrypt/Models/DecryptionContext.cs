@@ -3,7 +3,7 @@ namespace Serilog.Sinks.File.Encrypt.Models;
 /// <summary>
 /// Represents the current decryption context with active encryption keys
 /// </summary>
-internal class DecryptionContext(int tagLength, byte[] nonce, byte[] sessionKey)
+public class DecryptionContext(int tagLength, byte[] nonce, byte[] sessionKey)
 {
     public int TagLength { get; } = tagLength;
 
