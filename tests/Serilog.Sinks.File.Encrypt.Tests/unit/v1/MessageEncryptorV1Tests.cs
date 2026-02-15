@@ -12,13 +12,14 @@ public class MessageEncryptorV1Tests : V1EncryptionTestBase
 
     private (byte[] ciphertext, byte[] tag) EncryptToBytes(
         MessageEncryptorV1 encryptor,
-        SessionData session
+        SessionData session,
+        ReadOnlySpan<byte> buffer
     )
     {
         using var ms = new MemoryStream();
-        encryptor.EncryptAndWrite(ms, session.Plaintext, session.AesKey, session.Nonce);
+        encryptor.EncryptAndWrite(ms, session, buffer);
         byte[] encrypted = ms.ToArray();
-        int plaintextLength = session.Plaintext.Length;
+        int plaintextLength = buffer.Length;
         return (encrypted[..plaintextLength], encrypted[plaintextLength..]);
     }
 
@@ -27,14 +28,15 @@ public class MessageEncryptorV1Tests : V1EncryptionTestBase
     {
         // Arrange
         MessageEncryptorV1 encryptor = GetSut();
-        SessionData session = CreateSessionData("Hello, World!");
+        SessionData session = CreateSessionData();
+        ReadOnlySpan<byte> buffer = "Hello, World!"u8;
 
         // Act
-        var (ciphertext, tag) = EncryptToBytes(encryptor, session);
+        var (ciphertext, tag) = EncryptToBytes(encryptor, session, buffer);
 
         // Assert - Verify encrypted data has expected length
         ciphertext.Length.ShouldBe(
-            session.Plaintext.Length,
+            buffer.Length,
             "Ciphertext should be same length as plaintext for AES-GCM"
         );
         tag.Length.ShouldBe(
@@ -45,7 +47,7 @@ public class MessageEncryptorV1Tests : V1EncryptionTestBase
         // Decrypt the message using AES-GCM and verify it matches the original plaintext
         byte[] decryptedPlaintext = AesGcmDecrypt(ciphertext, session.AesKey, session.Nonce, tag);
         decryptedPlaintext.ShouldBe(
-            session.Plaintext.ToArray(),
+            buffer.ToArray(),
             "Decrypted plaintext should match original plaintext"
         );
     }
@@ -55,10 +57,10 @@ public class MessageEncryptorV1Tests : V1EncryptionTestBase
     {
         // Arrange
         MessageEncryptorV1 encryptor = GetSut();
-        SessionData session = CreateSessionData(string.Empty);
+        SessionData session = CreateSessionData();
 
         // Act
-        var (ciphertext, tag) = EncryptToBytes(encryptor, session);
+        var (ciphertext, tag) = EncryptToBytes(encryptor, session, ""u8);
 
         // Assert
         ciphertext.Length.ShouldBe(0, "Empty plaintext should produce empty ciphertext");
@@ -74,19 +76,20 @@ public class MessageEncryptorV1Tests : V1EncryptionTestBase
     {
         // Arrange
         MessageEncryptorV1 encryptor = GetSut();
+        SessionData session = CreateSessionData();
         string largePlaintext = new('X', 1024 * 100); // 100 KB
-        SessionData session = CreateSessionData(largePlaintext);
+        ReadOnlySpan<byte> buffer = Encoding.UTF8.GetBytes(largePlaintext).AsSpan();
 
         // Act
-        var (ciphertext, tag) = EncryptToBytes(encryptor, session);
+        var (ciphertext, tag) = EncryptToBytes(encryptor, session, buffer);
 
         // Assert
-        ciphertext.Length.ShouldBe(session.Plaintext.Length);
+        ciphertext.Length.ShouldBe(buffer.Length);
         tag.Length.ShouldBe(EncryptionConstants.TagLength);
 
         // Verify decryption works
         byte[] decrypted = AesGcmDecrypt(ciphertext, session.AesKey, session.Nonce, tag);
-        decrypted.ShouldBe(session.Plaintext.ToArray());
+        decrypted.ShouldBe(buffer.ToArray());
     }
 
     [Fact]
@@ -94,14 +97,15 @@ public class MessageEncryptorV1Tests : V1EncryptionTestBase
     {
         // Arrange
         MessageEncryptorV1 encryptor = GetSut();
-        SessionData session = CreateSessionData("Hello 🌍 世界 Κόσμε");
+        SessionData session = CreateSessionData();
+        ReadOnlySpan<byte> buffer = "Hello 🌍 世界 Κόσμε"u8;
 
         // Act
-        var (ciphertext, tag) = EncryptToBytes(encryptor, session);
+        var (ciphertext, tag) = EncryptToBytes(encryptor, session, buffer);
 
         // Assert
         byte[] decrypted = AesGcmDecrypt(ciphertext, session.AesKey, session.Nonce, tag);
-        decrypted.ShouldBe(session.Plaintext.ToArray());
+        decrypted.ShouldBe(buffer.ToArray());
         Encoding.UTF8.GetString(decrypted).ShouldBe("Hello 🌍 世界 Κόσμε");
     }
 
@@ -110,11 +114,12 @@ public class MessageEncryptorV1Tests : V1EncryptionTestBase
     {
         // Arrange
         MessageEncryptorV1 encryptor = GetSut();
-        SessionData session = CreateSessionData("Test message");
+        SessionData session = CreateSessionData();
+        ReadOnlySpan<byte> buffer = "Test message"u8;
 
         // Act - Encrypt twice with same parameters
-        var (ciphertext1, tag1) = EncryptToBytes(encryptor, session);
-        var (ciphertext2, tag2) = EncryptToBytes(encryptor, session);
+        var (ciphertext1, tag1) = EncryptToBytes(encryptor, session, buffer);
+        var (ciphertext2, tag2) = EncryptToBytes(encryptor, session, buffer);
 
         // Assert - Should be deterministic with same nonce
         ciphertext1.ShouldBe(ciphertext2);
@@ -126,23 +131,36 @@ public class MessageEncryptorV1Tests : V1EncryptionTestBase
     {
         // Arrange
         MessageEncryptorV1 encryptor = GetSut();
-        byte[] plaintext = "Test message"u8.ToArray();
-        ReadOnlyMemory<byte> plaintextMemory = new ReadOnlyMemory<byte>(plaintext);
+        ReadOnlySpan<byte> buffer = "Test message"u8.ToArray();
         byte[] key = RandomNumberGenerator.GetBytes(EncryptionConstants.SessionKeyLength);
         byte[] nonce1 = RandomNumberGenerator.GetBytes(EncryptionConstants.NonceLength);
         byte[] nonce2 = RandomNumberGenerator.GetBytes(EncryptionConstants.NonceLength);
 
+        SessionData session1 = new SessionData
+        {
+            AesGcm = new AesGcm(key, EncryptionConstants.TagLength),
+            AesKey = key,
+            Nonce = nonce1,
+        };
+
+        SessionData session2 = new SessionData
+        {
+            AesGcm = new AesGcm(key, EncryptionConstants.TagLength),
+            AesKey = key,
+            Nonce = nonce2,
+        };
+
         // Act
         using var ms1 = new MemoryStream();
-        encryptor.EncryptAndWrite(ms1, plaintextMemory, key, nonce1);
+        encryptor.EncryptAndWrite(ms1, session1, buffer);
         byte[] encrypted1 = ms1.ToArray();
 
         using var ms2 = new MemoryStream();
-        encryptor.EncryptAndWrite(ms2, plaintextMemory, key, nonce2);
+        encryptor.EncryptAndWrite(ms2, session2, buffer);
         byte[] encrypted2 = ms2.ToArray();
 
-        // Assert - Different nonce should produce different ciphertext
-        encrypted1[..plaintext.Length].ShouldNotBe(encrypted2[..plaintext.Length]);
+        // Assert - Different nonce should produce different ciphertexts
+        encrypted1[..buffer.Length].ShouldNotBe(encrypted2[..buffer.Length]);
     }
 
     [Fact]
@@ -150,14 +168,15 @@ public class MessageEncryptorV1Tests : V1EncryptionTestBase
     {
         // Arrange
         MessageEncryptorV1 encryptor = GetSut();
-        SessionData session = CreateSessionData("Test message for length verification");
+        SessionData session = CreateSessionData();
+        ReadOnlySpan<byte> buffer = "Test message for length verification"u8;
 
         // Act
-        int expectedLength = encryptor.GetEncryptedLength(session.Plaintext.Length);
+        int expectedLength = encryptor.GetEncryptedLength(buffer.Length);
 
         // Assert
         expectedLength.ShouldBe(
-            session.Plaintext.Length + EncryptionConstants.TagLength,
+            buffer.Length + EncryptionConstants.TagLength,
             "TotalLength should equal ciphertext length plus tag length"
         );
     }
@@ -173,14 +192,15 @@ public class MessageEncryptorV1Tests : V1EncryptionTestBase
     {
         // Arrange
         MessageEncryptorV1 encryptor = GetSut();
-        SessionData session = CreateSessionData(plaintext);
+        SessionData session = CreateSessionData();
+        ReadOnlySpan<byte> buffer = Encoding.UTF8.GetBytes(plaintext).AsSpan();
 
         // Act
-        var (ciphertext, tag) = EncryptToBytes(encryptor, session);
+        var (ciphertext, tag) = EncryptToBytes(encryptor, session, buffer);
 
         // Assert
-        ciphertext.Length.ShouldBe(session.Plaintext.Length);
+        ciphertext.Length.ShouldBe(buffer.Length);
         byte[] decrypted = AesGcmDecrypt(ciphertext, session.AesKey, session.Nonce, tag);
-        decrypted.ShouldBe(session.Plaintext.ToArray());
+        decrypted.ShouldBe(buffer.ToArray());
     }
 }

@@ -18,17 +18,14 @@ public interface IFrameWriter
     /// </summary>
     /// <param name="output">The output stream to which the session header will be written.</param>
     /// <param name="version">The version of the encrypted log format being used.</param>
+    /// <param name="keyId"></param>
     /// <param name="header">The RSA encrypted header bytes containing the session metadata.</param>
     /// <param name="sessionLength">The total length of the session data, including the header and encrypted messages, used for framing purposes.</param>
-    public void WriteHeader(Stream output, byte version, byte[] header, int sessionLength);
-
-    /// <summary>
-    /// Responsible for writing the encrypted log messages to the output stream according to the specified format:
-    /// 1. Total length of the framed message including ciphertext and tag (4 bytes, big-endian)
-    /// 2. Ciphertext (variable length, AES-GCM encrypted log message)
-    /// 3. Authentication tag (16 bytes, AES-GCM tag for integrity verification)
-    /// </summary>
-    /// <param name="output">The output stream to which the encrypted log message will be written.</param>
-    /// <param name="encryptedMessage">The encrypted log message containing the AES-GCM ciphertext and the associated authentication tag that will be written to the output stream.</param>
-    public void WriteMessage(Stream output, EncryptedMessage encryptedMessage);
+    void WriteHeader(
+        Stream output,
+        byte version,
+        ReadOnlyMemory<byte> keyId,
+        byte[] header,
+        int sessionLength
+    );
 }

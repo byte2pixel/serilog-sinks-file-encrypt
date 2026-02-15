@@ -34,8 +34,9 @@ public sealed class StreamingDecryptionTests : EncryptionTestBase
     {
         // Arrange
         const string TestMessage = "Test message with custom options";
-        StreamingOptions customOptions = new()
+        DecryptionOptions customOptions = new()
         {
+            DecryptionKeys = _rsaKeyMap,
             BufferSize = 8 * 1024, // 8KB
             QueueDepth = 5,
             ContinueOnError = false,
@@ -120,8 +121,9 @@ public sealed class StreamingDecryptionTests : EncryptionTestBase
     {
         // Arrange
         string[] messages = ["Good message 1", "Good message 2"];
-        StreamingOptions skipErrorOptions = new()
+        DecryptionOptions skipErrorOptions = new()
         {
+            DecryptionKeys = _rsaKeyMap,
             ContinueOnError = true,
             ErrorHandlingMode = ErrorHandlingMode.Skip,
         };
@@ -145,8 +147,9 @@ public sealed class StreamingDecryptionTests : EncryptionTestBase
     {
         // Arrange
         string[] messages = ["Good message 1", "Good message 2"];
-        StreamingOptions writeInlineOptions = new()
+        DecryptionOptions writeInlineOptions = new()
         {
+            DecryptionKeys = _rsaKeyMap,
             ContinueOnError = true,
             ErrorHandlingMode = ErrorHandlingMode.WriteInline,
         };
@@ -171,8 +174,9 @@ public sealed class StreamingDecryptionTests : EncryptionTestBase
         // Arrange
         string[] messages = ["Good message 1", "Good message 2"];
         string errorLogPath = Path.GetTempFileName();
-        StreamingOptions errorLogOptions = new()
+        DecryptionOptions errorLogOptions = new()
         {
+            DecryptionKeys = _rsaKeyMap,
             ContinueOnError = true,
             ErrorHandlingMode = ErrorHandlingMode.WriteToErrorLog,
             ErrorLogPath = errorLogPath,
@@ -212,8 +216,9 @@ public sealed class StreamingDecryptionTests : EncryptionTestBase
     {
         // Arrange
         string[] messages = ["Good message 1", "Good message 2"];
-        StreamingOptions throwExceptionOptions = new()
+        DecryptionOptions throwExceptionOptions = new()
         {
+            DecryptionKeys = _rsaKeyMap,
             ContinueOnError = false,
             ErrorHandlingMode = ErrorHandlingMode.ThrowException,
         };
@@ -236,8 +241,9 @@ public sealed class StreamingDecryptionTests : EncryptionTestBase
     {
         // Arrange
         string[] messages = ["Message 1", "Message 2", "Message 3"];
-        StreamingOptions throwExceptionOptions = new()
+        DecryptionOptions throwExceptionOptions = new()
         {
+            DecryptionKeys = _rsaKeyMap,
             ContinueOnError = false,
             ErrorHandlingMode = ErrorHandlingMode.ThrowException,
         };

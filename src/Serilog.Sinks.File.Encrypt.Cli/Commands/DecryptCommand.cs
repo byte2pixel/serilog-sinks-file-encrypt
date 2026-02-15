@@ -1,6 +1,7 @@
 using System.ComponentModel;
 using System.Diagnostics.CodeAnalysis;
 using System.IO.Abstractions;
+using System.Security.Cryptography;
 using Serilog.Sinks.File.Encrypt.Models;
 using Spectre.Console;
 using Spectre.Console.Cli;
@@ -137,8 +138,15 @@ public sealed class DecryptCommand(IAnsiConsole console, IFileSystem fileSystem)
                 continueOnError = true;
             }
 
-            StreamingOptions streamingOptions = new()
+            using RSA rsa = RSA.Create();
+            rsa.FromString(rsaPrivateKey);
+            var rsaKeys = new Dictionary<string, RSA>
             {
+                { "", rsa }, // Default key with empty key ID
+            };
+            DecryptionOptions decryptionOptions = new()
+            {
+                DecryptionKeys = rsaKeys,
                 ErrorHandlingMode = errorMode,
                 ErrorLogPath = settings.ErrorLogPath,
                 ContinueOnError = continueOnError,
@@ -149,8 +157,7 @@ public sealed class DecryptCommand(IAnsiConsole console, IFileSystem fileSystem)
             (int successCount, int failureCount) = await ProcessFilesAsync(
                 settings,
                 filesToDecrypt,
-                rsaPrivateKey,
-                streamingOptions,
+                decryptionOptions,
                 cancellationToken
             );
 
@@ -199,15 +206,13 @@ public sealed class DecryptCommand(IAnsiConsole console, IFileSystem fileSystem)
     /// </summary>
     /// <param name="settings">The command settings.</param>
     /// <param name="filesToDecrypt">The list of files to decrypt</param>
-    /// <param name="rsaPrivateKey">The private key.</param>
-    /// <param name="streamingOptions">The streaming decryption options.</param>
+    /// <param name="decryptionOptions">The decryption options.</param>
     /// <param name="cancellationToken">The cancellation token.</param>
     /// <returns></returns>
     private async Task<(int successCount, int failureCount)> ProcessFilesAsync(
         Settings settings,
         List<string> filesToDecrypt,
-        string rsaPrivateKey,
-        StreamingOptions streamingOptions,
+        DecryptionOptions decryptionOptions,
         CancellationToken cancellationToken
     )
     {
@@ -235,12 +240,10 @@ public sealed class DecryptCommand(IAnsiConsole console, IFileSystem fileSystem)
                 // Perform the decryption using streaming API
                 await using FileSystemStream inputStream = fileSystem.File.OpenRead(inputFile);
                 await using FileSystemStream outputStream = fileSystem.File.Create(outputFile);
-
                 await EncryptionUtils.DecryptLogFileAsync(
                     inputStream,
                     outputStream,
-                    rsaPrivateKey,
-                    streamingOptions,
+                    decryptionOptions,
                     cancellationToken
                 );
 

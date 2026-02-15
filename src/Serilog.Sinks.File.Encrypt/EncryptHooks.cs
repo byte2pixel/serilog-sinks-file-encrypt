@@ -69,7 +69,7 @@ public class EncryptHooks : FileLifecycleHooks
     {
         var rsa = RSA.Create();
         rsa.FromString(publicKey);
-        _encryptionOptions = new EncryptionOptions(rsa, null);
+        _encryptionOptions = new EncryptionOptions(rsa);
     }
 
     /// <summary>

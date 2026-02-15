@@ -1,3 +1,5 @@
+using Serilog.Sinks.File.Encrypt.Models;
+
 namespace Serilog.Sinks.File.Encrypt.Interfaces;
 
 /// <summary>

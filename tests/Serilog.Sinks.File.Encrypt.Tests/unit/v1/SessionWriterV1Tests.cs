@@ -10,18 +10,19 @@ public class SessionWriterV1Tests : V1EncryptionTestBase
     public void SessionWriterV1_Writes_Header_And_Messages_Correctly()
     {
         // Arrange
-        SessionData sessionData = CreateSessionData("Test log message");
+        SessionData sessionData = CreateSessionData();
+        ReadOnlySpan<byte> buffer = "Test log message"u8;
 
         // Use test doubles that track calls
         var headerEncryptor = new TestHeaderEncryptor();
         var messageEncryptor = new TestMessageEncryptor();
         var frameWriter = new TestFrameWriter();
 
-        var writer = new SessionWriterV1(headerEncryptor, messageEncryptor, frameWriter);
+        var writer = new SessionWriterV1(headerEncryptor, messageEncryptor, "", frameWriter);
 
         // Act
         using var ms = new MemoryStream();
-        writer.WriteSession(ms, sessionData);
+        writer.WriteSession(ms, sessionData, buffer);
 
         // Assert - Verify header encryptor was called correctly
         headerEncryptor.WasCalled.ShouldBeTrue();
@@ -31,7 +32,7 @@ public class SessionWriterV1Tests : V1EncryptionTestBase
 
         // Assert - Verify message encryptor was called correctly
         messageEncryptor.WasCalled.ShouldBeTrue();
-        messageEncryptor.CapturedPlaintext.ShouldBe(sessionData.Plaintext.ToArray());
+        messageEncryptor.CapturedPlaintext.ShouldBe(buffer.ToArray());
         messageEncryptor.CapturedKey.ShouldBe(sessionData.AesKey);
         messageEncryptor.CapturedNonce.ShouldBe(sessionData.Nonce);
 
@@ -42,7 +43,7 @@ public class SessionWriterV1Tests : V1EncryptionTestBase
 
         int expectedSessionLength =
             headerEncryptor.ReturnedHeader.Length
-            + messageEncryptor.GetEncryptedLength(sessionData.Plaintext.Length);
+            + messageEncryptor.GetEncryptedLength(buffer.Length);
         frameWriter.CapturedSessionLength.ShouldBe(expectedSessionLength);
     }
 
@@ -83,17 +84,12 @@ public class SessionWriterV1Tests : V1EncryptionTestBase
             return plaintextLength + EncryptionConstants.TagLength;
         }
 
-        public void EncryptAndWrite(
-            Stream output,
-            ReadOnlyMemory<byte> plaintext,
-            ReadOnlySpan<byte> key,
-            ReadOnlySpan<byte> nonce
-        )
+        public void EncryptAndWrite(Stream output, SessionData session, ReadOnlySpan<byte> buffer)
         {
             WasCalled = true;
-            CapturedPlaintext = plaintext.ToArray();
-            CapturedKey = key.ToArray();
-            CapturedNonce = nonce.ToArray();
+            CapturedPlaintext = buffer.ToArray();
+            CapturedKey = session.AesKey.ToArray();
+            CapturedNonce = session.Nonce.ToArray();
 
             // Write test data to stream
             output.Write(_testCiphertext);
@@ -108,7 +104,13 @@ public class SessionWriterV1Tests : V1EncryptionTestBase
         public byte[]? CapturedHeader { get; private set; }
         public int CapturedSessionLength { get; private set; }
 
-        public void WriteHeader(Stream output, byte version, byte[] header, int sessionLength)
+        public void WriteHeader(
+            Stream output,
+            byte version,
+            ReadOnlyMemory<byte> keyId,
+            byte[] header,
+            int sessionLength
+        )
         {
             WriteHeaderCallCount++;
             CapturedVersion = version;
@@ -116,9 +118,9 @@ public class SessionWriterV1Tests : V1EncryptionTestBase
             CapturedSessionLength = sessionLength;
         }
 
-        public void WriteMessage(Stream output, EncryptedMessage encryptedMessage)
-        {
-            // Not used in new implementation
-        }
+        // public void WriteMessage(Stream output, EncryptedMessage encryptedMessage)
+        // {
+        //     // Not used in new implementation
+        // }
     }
 }

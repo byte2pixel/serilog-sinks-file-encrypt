@@ -1,0 +1,49 @@
+using Serilog.Sinks.File.Encrypt.Models;
+using Serilog.Sinks.File.Encrypt.Readers;
+
+namespace Serilog.Sinks.File.Encrypt.Tests.unit;
+
+public class DecryptedLogReaderTests
+{
+    // This test is a placeholder for future tests that will validate the functionality of the DecryptedLogReader class.
+    private const string LogFilePath =
+        @"D:\repos\serilog-sinks-file-encrypt\examples\Example.Console\bin\Debug\net8.0\Logs\log20260215.txt";
+
+    private const string PrivateKeyPath =
+        @"D:\repos\serilog-sinks-file-encrypt\examples\Example.Console\private_key.xml";
+
+    private readonly Dictionary<string, RSA> _decryptionKeys = [];
+    private readonly DecryptionOptions _options;
+
+    public DecryptedLogReaderTests()
+    {
+        var rsa = RSA.Create();
+        rsa.FromString(System.IO.File.ReadAllText(PrivateKeyPath));
+        _decryptionKeys.Add("MyKeyIdExample", rsa);
+        _options = new DecryptionOptions { DecryptionKeys = _decryptionKeys, QueueDepth = 10 };
+    }
+
+    [Fact]
+    public async Task TestDecryptedLogReader()
+    {
+        // Arrange
+        await using var inputStream = new FileStream(LogFilePath, FileMode.Open, FileAccess.Read);
+        using var outputStream = new MemoryStream();
+        var decryptedLogReader = new EncryptedLogReader(inputStream, _options, new FrameReader());
+        await decryptedLogReader.DecryptToStreamAsync(
+            outputStream,
+            TestContext.Current.CancellationToken
+        );
+
+        // Assert
+        outputStream.Seek(0, SeekOrigin.Begin);
+        using var reader = new StreamReader(outputStream);
+        string decryptedContent = await reader.ReadToEndAsync(
+            TestContext.Current.CancellationToken
+        );
+        Assert.False(
+            string.IsNullOrEmpty(decryptedContent),
+            "Decrypted content should not be empty."
+        );
+    }
+}

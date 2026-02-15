@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using Serilog.Sinks.File.Encrypt.Models;
+using Serilog.Sinks.File.Encrypt.Readers;
 
 namespace Serilog.Sinks.File.Encrypt;
 
@@ -42,7 +43,7 @@ public static class EncryptionUtils
 
     /// <summary>
     /// AES-GCM encryption requires a unique nonce for each encryption operation.
-    /// This method increments the nonce value stored in the last 8 bytes of the data array.
+    /// This method increments the nonce value stored in the last 12 bytes of the data array.
     /// </summary>
     /// <param name="nonce">Nonce of any length >= 12</param>
     /// <exception cref="ArgumentNullException">
@@ -122,11 +123,10 @@ public static class EncryptionUtils
     /// </summary>
     /// <param name="inputStream">Stream containing the encrypted log data. Must be readable and seekable.</param>
     /// <param name="outputStream">Stream where the decrypted content will be written. Must be writable.</param>
-    /// <param name="rsaPrivateKey">The RSA private key used for decryption. Must match the public key used for encryption.</param>
     /// <param name="options">Streaming options for the decryption process. If null, uses <see cref="StreamingOptions.Default"/>.</param>
     /// <param name="cancellationToken">Cancellation token to cancel the decryption operation.</param>
     /// <returns>A task representing the asynchronous decryption operation.</returns>
-    /// <exception cref="ArgumentNullException">Thrown when <paramref name="inputStream"/>, <paramref name="outputStream"/>, or <paramref name="rsaPrivateKey"/> is null.</exception>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="inputStream"/>, <paramref name="outputStream"/></exception>
     /// <exception cref="CryptographicException">Thrown when decryption fails due to wrong key, corrupted data, or invalid format.</exception>
     /// <exception cref="InvalidOperationException">Thrown when the input stream does not contain valid encryption markers.</exception>
     /// <exception cref="OperationCanceledException">Thrown when the operation is cancelled via <paramref name="cancellationToken"/>.</exception>
@@ -179,14 +179,11 @@ public static class EncryptionUtils
     public static async Task DecryptLogFileAsync(
         Stream inputStream,
         Stream outputStream,
-        string rsaPrivateKey,
-        StreamingOptions? options = null,
+        DecryptionOptions options,
         CancellationToken cancellationToken = default
     )
     {
-        options ??= StreamingOptions.Default;
-
-        await using StreamingEncryptedFileReader reader = new(inputStream, rsaPrivateKey, options);
+        await using EncryptedLogReader reader = new(inputStream, options);
         await reader.DecryptToStreamAsync(outputStream, cancellationToken);
     }
 
@@ -195,7 +192,6 @@ public static class EncryptionUtils
     /// </summary>
     /// <param name="encryptedFilePath">Path to the encrypted log file. File must exist and be readable.</param>
     /// <param name="outputFilePath">Path where the decrypted content will be written. Will be created or overwritten.</param>
-    /// <param name="rsaPrivateKey">The RSA private key used for decryption. Must match the public key used for encryption.</param>
     /// <param name="options">Streaming options for the decryption process. If null, uses <see cref="StreamingOptions.Default"/>.</param>
     /// <param name="cancellationToken">Cancellation token to cancel the decryption operation.</param>
     /// <returns>A task representing the asynchronous decryption operation.</returns>
@@ -207,7 +203,7 @@ public static class EncryptionUtils
     /// <exception cref="OperationCanceledException">Thrown when the operation is canceled via <paramref name="cancellationToken"/>.</exception>
     /// <remarks>
     /// This is a convenience overload that automatically manages file streams. For more control over stream handling,
-    /// use the <see cref="DecryptLogFileAsync(Stream, Stream, string, StreamingOptions?, CancellationToken)"/> overload.
+    /// use the <see cref="DecryptLogFileAsync(Stream, Stream, DecryptionOptions, CancellationToken)"/> overload.
     /// </remarks>
     /// <example>
     /// <code>
@@ -237,20 +233,13 @@ public static class EncryptionUtils
     public static async Task DecryptLogFileAsync(
         string encryptedFilePath,
         string outputFilePath,
-        string rsaPrivateKey,
-        StreamingOptions? options = null,
+        DecryptionOptions options,
         CancellationToken cancellationToken = default
     )
     {
         await using FileStream inputStream = System.IO.File.OpenRead(encryptedFilePath);
         await using FileStream outputStream = System.IO.File.Create(outputFilePath);
 
-        await DecryptLogFileAsync(
-            inputStream,
-            outputStream,
-            rsaPrivateKey,
-            options,
-            cancellationToken
-        );
+        await DecryptLogFileAsync(inputStream, outputStream, options, cancellationToken);
     }
 }

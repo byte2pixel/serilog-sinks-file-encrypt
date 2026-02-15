@@ -1,3 +1,5 @@
+using Serilog.Sinks.File.Encrypt.Models;
+
 namespace Serilog.Sinks.File.Encrypt.Interfaces;
 
 /// <summary>
@@ -16,13 +18,7 @@ public interface IMessageEncryptor
     /// Encrypts the plaintext and writes the encrypted message (ciphertext + tag) directly to the output stream.
     /// </summary>
     /// <param name="output">The stream to write the encrypted data to.</param>
-    /// <param name="plaintext">The plaintext log message to be encrypted.</param>
-    /// <param name="key">The AES session key used for encryption.</param>
-    /// <param name="nonce">The nonce used for AES-GCM encryption.</param>
-    void EncryptAndWrite(
-        Stream output,
-        ReadOnlyMemory<byte> plaintext,
-        ReadOnlySpan<byte> key,
-        ReadOnlySpan<byte> nonce
-    );
+    /// <param name="session">The AesGcm Session and data</param>
+    /// <param name="buffer"></param>
+    void EncryptAndWrite(Stream output, SessionData session, ReadOnlySpan<byte> buffer);
 }

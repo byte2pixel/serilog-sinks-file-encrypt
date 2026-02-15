@@ -21,7 +21,11 @@ internal static class SessionWriterFactory
     {
         return options.Version switch
         {
-            1 => new SessionWriterV1(new HeaderEncryptorV1(options), new MessageEncryptorV1()),
+            1 => new SessionWriterV1(
+                new HeaderEncryptorV1(options),
+                new MessageEncryptorV1(),
+                options.KeyId
+            ),
             _ => throw new NotSupportedException(),
         };
     }

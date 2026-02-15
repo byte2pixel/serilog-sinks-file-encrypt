@@ -11,10 +11,9 @@ public sealed class EncryptedLogStream : Stream
 {
     private readonly Stream _inner;
     private readonly ISessionWriter _writer;
-    private MemoryStream _buffer = new();
-    private const int FlushThreshold = 4096; // Only flush when buffer exceeds 4KB
     private readonly byte[] _aesKey = new byte[32]; // Reusable buffer for AES key
     private readonly byte[] _nonce = new byte[12]; // Reusable buffer for nonce
+    private AesGcm? _aesGcm; // Reusable AES-GCM instance
 
     /// <summary>
     /// Initializes a new instance of the <see cref="EncryptedLogStream"/> class.
@@ -50,7 +49,40 @@ public sealed class EncryptedLogStream : Stream
     /// <inheritdoc />
     public override void Write(byte[] buffer, int offset, int count)
     {
-        _buffer.Write(buffer, offset, count);
+        if (_aesGcm == null)
+        {
+            StartNewSession();
+        }
+        Write(buffer[offset..(offset + count)].AsSpan());
+    }
+
+    /// <inheritdoc />
+    public override void Write(ReadOnlySpan<byte> buffer)
+    {
+        if (buffer.Length == 0)
+        {
+            return;
+        }
+
+        if (_aesGcm == null)
+        {
+            StartNewSession();
+        }
+        SessionData session = new SessionData
+        {
+            AesGcm = _aesGcm!,
+            AesKey = _aesKey,
+            Nonce = _nonce,
+        };
+        _writer.WriteSession(_inner, session, buffer);
+    }
+
+    private void StartNewSession()
+    {
+        // Generate random values directly into reusable buffers (no allocation)
+        RandomNumberGenerator.Fill(_aesKey);
+        RandomNumberGenerator.Fill(_nonce);
+        _aesGcm = new AesGcm(_aesKey, EncryptionConstants.TagLength);
     }
 
     /// <summary>
@@ -69,10 +101,9 @@ public sealed class EncryptedLogStream : Stream
     public override bool CanWrite => true;
 
     /// <summary>
-    /// The length of the buffered log data waiting to be encrypted and written to the underlying stream.
-    /// It does not reflect the length of the underlying stream.
+    /// The length of the underlying stream. This may not reflect the actual length of the encrypted log data until after flushing, as data is buffered for encryption.
     /// </summary>
-    public override long Length => _buffer.Length;
+    public override long Length => _inner.Length;
 
     /// <summary>
     /// The current position within the buffered log data.
@@ -81,7 +112,7 @@ public sealed class EncryptedLogStream : Stream
     /// <exception cref="NotImplementedException"></exception>
     public override long Position
     {
-        get => _buffer.Position;
+        get => _inner.Position;
         set => throw new NotImplementedException();
     }
 
@@ -90,56 +121,7 @@ public sealed class EncryptedLogStream : Stream
     /// </summary>
     public override void Flush()
     {
-        // Only flush if buffer exceeds threshold (batch multiple log entries)
-        if (_buffer.Length < FlushThreshold)
-        {
-            return;
-        }
-
-        FlushInternal();
-    }
-
-    private void FlushInternal()
-    {
-        if (_buffer.Length == 0)
-        {
-            return;
-        }
-
-        // Get zero-copy access to MemoryStream's internal buffer
-        if (!_buffer.TryGetBuffer(out ArraySegment<byte> bufferSegment))
-        {
-            throw new InvalidOperationException("Unable to access MemoryStream buffer");
-        }
-
-        // Generate random values directly into reusable buffers (no allocation)
-        RandomNumberGenerator.Fill(_aesKey);
-        RandomNumberGenerator.Fill(_nonce);
-
-        var session = new SessionData
-        {
-            AesKey = _aesKey,
-            Plaintext = new ReadOnlyMemory<byte>(
-                bufferSegment.Array,
-                bufferSegment.Offset,
-                (int)_buffer.Length
-            ),
-            Nonce = _nonce,
-        };
-
-        _writer.WriteSession(_inner, session);
-
         _inner.Flush();
-        if (_buffer.Capacity > 8192)
-        {
-            // If the buffer has grown too large, replace it with a new one to free memory
-            _buffer.Dispose();
-            _buffer = new MemoryStream();
-        }
-        else
-        {
-            _buffer.SetLength(0);
-        }
     }
 
     /// <summary>
@@ -163,9 +145,9 @@ public sealed class EncryptedLogStream : Stream
     {
         if (disposing)
         {
-            FlushInternal(); // Force flush all remaining data
-            _buffer.Dispose();
+            Flush();
             _inner.Dispose();
+            _aesGcm?.Dispose();
         }
         base.Dispose(disposing);
     }

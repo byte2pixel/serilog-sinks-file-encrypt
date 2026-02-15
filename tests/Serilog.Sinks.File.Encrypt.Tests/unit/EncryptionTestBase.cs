@@ -12,6 +12,9 @@ public abstract class EncryptionTestBase : IDisposable, IAsyncDisposable
         EncryptionUtils.GenerateRsaKeyPair();
     private readonly List<Stream> _streamsToDispose = [];
     private bool _disposed;
+    protected Dictionary<string, RSA> _rsaKeyMap;
+    private DecryptionOptions _decryptionOptions;
+    protected DecryptionOptions Options => _decryptionOptions;
 
     /// <summary>
     /// Creates an encrypted memory stream with the given messages using synchronous Flush. Stream is automatically disposed.
@@ -24,9 +27,16 @@ public abstract class EncryptionTestBase : IDisposable, IAsyncDisposable
         using RSA rsa = RSA.Create();
         rsa.FromXmlString(publicKey);
 
+        _decryptionOptions = new DecryptionOptions
+        {
+            DecryptionKeys = new Dictionary<string, RSA> { { "TestKey", rsa } },
+            QueueDepth = 10,
+        };
+        var encryptionOptions = new EncryptionOptions(rsa, "TestKey");
+
         // Create EncryptedStream but don't dispose it - disposing would close the underlying MemoryStream
         // We just need to flush the data
-        EncryptedStream encryptedStream = new(memoryStream, rsa);
+        EncryptedLogStream encryptedStream = new(memoryStream, encryptionOptions);
 
         foreach (byte[] message in messages.Select(m => Encoding.UTF8.GetBytes(m)))
         {
@@ -65,14 +75,18 @@ public abstract class EncryptionTestBase : IDisposable, IAsyncDisposable
         using RSA rsa = RSA.Create();
         rsa.FromXmlString(publicKey ?? RsaKeyPair.publicKey);
 
+        EncryptionOptions options = new EncryptionOptions(rsa, "TestKey");
+
         // Create EncryptedStream but don't dispose it - disposing would close the underlying MemoryStream
-        EncryptedStream encryptedStream = new(memoryStream, rsa);
+        EncryptedLogStream encryptedStream = new(memoryStream, options);
 
         foreach (byte[] message in messages.Select(m => Encoding.UTF8.GetBytes(m)))
         {
             await encryptedStream.WriteAsync(message, ct);
             await encryptedStream.FlushAsync(ct);
         }
+
+        await encryptedStream.FlushAsync(ct);
 
         // Don't dispose encryptedStream here - let it be garbage collected
         // The MemoryStream will be disposed by the test base
@@ -173,10 +187,14 @@ public abstract class EncryptionTestBase : IDisposable, IAsyncDisposable
         CancellationToken ct = cancellationToken ?? TestContext.Current.CancellationToken;
         MemoryStream outputStream = CreateMemoryStream();
 
+        _rsaKeyMap = new Dictionary<string, RSA> { { "TestKey", RSA.Create() } };
+        _rsaKeyMap["TestKey"].FromXmlString(privateKey ?? RsaKeyPair.privateKey);
+
+        _decryptionOptions = new DecryptionOptions { DecryptionKeys = _rsaKeyMap, QueueDepth = 10 };
         await EncryptionUtils.DecryptLogFileAsync(
             inputStream,
             outputStream,
-            privateKey ?? RsaKeyPair.privateKey,
+            _decryptionOptions,
             cancellationToken: ct
         );
 
@@ -190,7 +208,7 @@ public abstract class EncryptionTestBase : IDisposable, IAsyncDisposable
     /// </summary>
     protected async Task<string> DecryptStreamToStringAsync(
         Stream inputStream,
-        StreamingOptions options,
+        DecryptionOptions options,
         string? privateKey = null,
         CancellationToken? cancellationToken = null
     )
@@ -198,13 +216,7 @@ public abstract class EncryptionTestBase : IDisposable, IAsyncDisposable
         CancellationToken ct = cancellationToken ?? TestContext.Current.CancellationToken;
         MemoryStream outputStream = CreateMemoryStream();
 
-        await EncryptionUtils.DecryptLogFileAsync(
-            inputStream,
-            outputStream,
-            privateKey ?? RsaKeyPair.privateKey,
-            options,
-            ct
-        );
+        await EncryptionUtils.DecryptLogFileAsync(inputStream, outputStream, options, ct);
 
         outputStream.Position = 0;
         using StreamReader reader = new(outputStream, leaveOpen: true);

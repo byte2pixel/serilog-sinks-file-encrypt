@@ -1,6 +1,7 @@
 using System.Buffers;
 using System.Security.Cryptography;
 using Serilog.Sinks.File.Encrypt.Interfaces;
+using Serilog.Sinks.File.Encrypt.Models;
 
 namespace Serilog.Sinks.File.Encrypt.Writers;
 
@@ -14,16 +15,9 @@ internal class MessageEncryptorV1 : IMessageEncryptor
     }
 
     /// <inheritdoc />
-    public void EncryptAndWrite(
-        Stream output,
-        ReadOnlyMemory<byte> plaintext,
-        ReadOnlySpan<byte> key,
-        ReadOnlySpan<byte> nonce
-    )
+    public void EncryptAndWrite(Stream output, SessionData session, ReadOnlySpan<byte> buffer)
     {
-        using var aes = new AesGcm(key, EncryptionConstants.TagLength);
-
-        int plaintextLength = plaintext.Length;
+        int plaintextLength = buffer.Length;
 
         // Rent buffers from pool
         byte[] ciphertext = ArrayPool<byte>.Shared.Rent(plaintextLength);
@@ -32,13 +26,15 @@ internal class MessageEncryptorV1 : IMessageEncryptor
         try
         {
             // Encrypt directly into pooled buffers
-            aes.Encrypt(
-                nonce,
-                plaintext.Span,
+            session.AesGcm.Encrypt(
+                session.Nonce,
+                buffer,
                 ciphertext.AsSpan(0, plaintextLength),
                 tag.AsSpan(0, EncryptionConstants.TagLength),
                 associatedData: null
             );
+
+            session.Nonce.IncreaseNonce();
 
             // Write encrypted data directly to stream from pooled buffers
             output.Write(ciphertext, 0, plaintextLength);

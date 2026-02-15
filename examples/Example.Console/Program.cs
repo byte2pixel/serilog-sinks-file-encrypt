@@ -1,7 +1,9 @@
+using System.Security.Cryptography;
 using Example.Console;
 using Serilog;
 using Serilog.Core;
 using Serilog.Sinks.File.Encrypt;
+using Serilog.Sinks.File.Encrypt.Models;
 
 Console.WriteLine("Hello, World!");
 
@@ -11,6 +13,9 @@ if (!Directory.Exists(logDirectory))
 {
     Directory.CreateDirectory(logDirectory);
 }
+RSA rsa = RSA.Create();
+rsa.FromString(keyService.PublicKey);
+EncryptionOptions options = new(rsa, "MyKeyIdExample");
 
 Logger logger = new LoggerConfiguration()
     .MinimumLevel.Debug()
@@ -20,7 +25,7 @@ Logger logger = new LoggerConfiguration()
         path: Path.Join(logDirectory, "log.txt"),
         rollingInterval: RollingInterval.Day,
         retainedFileCountLimit: 31, // Keep logs for 31 days
-        hooks: new EncryptHooks(keyService.PublicKey) // Use public key for encryption
+        hooks: new EncryptHooks(options) // Use public key for encryption
     )
     .CreateLogger();
 

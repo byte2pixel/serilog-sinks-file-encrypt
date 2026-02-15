@@ -1,3 +1,5 @@
+using Serilog.Sinks.File.Encrypt.Models;
+
 namespace Serilog.Sinks.File.Encrypt.Tests;
 
 public sealed class FileSinkIntegrationTests : IDisposable
@@ -5,6 +7,8 @@ public sealed class FileSinkIntegrationTests : IDisposable
     private readonly string _testDirectory;
     private readonly string _logFilePath;
     private readonly (string publicKey, string privateKey) _rsaKeyPair;
+    private readonly Dictionary<string, RSA> _rsaKeyMap = [];
+    private DecryptionOptions _decryptionOptions;
     private bool _disposed;
 
     public FileSinkIntegrationTests()
@@ -20,6 +24,9 @@ public sealed class FileSinkIntegrationTests : IDisposable
 
         // Generate a key pair for testing
         _rsaKeyPair = EncryptionUtils.GenerateRsaKeyPair();
+        _rsaKeyMap.Add("TestKey", RSA.Create());
+        _rsaKeyMap["TestKey"].FromString(_rsaKeyPair.privateKey);
+        _decryptionOptions = new DecryptionOptions { DecryptionKeys = _rsaKeyMap, QueueDepth = 10 };
     }
 
     private void Dispose(bool disposing)
@@ -118,7 +125,7 @@ public sealed class FileSinkIntegrationTests : IDisposable
         await EncryptionUtils.DecryptLogFileAsync(
             inputStream,
             outputStream,
-            _rsaKeyPair.privateKey,
+            _decryptionOptions,
             cancellationToken: TestContext.Current.CancellationToken
         );
 
@@ -156,7 +163,7 @@ public sealed class FileSinkIntegrationTests : IDisposable
         await EncryptionUtils.DecryptLogFileAsync(
             _logFilePath,
             decryptedFilePath,
-            _rsaKeyPair.privateKey,
+            _decryptionOptions,
             cancellationToken: TestContext.Current.CancellationToken
         );
         // Assert
@@ -188,7 +195,7 @@ public sealed class FileSinkIntegrationTests : IDisposable
         await EncryptionUtils.DecryptLogFileAsync(
             inputStream,
             outputStream,
-            differentKeyPair.privateKey,
+            _decryptionOptions,
             cancellationToken: TestContext.Current.CancellationToken
         );
 
@@ -221,7 +228,7 @@ public sealed class FileSinkIntegrationTests : IDisposable
         await EncryptionUtils.DecryptLogFileAsync(
             inputStream,
             outputStream,
-            _rsaKeyPair.privateKey,
+            _decryptionOptions,
             cancellationToken: TestContext.Current.CancellationToken
         );
 
@@ -271,7 +278,7 @@ public sealed class FileSinkIntegrationTests : IDisposable
         await EncryptionUtils.DecryptLogFileAsync(
             inputStream,
             outputStream,
-            _rsaKeyPair.privateKey,
+            _decryptionOptions,
             cancellationToken: TestContext.Current.CancellationToken
         );
 
@@ -311,7 +318,7 @@ public sealed class FileSinkIntegrationTests : IDisposable
         await EncryptionUtils.DecryptLogFileAsync(
             inputStream,
             outputStream,
-            _rsaKeyPair.privateKey,
+            _decryptionOptions,
             cancellationToken: TestContext.Current.CancellationToken
         );
 
@@ -354,7 +361,7 @@ public sealed class FileSinkIntegrationTests : IDisposable
         await EncryptionUtils.DecryptLogFileAsync(
             inputStream,
             outputStream,
-            _rsaKeyPair.privateKey,
+            _decryptionOptions,
             cancellationToken: TestContext.Current.CancellationToken
         );
 
@@ -399,7 +406,7 @@ public sealed class FileSinkIntegrationTests : IDisposable
         await EncryptionUtils.DecryptLogFileAsync(
             inputStream1,
             outputStream1,
-            _rsaKeyPair.privateKey,
+            _decryptionOptions,
             cancellationToken: TestContext.Current.CancellationToken
         );
 
@@ -408,7 +415,7 @@ public sealed class FileSinkIntegrationTests : IDisposable
         await EncryptionUtils.DecryptLogFileAsync(
             inputStream2,
             outputStream2,
-            secondKeyPair.privateKey,
+            _decryptionOptions,
             cancellationToken: TestContext.Current.CancellationToken
         );
 
@@ -429,7 +436,7 @@ public sealed class FileSinkIntegrationTests : IDisposable
         await EncryptionUtils.DecryptLogFileAsync(
             crossInputStream1,
             crossOutputStream1,
-            secondKeyPair.privateKey,
+            _decryptionOptions,
             cancellationToken: TestContext.Current.CancellationToken
         );
 
@@ -438,7 +445,7 @@ public sealed class FileSinkIntegrationTests : IDisposable
         await EncryptionUtils.DecryptLogFileAsync(
             crossInputStream2,
             crossOutputStream2,
-            _rsaKeyPair.privateKey,
+            _decryptionOptions,
             cancellationToken: TestContext.Current.CancellationToken
         );
 

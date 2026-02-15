@@ -1,3 +1,5 @@
+using System.Security.Cryptography;
+
 namespace Serilog.Sinks.File.Encrypt.Models;
 
 /// <summary>
@@ -7,11 +9,7 @@ namespace Serilog.Sinks.File.Encrypt.Models;
 /// </summary>
 public class SessionData
 {
-    /// <summary>
-    /// The raw plaintext bytes for this session (everything since last flush).
-    /// Using ReadOnlyMemory allows zero-copy access to MemoryStream's internal buffer.
-    /// </summary>
-    public ReadOnlyMemory<byte> Plaintext { get; init; }
+    public required AesGcm AesGcm { get; init; }
 
     /// <summary>
     /// The randomly generated AES session key (e.g., 256-bit)
@@ -26,5 +24,5 @@ public class SessionData
     /// <summary>
     /// Optional: metadata for debugging or future versions
     /// </summary>
-    public DateTimeOffset Timestamp { get; } = DateTimeOffset.UtcNow;
+    public DateTimeOffset Timestamp { get; init; } = DateTimeOffset.UtcNow;
 }

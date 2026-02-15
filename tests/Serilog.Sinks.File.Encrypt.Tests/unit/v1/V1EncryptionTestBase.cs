@@ -10,13 +10,14 @@ public abstract class V1EncryptionTestBase : IDisposable
     protected readonly RSA PublicKey = RSA.Create();
     protected readonly RSA PrivateKey = RSA.Create();
     protected readonly string KeyId;
-    private readonly (string publicKey, string privateKey) _keyPair;
 
     protected V1EncryptionTestBase()
     {
-        _keyPair = EncryptionUtils.GenerateRsaKeyPair(format: KeyFormat.Xml);
-        PublicKey.FromString(_keyPair.publicKey);
-        PrivateKey.FromString(_keyPair.privateKey);
+        (string publicKey, string privateKey) keyPair = EncryptionUtils.GenerateRsaKeyPair(
+            format: KeyFormat.Xml
+        );
+        PublicKey.FromString(keyPair.publicKey);
+        PrivateKey.FromString(keyPair.privateKey);
         KeyId = Guid.NewGuid().ToString();
     }
 
@@ -29,32 +30,17 @@ public abstract class V1EncryptionTestBase : IDisposable
     }
 
     /// <summary>
-    /// Creates encryption options with a custom key ID.
-    /// </summary>
-    protected EncryptionOptions CreateOptionsWithKeyId(string? keyId)
-    {
-        return new EncryptionOptions(PublicKey, keyId);
-    }
-
-    /// <summary>
-    /// Creates encryption options with a custom RSA key and key ID.
-    /// </summary>
-    protected EncryptionOptions CreateOptionsWithCustomKey(RSA publicKey, string? keyId)
-    {
-        return new EncryptionOptions(publicKey, keyId);
-    }
-
-    /// <summary>
     /// Creates a new session data with random AES key and nonce.
     /// </summary>
-    protected SessionData CreateSessionData(string plaintext = "Test")
+    protected SessionData CreateSessionData()
     {
-        byte[] plaintextBytes = Encoding.UTF8.GetBytes(plaintext);
+        byte[] key = RandomNumberGenerator.GetBytes(EncryptionConstants.SessionKeyLength);
+        byte[] nonce = RandomNumberGenerator.GetBytes(EncryptionConstants.NonceLength);
         return new SessionData
         {
-            AesKey = RandomNumberGenerator.GetBytes(EncryptionConstants.SessionKeyLength),
-            Nonce = RandomNumberGenerator.GetBytes(EncryptionConstants.NonceLength),
-            Plaintext = new ReadOnlyMemory<byte>(plaintextBytes),
+            AesGcm = new AesGcm(key, EncryptionConstants.TagLength),
+            AesKey = key,
+            Nonce = nonce,
         };
     }
 
@@ -84,16 +70,16 @@ public abstract class V1EncryptionTestBase : IDisposable
         // If tag is provided separately, combine it with ciphertext
         if (tag != null)
         {
-            var plaintext = new byte[ciphertext.Length];
+            byte[] plaintext = new byte[ciphertext.Length];
             aesGcm.Decrypt(nonce, ciphertext, tag, plaintext);
             return plaintext;
         }
 
         // Otherwise, assume tag is appended to ciphertext
-        var ciphertextLength = ciphertext.Length - EncryptionConstants.TagLength;
-        var tagFromData = ciphertext.AsSpan(ciphertextLength, EncryptionConstants.TagLength);
-        var ciphertextOnly = ciphertext.AsSpan(0, ciphertextLength);
-        var decrypted = new byte[ciphertextLength];
+        int ciphertextLength = ciphertext.Length - EncryptionConstants.TagLength;
+        Span<byte> tagFromData = ciphertext.AsSpan(ciphertextLength, EncryptionConstants.TagLength);
+        Span<byte> ciphertextOnly = ciphertext.AsSpan(0, ciphertextLength);
+        byte[] decrypted = new byte[ciphertextLength];
 
         aesGcm.Decrypt(nonce, ciphertextOnly, tagFromData, decrypted);
         return decrypted;
@@ -106,13 +92,13 @@ public abstract class V1EncryptionTestBase : IDisposable
     {
         using var aesGcm = new AesGcm(key, EncryptionConstants.TagLength);
 
-        var ciphertext = new byte[plaintext.Length];
-        var tag = new byte[EncryptionConstants.TagLength];
+        byte[] ciphertext = new byte[plaintext.Length];
+        byte[] tag = new byte[EncryptionConstants.TagLength];
 
         aesGcm.Encrypt(nonce, plaintext, ciphertext, tag);
 
         // Return ciphertext with tag appended
-        var result = new byte[ciphertext.Length + tag.Length];
+        byte[] result = new byte[ciphertext.Length + tag.Length];
         Buffer.BlockCopy(ciphertext, 0, result, 0, ciphertext.Length);
         Buffer.BlockCopy(tag, 0, result, ciphertext.Length, tag.Length);
 

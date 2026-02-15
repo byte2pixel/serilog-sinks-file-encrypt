@@ -15,5 +15,6 @@ public interface ISessionWriter
     /// </summary>
     /// <param name="output">The underlying stream.</param>
     /// <param name="session">All the info that needs encrypted for this session.</param>
-    void WriteSession(Stream output, SessionData session);
+    /// <param name="buffer"></param>
+    void WriteSession(Stream output, SessionData session, ReadOnlySpan<byte> buffer);
 }
