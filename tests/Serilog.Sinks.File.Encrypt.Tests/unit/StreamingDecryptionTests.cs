@@ -36,9 +36,7 @@ public sealed class StreamingDecryptionTests : EncryptionTestBase
         const string TestMessage = "Test message with custom options";
         DecryptionOptions customOptions = new()
         {
-            DecryptionKeys = _rsaKeyMap,
-            BufferSize = 8 * 1024, // 8KB
-            QueueDepth = 5,
+            DecryptionKeys = DecryptOptions.DecryptionKeys,
             ContinueOnError = false,
         };
 
@@ -75,14 +73,14 @@ public sealed class StreamingDecryptionTests : EncryptionTestBase
     /// and ensures decryption continues past it.
     /// </summary>
     [Theory]
-    [InlineData(299)] // Corrupt the length so it is a marker, but the data is still intact
-    [InlineData(300)] // Corrupt part of the length and data.
-    [InlineData(301)] // Corrupt part of the length and data.
-    [InlineData(302)] // Corrupt part of the length and data.
-    [InlineData(303)] // Corrupt the data
-    [InlineData(305)] // Corrupt the data more.
-    [InlineData(310)] // Corrupt the data and more.
-    [InlineData(320)] // Corrupt the data and more and more.
+    [InlineData(332)] // Corrupt the length so it is a marker and part of the data.
+    [InlineData(333)] // Corrupt part of the length and data.
+    [InlineData(334)] // Corrupt part of the length and data.
+    [InlineData(335)] // Corrupt part of the length and data.
+    [InlineData(336)] // Corrupt the data
+    [InlineData(337)] // Corrupt the data more.
+    [InlineData(338)] // Corrupt the data and more.
+    [InlineData(339)] // Corrupt the data and more and more.
     public async Task DecryptLogFileAsync_WithCorruptedMessageLength_ContinuesOnError(
         int corruptionOffset
     )
@@ -94,17 +92,13 @@ public sealed class StreamingDecryptionTests : EncryptionTestBase
         MemoryStream encryptedStream = await CreateEncryptedStreamAsync(messages);
 
         // Append a new session with a message.
-        encryptedStream = await CreateAppendedMemoryStream(
-            encryptedStream,
-            "Appended message",
-            TestContext.Current.CancellationToken
-        );
+        encryptedStream = await CreateAppendedMemoryStream(encryptedStream, "Appended message");
 
         // Corrupt part of the first session with a marker that corrupts the length of the 2nd message.
         byte[] fileBytes = encryptedStream.ToArray();
         byte[] corrupted = CorruptDataAddingMarker(
             fileBytes,
-            EncryptionConstants.Marker,
+            EncryptionConstants.MagicBytes,
             corruptionOffset
         );
         MemoryStream corruptedStream = CreateMemoryStream(corrupted);
@@ -123,7 +117,7 @@ public sealed class StreamingDecryptionTests : EncryptionTestBase
         string[] messages = ["Good message 1", "Good message 2"];
         DecryptionOptions skipErrorOptions = new()
         {
-            DecryptionKeys = _rsaKeyMap,
+            DecryptionKeys = DecryptOptions.DecryptionKeys,
             ContinueOnError = true,
             ErrorHandlingMode = ErrorHandlingMode.Skip,
         };
@@ -149,7 +143,7 @@ public sealed class StreamingDecryptionTests : EncryptionTestBase
         string[] messages = ["Good message 1", "Good message 2"];
         DecryptionOptions writeInlineOptions = new()
         {
-            DecryptionKeys = _rsaKeyMap,
+            DecryptionKeys = DecryptOptions.DecryptionKeys,
             ContinueOnError = true,
             ErrorHandlingMode = ErrorHandlingMode.WriteInline,
         };
@@ -176,7 +170,7 @@ public sealed class StreamingDecryptionTests : EncryptionTestBase
         string errorLogPath = Path.GetTempFileName();
         DecryptionOptions errorLogOptions = new()
         {
-            DecryptionKeys = _rsaKeyMap,
+            DecryptionKeys = DecryptOptions.DecryptionKeys,
             ContinueOnError = true,
             ErrorHandlingMode = ErrorHandlingMode.WriteToErrorLog,
             ErrorLogPath = errorLogPath,
@@ -218,7 +212,7 @@ public sealed class StreamingDecryptionTests : EncryptionTestBase
         string[] messages = ["Good message 1", "Good message 2"];
         DecryptionOptions throwExceptionOptions = new()
         {
-            DecryptionKeys = _rsaKeyMap,
+            DecryptionKeys = DecryptOptions.DecryptionKeys,
             ContinueOnError = false,
             ErrorHandlingMode = ErrorHandlingMode.ThrowException,
         };
@@ -243,7 +237,7 @@ public sealed class StreamingDecryptionTests : EncryptionTestBase
         string[] messages = ["Message 1", "Message 2", "Message 3"];
         DecryptionOptions throwExceptionOptions = new()
         {
-            DecryptionKeys = _rsaKeyMap,
+            DecryptionKeys = DecryptOptions.DecryptionKeys,
             ContinueOnError = false,
             ErrorHandlingMode = ErrorHandlingMode.ThrowException,
         };

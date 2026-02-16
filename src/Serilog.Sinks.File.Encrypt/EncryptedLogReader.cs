@@ -13,14 +13,20 @@ internal sealed class EncryptedLogReader : IAsyncDisposable, IDisposable
     private readonly DecryptionOptions _options;
     private StreamWriter? _auditLogWriter;
     private bool _disposed;
-    private bool _hasFoundValidHeader;
     private DecryptionContext _context = DecryptionContext.Empty;
+    private readonly Dictionary<string, RSA> _rsaKeyCache = new();
+    private long _decryptedSessions = 0;
+    private long _decryptedMessages = 0;
 
     public EncryptedLogReader(Stream input, DecryptionOptions options)
     {
         _input = input;
         _options = options;
-        _hasFoundValidHeader = false;
+        foreach (KeyValuePair<string, string> key in options.DecryptionKeys)
+        {
+            _rsaKeyCache.Add(key.Key, RSA.Create());
+            _rsaKeyCache[key.Key].FromString(key.Value);
+        }
         _disposed = false;
     }
 
@@ -53,12 +59,16 @@ internal sealed class EncryptedLogReader : IAsyncDisposable, IDisposable
                 throw;
             }
         }
-
-        if (!_hasFoundValidHeader)
-        {
-            // audit log?
-        }
         await output.FlushAsync(cancellationToken);
+        switch (_options.ContinueOnError)
+        {
+            case false when _decryptedSessions == 0:
+                throw new FormatException("No valid sessions found in the file.");
+            case false when _decryptedMessages == 0:
+                throw new CryptographicException(
+                    "No valid messages decrypted from the input stream"
+                );
+        }
     }
 
     private async Task ProcessNextSectionAsync(Stream output, CancellationToken cancellationToken)
@@ -66,27 +76,21 @@ internal sealed class EncryptedLogReader : IAsyncDisposable, IDisposable
         // If we have an active session, try to read a message first
         if (_context.HasKeys)
         {
-            // Peek to check if we're at a new session header
-            byte[] peekBuffer = new byte[EncryptionConstants.MagicBytes.Length];
-            int bytesRead = await _input.ReadAsync(peekBuffer, cancellationToken);
-
-            if (bytesRead < EncryptionConstants.MagicBytes.Length)
+            long startingPosition = _input.Position;
+            try
             {
-                return; // EOF
-            }
-
-            // Check if this is a new session header
-            if (IsHeaderMarker(peekBuffer))
-            {
-                // New session - process it
-                await ProcessSessionHeaderAsync(cancellationToken);
+                await ProcessMessageAsync(output, cancellationToken);
                 return;
             }
-
-            // Not a new session - reset position and process message
-            _input.Position -= bytesRead;
-            await ProcessMessageAsync(output, cancellationToken);
-            return;
+            catch (Exception ex)
+            {
+                // If message processing fails, handle the error and try to recover
+                await HandleErrorChunkAsync(ex, startingPosition, output, cancellationToken);
+                _input.Position = startingPosition;
+                _context = DecryptionContext.Empty; // Clear session context on error
+                await TryRecoverAsync(cancellationToken);
+                return;
+            }
         }
 
         // No active session - look for a session header
@@ -122,10 +126,10 @@ internal sealed class EncryptedLogReader : IAsyncDisposable, IDisposable
             ISessionReader sessionReader = SessionReaderFactory.GetSessionReader(version);
             _context = await sessionReader.ReadSessionAsync(
                 _input,
-                _options.DecryptionKeys,
+                _rsaKeyCache,
                 cancellationToken
             );
-            _hasFoundValidHeader = true;
+            _decryptedSessions++;
         }
         catch (Exception ex)
         {
@@ -200,11 +204,19 @@ internal sealed class EncryptedLogReader : IAsyncDisposable, IDisposable
                     plaintext.AsMemory(0, ciphertextLength).ToArray(),
                     cancellationToken
                 );
+                _decryptedMessages++;
             }
             finally
             {
                 ArrayPool<byte>.Shared.Return(plaintext);
             }
+        }
+        catch (Exception ex)
+        {
+            throw new CryptographicException(
+                $"Failed to decrypt message at position {_input.Position}: {ex.Message}",
+                ex
+            );
         }
         finally
         {
@@ -377,18 +389,13 @@ internal sealed class EncryptedLogReader : IAsyncDisposable, IDisposable
         {
             return;
         }
+        foreach (KeyValuePair<string, RSA> keyValuePair in _rsaKeyCache)
+        {
+            keyValuePair.Value.Dispose();
+        }
 
-        DisposeRsa();
         _auditLogWriter?.Dispose();
         _disposed = true;
-    }
-
-    private void DisposeRsa()
-    {
-        foreach (KeyValuePair<string, RSA> keyInfo in _options.DecryptionKeys)
-        {
-            keyInfo.Value.Dispose();
-        }
     }
 
     public async ValueTask DisposeAsync()
@@ -398,11 +405,14 @@ internal sealed class EncryptedLogReader : IAsyncDisposable, IDisposable
             return;
         }
 
-        DisposeRsa();
-
         if (_auditLogWriter != null)
         {
             await _auditLogWriter.DisposeAsync();
+        }
+
+        foreach (KeyValuePair<string, RSA> keyValuePair in _rsaKeyCache)
+        {
+            keyValuePair.Value.Dispose();
         }
 
         await _input.DisposeAsync();

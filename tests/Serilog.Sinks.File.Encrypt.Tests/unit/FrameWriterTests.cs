@@ -13,7 +13,6 @@ public class FrameWriterTests
         var frameWriter = new FrameWriter();
         const byte Version = 1;
         byte[] header = [1, 2, 3, 4];
-        int sessionLength = header.Length + 16; // Example session length
 
         using var ms = new MemoryStream();
 
@@ -23,12 +22,9 @@ public class FrameWriterTests
 
         // Assert
         byte[] expectedMagicBytes = [0x00, 0x42, 0x32, 0x50, 0xFF, 0xDA, 0x7E, 0x00];
-        byte[] expectedSessionLengthBytes = new byte[4];
-        BinaryPrimitives.WriteInt32BigEndian(expectedSessionLengthBytes, sessionLength);
         byte[] expectedOutput = expectedMagicBytes
             .Concat([Version])
             .Concat(keyIdBytes.ToArray())
-            .Concat(expectedSessionLengthBytes)
             .Concat(header)
             .ToArray();
 

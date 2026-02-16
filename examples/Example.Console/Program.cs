@@ -13,7 +13,7 @@ if (!Directory.Exists(logDirectory))
 {
     Directory.CreateDirectory(logDirectory);
 }
-RSA rsa = RSA.Create();
+using var rsa = RSA.Create();
 rsa.FromString(keyService.PublicKey);
 EncryptionOptions options = new(rsa, "MyKeyIdExample");
 

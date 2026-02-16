@@ -2,8 +2,6 @@ namespace Serilog.Sinks.File.Encrypt;
 
 internal static class EncryptionConstants
 {
-    public static readonly byte[] Marker = [0xFF, 0xFF, 0xFF, 0xFF];
-
     /// <summary>
     /// The fixed magic bytes that identify the file format.
     /// 0x00: Reserved byte (must be 0)
@@ -15,4 +13,5 @@ internal static class EncryptionConstants
     public const int NonceLength = 12; // 96 bits, NIST recommended for AES-GCM
     public const int SessionKeyLength = 32; // 256 bits for AES-256
     public const int TagLength = 16; // 128 bits for AES-GCM authentication tag
+    public const int MinimumRsaKeySize = 2048; // Minimum RSA key size in bits for secure encryption
 }

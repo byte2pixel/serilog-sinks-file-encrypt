@@ -8,7 +8,9 @@ public class EncryptionUtilsTests : EncryptionTestBase
     public void GenerateRsaKeyPair_WithXmlFormat_ReturnsValidKeys()
     {
         // Arrange, Act
-        (string publicKey, string privateKey) = EncryptionUtils.GenerateRsaKeyPair(format: KeyFormat.Xml);
+        (string publicKey, string privateKey) = EncryptionUtils.GenerateRsaKeyPair(
+            format: KeyFormat.Xml
+        );
 
         using RSA privateKeyRsa = RSA.Create();
         privateKeyRsa.FromXmlString(privateKey);
@@ -28,7 +30,9 @@ public class EncryptionUtilsTests : EncryptionTestBase
     public void GenerateRsaKeyPair_WithPemFormat_ReturnsValidKeys()
     {
         // Arrange, Act
-        (string publicKey, string privateKey) = EncryptionUtils.GenerateRsaKeyPair(format: KeyFormat.Pem);
+        (string publicKey, string privateKey) = EncryptionUtils.GenerateRsaKeyPair(
+            format: KeyFormat.Pem
+        );
 
         using RSA privateKeyRsa = RSA.Create();
         privateKeyRsa.ImportFromPem(privateKey);
@@ -51,12 +55,7 @@ public class EncryptionUtilsTests : EncryptionTestBase
         const string OriginalText = "Hello, simple encrypted log!";
 
         // Act - Use helper method that handles all stream management
-        string decrypted = await EncryptAndDecryptAsync(
-            OriginalText,
-            RsaKeyPair.publicKey,
-            RsaKeyPair.privateKey,
-            TestContext.Current.CancellationToken
-        );
+        string decrypted = await EncryptAndDecryptAsync(OriginalText);
 
         // Assert
         decrypted.ShouldContain(OriginalText);
@@ -70,12 +69,7 @@ public class EncryptionUtilsTests : EncryptionTestBase
         const string LogMessage2 = "Second simple log entry!";
 
         // Act - Use helper method that handles all stream management
-        string decrypted = await EncryptAndDecryptAsync(
-            [LogMessage1, LogMessage2],
-            RsaKeyPair.publicKey,
-            RsaKeyPair.privateKey,
-            TestContext.Current.CancellationToken
-        );
+        string decrypted = await EncryptAndDecryptAsync([LogMessage1, LogMessage2]);
 
         // Assert
         decrypted.ShouldContain(LogMessage1);
@@ -86,7 +80,10 @@ public class EncryptionUtilsTests : EncryptionTestBase
     public void GenerateRsaKeyPair_With4096BitKey_WithXmlFormat_ReturnsValidKeys()
     {
         // Arrange & Act
-        (string publicKey, string privateKey) = EncryptionUtils.GenerateRsaKeyPair(keySize: 4096, format: KeyFormat.Xml);
+        (string publicKey, string privateKey) = EncryptionUtils.GenerateRsaKeyPair(
+            keySize: 4096,
+            format: KeyFormat.Xml
+        );
 
         using RSA privateKeyRsa = RSA.Create();
         privateKeyRsa.FromXmlString(privateKey);
@@ -110,7 +107,10 @@ public class EncryptionUtilsTests : EncryptionTestBase
     public void GenerateRsaKeyPair_With4096BitKey_WithPemFormat_ReturnsValidKeys()
     {
         // Arrange & Act
-        (string publicKey, string privateKey) = EncryptionUtils.GenerateRsaKeyPair(keySize: 4096, format: KeyFormat.Pem);
+        (string publicKey, string privateKey) = EncryptionUtils.GenerateRsaKeyPair(
+            keySize: 4096,
+            format: KeyFormat.Pem
+        );
 
         using RSA privateKeyRsa = RSA.Create();
         privateKeyRsa.ImportFromPem(privateKey);
@@ -142,12 +142,7 @@ public class EncryptionUtilsTests : EncryptionTestBase
         rsa.KeySize.ShouldBe(4096); // Verify key size
 
         // Act - Use helper that manages streams automatically
-        string decrypted = await EncryptAndDecryptAsync(
-            OriginalText,
-            publicKey,
-            privateKey,
-            TestContext.Current.CancellationToken
-        );
+        string decrypted = await EncryptAndDecryptAsync(OriginalText);
 
         // Assert
         decrypted.ShouldBe(OriginalText);
@@ -158,6 +153,11 @@ public class EncryptionUtilsTests : EncryptionTestBase
     {
         // Arrange
         (string publicKey, string privateKey) = EncryptionUtils.GenerateRsaKeyPair(keySize: 4096);
+        using var rsa = RSA.Create();
+        rsa.FromString(publicKey);
+        EncryptionOptions options = new(rsa, "4096");
+        var map = new Dictionary<string, string> { { options.KeyId, privateKey } };
+        DecryptionOptions decryptionOptions = new() { DecryptionKeys = map };
         const string LogMessage1 = "First log entry with 4096-bit key";
         const string LogMessage2 = "Second log entry with 4096-bit key";
         const string LogMessage3 = "Third log entry with 4096-bit key";
@@ -165,9 +165,8 @@ public class EncryptionUtilsTests : EncryptionTestBase
         // Act - Use helper that manages streams automatically
         string decrypted = await EncryptAndDecryptAsync(
             [LogMessage1, LogMessage2, LogMessage3],
-            publicKey,
-            privateKey,
-            TestContext.Current.CancellationToken
+            options,
+            decryptionOptions
         );
 
         // Assert

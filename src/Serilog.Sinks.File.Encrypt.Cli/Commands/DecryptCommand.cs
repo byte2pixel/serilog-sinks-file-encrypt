@@ -138,15 +138,13 @@ public sealed class DecryptCommand(IAnsiConsole console, IFileSystem fileSystem)
                 continueOnError = true;
             }
 
-            using RSA rsa = RSA.Create();
-            rsa.FromString(rsaPrivateKey);
-            var rsaKeys = new Dictionary<string, RSA>
+            var decryptionKeys = new Dictionary<string, string>
             {
-                { "", rsa }, // Default key with empty key ID
+                { "", rsaPrivateKey }, // Default key with empty key ID
             };
             DecryptionOptions decryptionOptions = new()
             {
-                DecryptionKeys = rsaKeys,
+                DecryptionKeys = decryptionKeys,
                 ErrorHandlingMode = errorMode,
                 ErrorLogPath = settings.ErrorLogPath,
                 ContinueOnError = continueOnError,
@@ -184,7 +182,7 @@ public sealed class DecryptCommand(IAnsiConsole console, IFileSystem fileSystem)
             console.MarkupLineInterpolated($"[red]✗ Access denied: {ex.Message}[/]");
             return 1;
         }
-        catch (System.Security.Cryptography.CryptographicException ex)
+        catch (CryptographicException ex)
         {
             console.MarkupLineInterpolated($"[red]✗ Decryption failed: {ex.Message}[/]");
             return 1;
@@ -256,7 +254,7 @@ public sealed class DecryptCommand(IAnsiConsole console, IFileSystem fileSystem)
                 console.MarkupLineInterpolated($"[red]✗ Failed:[/] {inputFile} - {ex.Message}");
                 failureCount++;
             }
-            catch (System.Security.Cryptography.CryptographicException ex)
+            catch (CryptographicException ex)
             {
                 console.MarkupLineInterpolated(
                     $"[red]✗ Decryption failed:[/] {inputFile} - {ex.Message}"

@@ -1,5 +1,4 @@
 using Serilog.Sinks.File.Encrypt.Models;
-using Serilog.Sinks.File.Encrypt.Readers;
 
 namespace Serilog.Sinks.File.Encrypt.Tests.unit;
 
@@ -12,15 +11,14 @@ public class DecryptedLogReaderTests
     private const string PrivateKeyPath =
         @"D:\repos\serilog-sinks-file-encrypt\examples\Example.Console\private_key.xml";
 
-    private readonly Dictionary<string, RSA> _decryptionKeys = [];
+    private readonly Dictionary<string, string> _decryptionKeys = [];
     private readonly DecryptionOptions _options;
 
     public DecryptedLogReaderTests()
     {
-        var rsa = RSA.Create();
-        rsa.FromString(System.IO.File.ReadAllText(PrivateKeyPath));
-        _decryptionKeys.Add("MyKeyIdExample", rsa);
-        _options = new DecryptionOptions { DecryptionKeys = _decryptionKeys, QueueDepth = 10 };
+        string privateKey = System.IO.File.ReadAllText(PrivateKeyPath);
+        _decryptionKeys.Add("MyKeyIdExample", privateKey);
+        _options = new DecryptionOptions { DecryptionKeys = _decryptionKeys };
     }
 
     [Fact]

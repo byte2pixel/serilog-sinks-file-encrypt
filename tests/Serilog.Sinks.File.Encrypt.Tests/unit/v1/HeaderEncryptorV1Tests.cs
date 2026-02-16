@@ -44,7 +44,7 @@ public class HeaderEncryptorV1Tests : V1EncryptionTestBase
     /// <summary>
     /// Helper method to decrypt and parse the V1 header format.
     /// Format:
-    /// RSA-Encrypted: AESKey(32) + Nonce(12) + Timestamp(8)
+    /// RSA-Encrypted: AESKey(32) + Nonce(12)
     /// </summary>
     private DecryptedHeaderV1 DecryptAndParseHeader(ReadOnlySpan<byte> header)
     {
@@ -64,19 +64,9 @@ public class HeaderEncryptorV1Tests : V1EncryptionTestBase
         byte[] nonce = decryptedPayload
             .AsSpan(payloadOffset, HeaderMetadataV1.NonceLength)
             .ToArray();
-        payloadOffset += HeaderMetadataV1.NonceLength;
 
-        // Parse Timestamp
-        long timestamp = BitConverter.ToInt64(decryptedPayload.AsSpan(payloadOffset, 8));
-        var timestampOffset = DateTimeOffset.FromUnixTimeMilliseconds(timestamp);
-
-        return new DecryptedHeaderV1(KeyId, aesKey, nonce, timestampOffset);
+        return new DecryptedHeaderV1(KeyId, aesKey, nonce);
     }
 
-    private record DecryptedHeaderV1(
-        string KeyId,
-        byte[] AesKey,
-        byte[] Nonce,
-        DateTimeOffset Timestamp
-    );
+    private record DecryptedHeaderV1(string KeyId, byte[] AesKey, byte[] Nonce);
 }

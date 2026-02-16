@@ -20,8 +20,6 @@ public class EncryptedLogStreamTests
         encStream.CanSeek.ShouldBeFalse();
         encStream.CanWrite.ShouldBeTrue();
 
-        Should.Throw<NotSupportedException>(() => encStream.Length.ShouldBe(0));
-        Should.Throw<NotSupportedException>(() => encStream.Position = 0);
         Should.Throw<NotSupportedException>(() => encStream.Read(new byte[1], 0, 1));
         Should.Throw<NotSupportedException>(() => encStream.Seek(0, SeekOrigin.Begin));
         Should.Throw<NotSupportedException>(() => encStream.SetLength(100));
@@ -131,18 +129,5 @@ public class EncryptedLogStreamTests
 
         // Act & Assert
         Should.Throw<ArgumentNullException>(() => new EncryptedLogStream(fs, null!));
-    }
-
-    [Fact]
-    public void Ctor_KeyTooShort_ThrowsArgumentException()
-    {
-        // Arrange
-        (string publicKey, _) = EncryptionUtils.GenerateRsaKeyPair(512); // Too short for OAEP
-        using MemoryStream fs = new();
-        using RSA rsa = RSA.Create();
-        rsa.FromXmlString(publicKey);
-        EncryptionOptions options = new(rsa);
-        // Act & Assert
-        Should.Throw<ArgumentOutOfRangeException>(() => new EncryptedLogStream(fs, options));
     }
 }

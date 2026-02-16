@@ -47,6 +47,7 @@ public class EncryptHooks : FileLifecycleHooks
     /// Creates a new instance of <see cref="EncryptHooks"/> with the provided RSA public key.
     /// </summary>
     /// <param name="publicKey">The RSA public key in XML or PEM format. Use <see cref="EncryptionUtils.GenerateRsaKeyPair"/> to generate keys.</param>
+    /// <param name="keyId">Optional key ID to include in the header for key rotation. Default is an empty string.</param>
     /// <exception cref="ArgumentNullException">Thrown when <paramref name="publicKey"/> is null or whitespace.</exception>
     /// <exception cref="FormatException">Thrown when <paramref name="publicKey"/> is in an invalid format.</exception>
     /// <exception cref="CryptographicException">Thrown when the format is invalid or cannot be parsed as an RSA public key.</exception>
@@ -65,11 +66,11 @@ public class EncryptHooks : FileLifecycleHooks
     /// var hooks = new EncryptHooks(publicKey);
     /// </code>
     /// </example>
-    public EncryptHooks(string publicKey)
+    public EncryptHooks(string publicKey, string keyId = "")
     {
         var rsa = RSA.Create();
         rsa.FromString(publicKey);
-        _encryptionOptions = new EncryptionOptions(rsa);
+        _encryptionOptions = new EncryptionOptions(rsa, keyId);
     }
 
     /// <summary>
@@ -79,6 +80,10 @@ public class EncryptHooks : FileLifecycleHooks
     /// <exception cref="ArgumentNullException">Thrown when <paramref name="encryptionOptions"/> is null.</exception>
     public EncryptHooks(EncryptionOptions encryptionOptions)
     {
+        ArgumentOutOfRangeException.ThrowIfLessThan(
+            encryptionOptions.Rsa.KeySize,
+            EncryptionConstants.MinimumRsaKeySize
+        );
         ArgumentNullException.ThrowIfNull(encryptionOptions);
         _encryptionOptions = encryptionOptions;
     }

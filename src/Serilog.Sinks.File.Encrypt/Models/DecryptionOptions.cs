@@ -5,57 +5,12 @@ namespace Serilog.Sinks.File.Encrypt.Models;
 /// <summary>
 /// Decryption options for Serilog.Sinks.File.Encrypt decryption tools.
 /// </summary>
-public record DecryptionOptions
+public sealed record DecryptionOptions
 {
     /// <summary>
     /// A dictionary of RSA private keys indexed by their corresponding key IDs. This allows for key rotation and supports multiple keys for decryption.
     /// </summary>
-    public required Dictionary<string, RSA> DecryptionKeys { get; init; } = [];
-
-    /// <summary>
-    /// Default buffer size for decryption chunks (16KB)
-    /// </summary>
-    private const int DefaultBufferSize = 16 * 1024;
-
-    /// <summary>
-    /// Default queue depth for producer-consumer pattern
-    /// </summary>
-    private const int DefaultQueueDepth = 10;
-
-    /// <summary>
-    /// Buffer size for processing encryption chunks in bytes.
-    /// </summary>
-    /// <remarks>
-    /// <para>
-    /// Larger buffers improve throughput for large files but increase memory usage.
-    /// Recommended range: 8KB - 64KB.
-    /// </para>
-    /// <para>
-    /// <b>Performance Impact:</b>
-    /// - 8KB: Low memory, suitable for memory-constrained environments
-    /// - 16KB: Balanced (default)
-    /// - 32KB-64KB: High throughput for large files
-    /// </para>
-    /// </remarks>
-    public int BufferSize { get; init; } = DefaultBufferSize;
-
-    /// <summary>
-    /// Maximum number of chunks to queue between producer and consumer threads.
-    /// </summary>
-    /// <remarks>
-    /// <para>
-    /// Higher values allow more parallelism but increase memory usage.
-    /// Total buffered memory ≈ BufferSize × QueueDepth.
-    /// Recommended range: 5 - 50.
-    /// </para>
-    /// <para>
-    /// <b>Performance Impact:</b>
-    /// - 5-10: Balanced (default: 10)
-    /// - 20-50: High throughput scenarios
-    /// - 1-5: Memory-constrained environments
-    /// </para>
-    /// </remarks>
-    public int QueueDepth { get; init; } = DefaultQueueDepth;
+    public required Dictionary<string, string> DecryptionKeys { get; init; } = [];
 
     /// <summary>
     /// Whether to continue processing after encountering decryption errors.

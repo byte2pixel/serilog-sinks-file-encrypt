@@ -40,16 +40,15 @@ public sealed class EncryptedLogStream : Stream
     /// <param name="offset"></param>
     /// <param name="origin"></param>
     /// <returns></returns>
-    /// <exception cref="NotImplementedException"></exception>
-    public override long Seek(long offset, SeekOrigin origin) =>
-        throw new NotImplementedException();
+    /// <exception cref="NotSupportedException"></exception>
+    public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
 
     /// <summary>
     /// Setting length is not supported on <see cref="EncryptedLogStream"/> as it is designed for sequential writes.
     /// </summary>
     /// <param name="value"></param>
-    /// <exception cref="NotImplementedException"></exception>
-    public override void SetLength(long value) => throw new NotImplementedException();
+    /// <exception cref="NotSupportedException"></exception>
+    public override void SetLength(long value) => throw new NotSupportedException();
 
     /// <inheritdoc />
     public override void Write(byte[] buffer, int offset, int count)
@@ -169,11 +168,11 @@ public sealed class EncryptedLogStream : Stream
     /// <param name="offset"></param>
     /// <param name="count"></param>
     /// <returns></returns>
-    /// <exception cref="NotImplementedException">
+    /// <exception cref="NotSupportedException">
     /// Reading is not supported on <see cref="EncryptedLogStream"/> as it is designed for write-only log encryption.
     /// </exception>
     public override int Read(byte[] buffer, int offset, int count) =>
-        throw new NotImplementedException();
+        throw new NotSupportedException();
 
     /// <summary>
     /// Disposes the stream by flushing any remaining buffered log data, encrypting it, and writing it to the underlying stream before disposing of the inner stream.

@@ -530,8 +530,8 @@ public class DecryptCommandTests : CommandTestBase
         result.ShouldBe(1); // Error
         // Should detect that the file has no valid encryption markers
         // With ThrowException mode, the InvalidOperationException bubbles up to the top-level handler
-        TestConsole.Output.ShouldContain("✗ Invalid file:");
-        TestConsole.Output.ShouldContain("does not contain valid encryption markers");
+        TestConsole.Output.ShouldContain("✗ Invalid");
+        TestConsole.Output.ShouldContain("No valid sessions found in the file.");
     }
 
     [Fact]

@@ -7,8 +7,8 @@ public sealed class FileSinkIntegrationTests : IDisposable
     private readonly string _testDirectory;
     private readonly string _logFilePath;
     private readonly (string publicKey, string privateKey) _rsaKeyPair;
-    private readonly Dictionary<string, RSA> _rsaKeyMap = [];
-    private DecryptionOptions _decryptionOptions;
+    private readonly Dictionary<string, string> _rsaKeyMap = [];
+    private readonly DecryptionOptions _decryptionOptions;
     private bool _disposed;
 
     public FileSinkIntegrationTests()
@@ -24,9 +24,8 @@ public sealed class FileSinkIntegrationTests : IDisposable
 
         // Generate a key pair for testing
         _rsaKeyPair = EncryptionUtils.GenerateRsaKeyPair();
-        _rsaKeyMap.Add("TestKey", RSA.Create());
-        _rsaKeyMap["TestKey"].FromString(_rsaKeyPair.privateKey);
-        _decryptionOptions = new DecryptionOptions { DecryptionKeys = _rsaKeyMap, QueueDepth = 10 };
+        _rsaKeyMap.Add("", _rsaKeyPair.privateKey);
+        _decryptionOptions = new DecryptionOptions { DecryptionKeys = _rsaKeyMap };
     }
 
     private void Dispose(bool disposing)
@@ -195,7 +194,13 @@ public sealed class FileSinkIntegrationTests : IDisposable
         await EncryptionUtils.DecryptLogFileAsync(
             inputStream,
             outputStream,
-            _decryptionOptions,
+            new DecryptionOptions()
+            {
+                DecryptionKeys = new Dictionary<string, string>()
+                {
+                    { "", differentKeyPair.privateKey },
+                },
+            },
             cancellationToken: TestContext.Current.CancellationToken
         );
 
@@ -382,14 +387,16 @@ public sealed class FileSinkIntegrationTests : IDisposable
 
         // Generate a second key pair
         (string publicKey, string privateKey) secondKeyPair = EncryptionUtils.GenerateRsaKeyPair();
+        _decryptionOptions.DecryptionKeys.Add("Key1", _rsaKeyPair.privateKey);
+        _decryptionOptions.DecryptionKeys.Add("Key2", secondKeyPair.privateKey);
 
         // Act - Create two loggers with different encryption keys
         Logger logger1 = new LoggerConfiguration()
-            .WriteTo.File(path: logFile1, hooks: new EncryptHooks(_rsaKeyPair.publicKey))
+            .WriteTo.File(path: logFile1, hooks: new EncryptHooks(_rsaKeyPair.publicKey, "Key1"))
             .CreateLogger();
 
         Logger logger2 = new LoggerConfiguration()
-            .WriteTo.File(path: logFile2, hooks: new EncryptHooks(secondKeyPair.publicKey))
+            .WriteTo.File(path: logFile2, hooks: new EncryptHooks(secondKeyPair.publicKey, "Key2"))
             .CreateLogger();
 
         // Write to both logs
@@ -436,7 +443,13 @@ public sealed class FileSinkIntegrationTests : IDisposable
         await EncryptionUtils.DecryptLogFileAsync(
             crossInputStream1,
             crossOutputStream1,
-            _decryptionOptions,
+            new DecryptionOptions
+            {
+                DecryptionKeys = new Dictionary<string, string>
+                {
+                    { "Key2", secondKeyPair.privateKey },
+                },
+            },
             cancellationToken: TestContext.Current.CancellationToken
         );
 
@@ -445,7 +458,13 @@ public sealed class FileSinkIntegrationTests : IDisposable
         await EncryptionUtils.DecryptLogFileAsync(
             crossInputStream2,
             crossOutputStream2,
-            _decryptionOptions,
+            new DecryptionOptions
+            {
+                DecryptionKeys = new Dictionary<string, string>
+                {
+                    { "Key1", _rsaKeyPair.privateKey },
+                },
+            },
             cancellationToken: TestContext.Current.CancellationToken
         );
 
