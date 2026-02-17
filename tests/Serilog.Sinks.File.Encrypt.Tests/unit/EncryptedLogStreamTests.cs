@@ -19,10 +19,12 @@ public class EncryptedLogStreamTests
         encStream.CanRead.ShouldBeFalse();
         encStream.CanSeek.ShouldBeFalse();
         encStream.CanWrite.ShouldBeTrue();
+        encStream.Length.ShouldBe(0);
 
         Should.Throw<NotSupportedException>(() => encStream.Read(new byte[1], 0, 1));
         Should.Throw<NotSupportedException>(() => encStream.Seek(0, SeekOrigin.Begin));
         Should.Throw<NotSupportedException>(() => encStream.SetLength(100));
+        Should.Throw<NotSupportedException>(() => encStream.Position = 0);
     }
 
     [Fact]

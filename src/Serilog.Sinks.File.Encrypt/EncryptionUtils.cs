@@ -101,17 +101,13 @@ public static class EncryptionUtils
     {
         using RSA rsa = RSA.Create(keySize);
 
-        string publicKey = format switch
+        (string publicKey, string privateKey) = format switch
         {
-            KeyFormat.Xml => rsa.ToXmlString(includePrivateParameters: false),
-            KeyFormat.Pem => rsa.ExportRSAPublicKeyPem(),
-            _ => throw new NotSupportedException($"Unsupported key format: {format}"),
-        };
-
-        string privateKey = format switch
-        {
-            KeyFormat.Xml => rsa.ToXmlString(includePrivateParameters: true),
-            KeyFormat.Pem => rsa.ExportRSAPrivateKeyPem(),
+            KeyFormat.Xml => (
+                rsa.ToXmlString(includePrivateParameters: false),
+                rsa.ToXmlString(includePrivateParameters: true)
+            ),
+            KeyFormat.Pem => (rsa.ExportRSAPublicKeyPem(), rsa.ExportRSAPrivateKeyPem()),
             _ => throw new NotSupportedException($"Unsupported key format: {format}"),
         };
 

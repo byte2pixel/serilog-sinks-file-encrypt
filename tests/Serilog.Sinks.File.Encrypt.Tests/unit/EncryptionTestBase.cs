@@ -18,8 +18,8 @@ public abstract class EncryptionTestBase : IDisposable, IAsyncDisposable
 
     protected EncryptionTestBase()
     {
-        DecryptOptions = CreateDecryptionOptions();
         EncryptOptions = CreateEncryptionOptions();
+        DecryptOptions = CreateDecryptionOptions();
     }
 
     public async ValueTask DisposeAsync()

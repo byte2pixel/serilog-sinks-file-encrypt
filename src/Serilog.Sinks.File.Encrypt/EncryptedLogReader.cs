@@ -15,8 +15,9 @@ internal sealed class EncryptedLogReader : IAsyncDisposable, IDisposable
     private bool _disposed;
     private DecryptionContext _context = DecryptionContext.Empty;
     private readonly Dictionary<string, RSA> _rsaKeyCache = new();
-    private long _decryptedSessions = 0;
-    private long _decryptedMessages = 0;
+    private long _decryptedSessions;
+    private long _decryptedMessages;
+    private long _nextSyncPosition;
 
     public EncryptedLogReader(Stream input, DecryptionOptions options)
     {
@@ -35,6 +36,7 @@ internal sealed class EncryptedLogReader : IAsyncDisposable, IDisposable
         CancellationToken cancellationToken = default
     )
     {
+        await WriteToAuditLogAsync("Starting decryption process", cancellationToken);
         while (!IsEndOfStream() && !cancellationToken.IsCancellationRequested)
         {
             try
@@ -43,7 +45,8 @@ internal sealed class EncryptedLogReader : IAsyncDisposable, IDisposable
             }
             catch (Exception ex) when (_options.ContinueOnError)
             {
-                await HandleErrorChunkAsync(ex, _input.Position, output, cancellationToken);
+                await WriteToErrorLogAsync(ex, _input.Position, cancellationToken);
+                await HandleErrorChunkAsync(ex, output, cancellationToken);
                 await TryRecoverAsync(cancellationToken);
             }
             catch (Exception ex) when (!_options.ContinueOnError)
@@ -55,10 +58,26 @@ internal sealed class EncryptedLogReader : IAsyncDisposable, IDisposable
                         ex
                     );
                 }
-                await HandleErrorChunkAsync(ex, _input.Position, output, cancellationToken);
+
+                await HandleErrorChunkAsync(ex, output, cancellationToken);
                 throw;
             }
+            finally
+            {
+                await WriteToAuditLogAsync(
+                    $"Finally block executed - flushing output stream: input position: {_input.Position}, next sync position: {_nextSyncPosition}",
+                    cancellationToken
+                );
+                await output.FlushAsync(cancellationToken);
+            }
         }
+        await WriteToAuditLogAsync(
+            "Decryption completed. Total sessions: "
+                + _decryptedSessions
+                + ", Total messages: "
+                + _decryptedMessages,
+            cancellationToken
+        );
         await output.FlushAsync(cancellationToken);
         switch (_options.ContinueOnError)
         {
@@ -76,7 +95,6 @@ internal sealed class EncryptedLogReader : IAsyncDisposable, IDisposable
         // If we have an active session, try to read a message first
         if (_context.HasKeys)
         {
-            long startingPosition = _input.Position;
             try
             {
                 await ProcessMessageAsync(output, cancellationToken);
@@ -85,8 +103,7 @@ internal sealed class EncryptedLogReader : IAsyncDisposable, IDisposable
             catch (Exception ex)
             {
                 // If message processing fails, handle the error and try to recover
-                await HandleErrorChunkAsync(ex, startingPosition, output, cancellationToken);
-                _input.Position = startingPosition;
+                await HandleErrorChunkAsync(ex, output, cancellationToken);
                 _context = DecryptionContext.Empty; // Clear session context on error
                 await TryRecoverAsync(cancellationToken);
                 return;
@@ -109,11 +126,17 @@ internal sealed class EncryptedLogReader : IAsyncDisposable, IDisposable
 
         // Not a header marker - reset position and try to recover
         _input.Position -= read;
+        _nextSyncPosition = _input.Position;
         await TryRecoverAsync(cancellationToken);
     }
 
     private async Task ProcessSessionHeaderAsync(CancellationToken cancellationToken)
     {
+        long start = _input.Position;
+        await WriteToAuditLogAsync(
+            $"Session header marker found at position {_input.Position - EncryptionConstants.MagicBytes.Length}",
+            cancellationToken
+        );
         int version = _input.ReadByte();
         if (version == -1)
         {
@@ -130,9 +153,11 @@ internal sealed class EncryptedLogReader : IAsyncDisposable, IDisposable
                 cancellationToken
             );
             _decryptedSessions++;
+            _nextSyncPosition = _input.Position;
         }
         catch (Exception ex)
         {
+            _nextSyncPosition = start;
             throw new CryptographicException(
                 $"Failed to process session at position {_input.Position}: {ex.Message}",
                 ex
@@ -205,6 +230,7 @@ internal sealed class EncryptedLogReader : IAsyncDisposable, IDisposable
                     cancellationToken
                 );
                 _decryptedMessages++;
+                _nextSyncPosition = _input.Position;
             }
             finally
             {
@@ -247,7 +273,6 @@ internal sealed class EncryptedLogReader : IAsyncDisposable, IDisposable
     /// <exception cref="CryptographicException"></exception>
     private async Task HandleErrorChunkAsync(
         Exception exception,
-        long position,
         Stream outputStream,
         CancellationToken cancellationToken
     )
@@ -256,18 +281,18 @@ internal sealed class EncryptedLogReader : IAsyncDisposable, IDisposable
         {
             case ErrorHandlingMode.WriteInline:
                 string errorMessage =
-                    $"[Decryption error at position {position}: {exception.Message}]\n";
+                    $"[Decryption error at position {_input.Position}: {exception.Message}]\n";
                 byte[] errorBytes = Encoding.UTF8.GetBytes(errorMessage);
                 await outputStream.WriteAsync(errorBytes, cancellationToken);
                 break;
 
             case ErrorHandlingMode.WriteToErrorLog:
-                await WriteToErrorLogAsync(exception, position, cancellationToken);
+                await WriteToErrorLogAsync(exception, _input.Position, cancellationToken);
                 break;
 
             case ErrorHandlingMode.ThrowException:
                 throw new CryptographicException(
-                    $"Decryption failed at position {position}: {exception.Message}"
+                    $"Decryption failed at position {_input.Position}: {exception.Message}"
                 );
         }
     }
@@ -290,6 +315,21 @@ internal sealed class EncryptedLogReader : IAsyncDisposable, IDisposable
         await _auditLogWriter.FlushAsync(cancellationToken);
     }
 
+    private async Task WriteToAuditLogAsync(string message, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(_options.ErrorLogPath))
+        {
+            return;
+        }
+
+        _auditLogWriter ??= await CreateErrorLogWriterAsync(cancellationToken);
+
+        string timestamp = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss.fff");
+        string logEntry = $"[{timestamp}] {message}";
+        await _auditLogWriter.WriteLineAsync(logEntry.AsMemory(), cancellationToken);
+        await _auditLogWriter.FlushAsync(cancellationToken);
+    }
+
     /// <summary>
     /// Creates a StreamWriter for the error log file
     /// </summary>
@@ -307,7 +347,7 @@ internal sealed class EncryptedLogReader : IAsyncDisposable, IDisposable
         // Create or append to the error log file
         FileStream fileStream = new(
             errorLogPath,
-            FileMode.Append,
+            FileMode.Create,
             FileAccess.Write,
             FileShare.Read,
             bufferSize: 4096,
@@ -360,6 +400,11 @@ internal sealed class EncryptedLogReader : IAsyncDisposable, IDisposable
         // Try to find the next valid marker
         byte[] searchBuffer = new byte[EncryptionConstants.MagicBytes.Length];
 
+        _input.Position = _nextSyncPosition;
+        await WriteToAuditLogAsync(
+            $"Trying to recover - searching for next marker from position {_input.Position}",
+            cancellationToken
+        );
         while (_input.Position < _input.Length - EncryptionConstants.MagicBytes.Length)
         {
             // Read potential marker
@@ -373,11 +418,20 @@ internal sealed class EncryptedLogReader : IAsyncDisposable, IDisposable
             if (IsHeaderMarker(searchBuffer))
             {
                 // Move back to start of marker
+                await WriteToAuditLogAsync(
+                    $"Found potential session header marker at position {_input.Position - EncryptionConstants.MagicBytes.Length}",
+                    cancellationToken
+                );
                 _input.Position -= EncryptionConstants.MagicBytes.Length;
+                _nextSyncPosition = _input.Position + 1; // Update next sync position to avoid infinite loop on same marker
                 return;
             }
 
             // Move back and advance by 1 byte to continue searching
+            await WriteToAuditLogAsync(
+                $"No marker at position {_input.Position - EncryptionConstants.MagicBytes.Length}, continuing search at +1 byte",
+                cancellationToken
+            );
             _input.Position -= EncryptionConstants.MagicBytes.Length - 1;
         }
         _input.Position = _input.Length;

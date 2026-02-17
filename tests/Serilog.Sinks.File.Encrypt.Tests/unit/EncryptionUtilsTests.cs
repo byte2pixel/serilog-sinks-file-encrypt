@@ -49,34 +49,6 @@ public class EncryptionUtilsTests : EncryptionTestBase
     }
 
     [Fact]
-    public async Task DecryptLogFileAsync_ReturnsDecryptedContent()
-    {
-        // Arrange
-        const string OriginalText = "Hello, simple encrypted log!";
-
-        // Act - Use helper method that handles all stream management
-        string decrypted = await EncryptAndDecryptAsync(OriginalText);
-
-        // Assert
-        decrypted.ShouldContain(OriginalText);
-    }
-
-    [Fact]
-    public async Task DecryptLogFileAsync_ReturnsMultipleDecryptedEntries()
-    {
-        // Arrange
-        const string LogMessage1 = "Simple log file test!";
-        const string LogMessage2 = "Second simple log entry!";
-
-        // Act - Use helper method that handles all stream management
-        string decrypted = await EncryptAndDecryptAsync([LogMessage1, LogMessage2]);
-
-        // Assert
-        decrypted.ShouldContain(LogMessage1);
-        decrypted.ShouldContain(LogMessage2);
-    }
-
-    [Fact]
     public void GenerateRsaKeyPair_With4096BitKey_WithXmlFormat_ReturnsValidKeys()
     {
         // Arrange & Act
@@ -128,6 +100,45 @@ public class EncryptionUtilsTests : EncryptionTestBase
         byte[] decryptedData = privateKeyRsa.Decrypt(encryptedData, RSAEncryptionPadding.Pkcs1);
 
         decryptedData.ShouldBe(data);
+    }
+
+    [Fact]
+    public void GenerateRsaKeyPair_WithInvalidFormat_ThrowsArgumentException()
+    {
+        // Act & Assert
+        Should
+            .Throw<NotSupportedException>(() =>
+                EncryptionUtils.GenerateRsaKeyPair(format: (KeyFormat)999)
+            )
+            .Message.ShouldContain("Unsupported key format: 999");
+    }
+
+    [Fact]
+    public async Task DecryptLogFileAsync_ReturnsDecryptedContent()
+    {
+        // Arrange
+        const string OriginalText = "Hello, simple encrypted log!";
+
+        // Act - Use helper method that handles all stream management
+        string decrypted = await EncryptAndDecryptAsync(OriginalText);
+
+        // Assert
+        decrypted.ShouldContain(OriginalText);
+    }
+
+    [Fact]
+    public async Task DecryptLogFileAsync_ReturnsMultipleDecryptedEntries()
+    {
+        // Arrange
+        const string LogMessage1 = "Simple log file test!";
+        const string LogMessage2 = "Second simple log entry!";
+
+        // Act - Use helper method that handles all stream management
+        string decrypted = await EncryptAndDecryptAsync([LogMessage1, LogMessage2]);
+
+        // Assert
+        decrypted.ShouldContain(LogMessage1);
+        decrypted.ShouldContain(LogMessage2);
     }
 
     [Fact]

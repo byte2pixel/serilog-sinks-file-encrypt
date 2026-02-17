@@ -144,13 +144,14 @@ public sealed class EncryptedLogStream : Stream
 
     /// <summary>
     /// The current position within the buffered log data.
-    /// Setting the position is not supported as <see cref="EncryptedLogStream"/> is designed for sequential writes.
     /// </summary>
-    /// <exception cref="NotImplementedException"></exception>
+    /// <exception cref="NotSupportedException">
+    /// Setting the position is not supported on <see cref="EncryptedLogStream"/> as it is designed for sequential writes.
+    /// </exception>
     public override long Position
     {
         get => _inner.Position;
-        set => throw new NotImplementedException();
+        set => throw new NotSupportedException();
     }
 
     /// <summary>

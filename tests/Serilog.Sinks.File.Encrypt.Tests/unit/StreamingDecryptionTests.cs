@@ -87,7 +87,12 @@ public sealed class StreamingDecryptionTests : EncryptionTestBase
     {
         // Arrange - Do not change message sizes or the marker will not be in the correct offsets for each test.
         string[] messages = ["Good message 1\n", "Good message 2\n"];
-
+        var keyMap = new Dictionary<string, string> { { "", RsaKeyPair.privateKey } };
+        DecryptionOptions decryptionOptions = new()
+        {
+            DecryptionKeys = keyMap,
+            // ErrorLogPath = $"decryption_errors_{corruptionOffset}.log",
+        };
         // create a session with 2 messages.
         MemoryStream encryptedStream = await CreateEncryptedStreamAsync(messages);
 
@@ -104,7 +109,7 @@ public sealed class StreamingDecryptionTests : EncryptionTestBase
         MemoryStream corruptedStream = CreateMemoryStream(corrupted);
 
         // Act
-        string result = await DecryptStreamToStringAsync(corruptedStream);
+        string result = await DecryptStreamToStringAsync(corruptedStream, decryptionOptions);
 
         // Assert we still got message 1 and message 2
         result.ShouldBe("Good message 1\nAppended message");

@@ -27,13 +27,6 @@ internal sealed class HeaderEncryptorV1 : IHeaderEncryptor
     /// <inheritdoc />
     public ReadOnlySpan<byte> Encrypt(ReadOnlySpan<byte> aesKey, ReadOnlySpan<byte> nonce)
     {
-        // Validate RSA payload size before encryption
-        RsaEncryptionHelper.ValidatePayloadSize(
-            HeaderMetadataV1.RsaPayloadLength,
-            _rsa.KeySize,
-            HeaderMetadataV1.Padding
-        );
-
         // Rent buffer from pool for RSA payload
         byte[] payload = ArrayPool<byte>.Shared.Rent(HeaderMetadataV1.RsaPayloadLength);
         try

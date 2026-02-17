@@ -1,3 +1,4 @@
+using System.Collections.ObjectModel;
 using System.Text;
 using Serilog.Sinks.File.Encrypt.Interfaces;
 using Serilog.Sinks.File.Encrypt.Models;
@@ -34,18 +35,17 @@ internal sealed class SessionHeaderWriterV1 : ISessionHeaderWriter
     /// <inheritdoc />
     public void WriteHeader(Stream output, ReadOnlySpan<byte> aesKey, ReadOnlySpan<byte> nonce)
     {
-        // 1. Encrypt header using RSA
-        ReadOnlySpan<byte> header = _headerEncryptor.Encrypt(aesKey, nonce);
-
-        // 2. Write the 32 byte keyId padded or throw if too long for the header format
-        Span<byte> keyIdBytes = Encoding.UTF8.GetBytes(_keyId).AsSpan();
+        Span<byte> keyIdBytes = Encoding.UTF8.GetBytes(_keyId);
         if (keyIdBytes.Length > HeaderMetadataV1.KeyIdLength)
         {
             throw new InvalidOperationException(
                 $"KeyId is too long for the header format. Maximum length is 32 bytes, but was {keyIdBytes.Length} bytes."
             );
         }
+        // 1. Encrypt header using RSA
+        ReadOnlySpan<byte> header = _headerEncryptor.Encrypt(aesKey, nonce);
 
+        // 2. Write the 32 byte keyId padded or throw if too long for the header format
         Span<byte> paddedKeyIdBytes = stackalloc byte[HeaderMetadataV1.KeyIdLength];
         keyIdBytes.CopyTo(paddedKeyIdBytes);
 

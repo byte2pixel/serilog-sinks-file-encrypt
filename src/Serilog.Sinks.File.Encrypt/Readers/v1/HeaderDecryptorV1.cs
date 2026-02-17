@@ -10,17 +10,19 @@ public class HeaderDecryptorV1 : IHeaderDecryptor
     /// <inheritdoc />
     public (byte[] AesKey, byte[] Nonce) Decrypt(RSA rsa, ReadOnlySpan<byte> headerData)
     {
+        int offset = 0;
+
         // Decrypt the RSA payload
         byte[] decryptedPayload = rsa.Decrypt(headerData, RSAEncryptionPadding.OaepSHA256);
-        // Read AES key length + key
-        if (decryptedPayload.Length < 1)
+
+        // Read AES key
+        if (decryptedPayload.Length < HeaderMetadataV1.AesKeyLength)
         {
             throw new InvalidOperationException(
                 "Decrypted payload is too short to read AES key length"
             );
         }
 
-        int offset = 0;
         byte[] aesKey = decryptedPayload[offset..(HeaderMetadataV1.AesKeyLength)];
         offset += HeaderMetadataV1.AesKeyLength;
 
