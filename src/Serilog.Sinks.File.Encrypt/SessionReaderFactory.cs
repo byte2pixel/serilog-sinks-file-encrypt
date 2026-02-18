@@ -13,4 +13,13 @@ internal static class SessionReaderFactory
             _ => throw new NotSupportedException($"Unsupported encryption version: {version}"),
         };
     }
+
+    public static ISessionReader GetSessionReader(byte version)
+    {
+        return version switch
+        {
+            1 => new SessionReaderV1(new HeaderDecryptorV1()),
+            _ => throw new NotSupportedException($"Unsupported encryption version: {version}"),
+        };
+    }
 }
