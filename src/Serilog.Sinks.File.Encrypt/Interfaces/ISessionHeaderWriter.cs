@@ -14,6 +14,7 @@ public interface ISessionHeaderWriter
     /// This includes magic bytes, version, key ID, and RSA-encrypted session data (AES key, nonce, timestamp).
     /// </summary>
     /// <param name="output">The stream to write the header to.</param>
-    /// <param name="session">The session data containing the AES key, nonce, and other session information.</param>
+    /// <param name="aesKey">The AES key for the session, which will be encrypted with RSA and included in the header.</param>
+    /// <param name="nonce">The nonce for AES-GCM, which will also be encrypted and included in the header.</param>
     void WriteHeader(Stream output, ReadOnlySpan<byte> aesKey, ReadOnlySpan<byte> nonce);
 }

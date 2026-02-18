@@ -179,7 +179,7 @@ public static class EncryptionUtils
         CancellationToken cancellationToken = default
     )
     {
-        await using EncryptedLogReader reader = new(inputStream, options);
+        await using LogReader reader = new(inputStream, options);
         await reader.DecryptToStreamAsync(outputStream, cancellationToken);
     }
 

@@ -15,6 +15,6 @@ public class EncryptHooksTests
         using Stream resultStream = hooks.OnFileOpened("test.log", memoryStream, encoding);
 
         // Assert
-        Assert.IsType<EncryptedLogStream>(resultStream);
+        Assert.IsType<LogWriter>(resultStream);
     }
 }

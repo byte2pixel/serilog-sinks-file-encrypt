@@ -44,12 +44,12 @@ public abstract class EncryptionTestBase : IDisposable, IAsyncDisposable
 
         // Create EncryptedStream but don't dispose it - disposing would close the underlying MemoryStream
         // We just need to flush the data
-        EncryptedLogStream encryptedStream = new(memoryStream, EncryptOptions);
+        LogWriter logWriter = new(memoryStream, EncryptOptions);
 
         foreach (byte[] message in messages.Select(m => Encoding.UTF8.GetBytes(m)))
         {
-            encryptedStream.Write(message, 0, message.Length);
-            encryptedStream.Flush();
+            logWriter.Write(message, 0, message.Length);
+            logWriter.Flush();
         }
 
         // Don't dispose encryptedStream here - let it be garbage collected
@@ -81,15 +81,15 @@ public abstract class EncryptionTestBase : IDisposable, IAsyncDisposable
         _streamsToDispose.Add(memoryStream);
 
         // Create EncryptedStream but don't dispose it - disposing would close the underlying MemoryStream
-        EncryptedLogStream encryptedStream = new(memoryStream, encryptionOptions ?? EncryptOptions);
+        LogWriter logWriter = new(memoryStream, encryptionOptions ?? EncryptOptions);
 
         foreach (byte[] message in messages.Select(m => Encoding.UTF8.GetBytes(m)))
         {
-            await encryptedStream.WriteAsync(message, ct);
-            await encryptedStream.FlushAsync(ct);
+            await logWriter.WriteAsync(message, ct);
+            await logWriter.FlushAsync(ct);
         }
 
-        await encryptedStream.FlushAsync(ct);
+        await logWriter.FlushAsync(ct);
 
         // Don't dispose encryptedStream here - let it be garbage collected
         // The MemoryStream will be disposed by the test base
@@ -120,10 +120,10 @@ public abstract class EncryptionTestBase : IDisposable, IAsyncDisposable
         CancellationToken ct = cancellationToken ?? TestContext.Current.CancellationToken;
         memoryStream.Position = memoryStream.Length;
 
-        EncryptedLogStream encryptedStream = new(memoryStream, encryptionOptions ?? EncryptOptions);
+        LogWriter logWriter = new(memoryStream, encryptionOptions ?? EncryptOptions);
         byte[] messageBytes = Encoding.UTF8.GetBytes(message);
-        await encryptedStream.WriteAsync(messageBytes, ct);
-        await encryptedStream.FlushAsync(ct);
+        await logWriter.WriteAsync(messageBytes, ct);
+        await logWriter.FlushAsync(ct);
         memoryStream.Position = 0;
         return memoryStream;
     }

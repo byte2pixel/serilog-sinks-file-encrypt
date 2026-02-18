@@ -67,7 +67,7 @@ public class EncryptedLogStreamBenchmarks
     {
         EncryptionOptions options = new(_rsa, _keyId);
         using MemoryStream ms = new();
-        using EncryptedLogStream els = new(ms, options);
+        using LogWriter els = new(ms, options);
         els.Write(_buffer, 0, _buffer.Length);
         els.Flush();
     }

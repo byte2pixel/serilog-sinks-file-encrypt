@@ -2,7 +2,7 @@ using Serilog.Sinks.File.Encrypt.Models;
 
 namespace Serilog.Sinks.File.Encrypt.Tests.unit;
 
-public class DecryptedLogReaderTests
+public class LogReaderTests
 {
     // This test is a placeholder for future tests that will validate the functionality of the DecryptedLogReader class.
     private const string LogFilePath =
@@ -14,7 +14,7 @@ public class DecryptedLogReaderTests
     private readonly Dictionary<string, string> _decryptionKeys = [];
     private readonly DecryptionOptions _options;
 
-    public DecryptedLogReaderTests()
+    public LogReaderTests()
     {
         string privateKey = System.IO.File.ReadAllText(PrivateKeyPath);
         _decryptionKeys.Add("MyKeyIdExample", privateKey);
@@ -27,7 +27,7 @@ public class DecryptedLogReaderTests
         // Arrange
         await using var inputStream = new FileStream(LogFilePath, FileMode.Open, FileAccess.Read);
         using var outputStream = new MemoryStream();
-        var decryptedLogReader = new EncryptedLogReader(inputStream, _options);
+        var decryptedLogReader = new LogReader(inputStream, _options);
         await decryptedLogReader.DecryptToStreamAsync(
             outputStream,
             TestContext.Current.CancellationToken

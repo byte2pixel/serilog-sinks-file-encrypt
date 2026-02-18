@@ -1107,11 +1107,11 @@ public class DecryptCommandTests : CommandTestBase
         rsa.FromString(rsaPublicKey);
         EncryptionOptions options = new(rsa);
 
-        using (EncryptedLogStream encryptedStream = new(memoryStream, options))
+        using (LogWriter logWriter = new(memoryStream, options))
         {
             byte[] logBytes = Encoding.UTF8.GetBytes(logContent);
-            encryptedStream.Write(logBytes, 0, logBytes.Length);
-            encryptedStream.Flush();
+            logWriter.Write(logBytes, 0, logBytes.Length);
+            logWriter.Flush();
         }
 
         return memoryStream.ToArray();

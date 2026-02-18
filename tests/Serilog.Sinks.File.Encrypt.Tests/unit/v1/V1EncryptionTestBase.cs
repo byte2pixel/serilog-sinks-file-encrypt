@@ -33,7 +33,7 @@ public abstract class V1EncryptionTestBase : IDisposable
     /// <summary>
     /// Creates a new session data with random AES key and nonce.
     /// </summary>
-    protected (byte[] aesKey, byte[] nonce) CreateSessionData()
+    protected static (byte[] aesKey, byte[] nonce) CreateSessionData()
     {
         byte[] key = RandomNumberGenerator.GetBytes(EncryptionConstants.SessionKeyLength);
         byte[] nonce = RandomNumberGenerator.GetBytes(EncryptionConstants.NonceLength);

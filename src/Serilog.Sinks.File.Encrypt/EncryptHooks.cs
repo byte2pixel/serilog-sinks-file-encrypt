@@ -94,13 +94,13 @@ public class EncryptHooks : FileLifecycleHooks
     /// <param name="path">The path to the log file being opened.</param>
     /// <param name="underlyingStream">The underlying file stream created by Serilog.</param>
     /// <param name="encoding">The text encoding used for log entries.</param>
-    /// <returns>An <see cref="EncryptedLogStream"/> that wraps the underlying stream for transparent encryption.</returns>
+    /// <returns>An <see cref="LogWriter"/> that wraps the underlying stream for transparent encryption.</returns>
     /// <remarks>
     /// This method is called internally by Serilog and should not be called directly by application code.
     /// The returned stream is managed by Serilog and will be disposed when the log file is closed.
     /// </remarks>
     public override Stream OnFileOpened(string path, Stream underlyingStream, Encoding encoding)
     {
-        return new EncryptedLogStream(underlyingStream, _encryptionOptions);
+        return new LogWriter(underlyingStream, _encryptionOptions);
     }
 }

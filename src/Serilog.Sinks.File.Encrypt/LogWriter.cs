@@ -11,22 +11,35 @@ namespace Serilog.Sinks.File.Encrypt;
 /// Uses a hybrid encryption scheme: RSA for session key exchange (once per session),
 /// AES-GCM for data encryption (per message).
 /// </summary>
-public sealed class EncryptedLogStream : Stream
+public sealed class LogWriter : Stream
 {
     private readonly Stream _inner;
     private readonly ISessionHeaderWriter _headerWriter;
-    private readonly byte[] _aesKey = new byte[32]; // Reusable buffer for AES key
-    private readonly byte[] _nonce = new byte[12]; // Reusable buffer for nonce
-    private AesGcm? _aesGcm; // Reusable AES-GCM instance
+
+    /// <summary>
+    /// Reusable buffer for AES key
+    /// </summary>
+    private readonly byte[] _aesKey = new byte[EncryptionConstants.SessionKeyLength];
+
+    /// <summary>
+    /// Reusable buffer for nonce
+    /// </summary>
+    private readonly byte[] _nonce = new byte[EncryptionConstants.NonceLength];
+
+    /// <summary>
+    /// Reusable AES-GCM instance
+    /// </summary>
+    private AesGcm? _aesGcm;
+
     private bool _sessionHeaderWritten;
 
     /// <summary>
-    /// Initializes a new instance of the <see cref="EncryptedLogStream"/> class.
+    /// Initializes a new instance of the <see cref="LogWriter"/> class.
     /// </summary>
     /// <param name="inner">The underlying stream to which encrypted log data will be written.</param>
     /// <param name="options">The encryption options containing the info to use for encryption.</param>
     /// <exception cref="ArgumentNullException">Thrown if either the inner stream or encryption options are null.</exception>
-    public EncryptedLogStream(Stream inner, EncryptionOptions options)
+    public LogWriter(Stream inner, EncryptionOptions options)
     {
         ArgumentNullException.ThrowIfNull(inner);
         ArgumentNullException.ThrowIfNull(options);
@@ -35,7 +48,7 @@ public sealed class EncryptedLogStream : Stream
     }
 
     /// <summary>
-    /// Seeking is not supported on <see cref="EncryptedLogStream"/> as it is designed for sequential writes.
+    /// Seeking is not supported on <see cref="LogWriter"/> as it is designed for sequential writes.
     /// </summary>
     /// <param name="offset"></param>
     /// <param name="origin"></param>
@@ -44,7 +57,7 @@ public sealed class EncryptedLogStream : Stream
     public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
 
     /// <summary>
-    /// Setting length is not supported on <see cref="EncryptedLogStream"/> as it is designed for sequential writes.
+    /// Setting length is not supported on <see cref="LogWriter"/> as it is designed for sequential writes.
     /// </summary>
     /// <param name="value"></param>
     /// <exception cref="NotSupportedException"></exception>
@@ -123,17 +136,17 @@ public sealed class EncryptedLogStream : Stream
     }
 
     /// <summary>
-    /// Reading is not supported on <see cref="EncryptedLogStream"/> as it is designed for write-only log encryption.
+    /// Reading is not supported on <see cref="LogWriter"/> as it is designed for write-only log encryption.
     /// </summary>
     public override bool CanRead => false;
 
     /// <summary>
-    /// Seeking is not supported on <see cref="EncryptedLogStream"/> as it is designed for sequential writes.
+    /// Seeking is not supported on <see cref="LogWriter"/> as it is designed for sequential writes.
     /// </summary>
     public override bool CanSeek => false;
 
     /// <summary>
-    /// <see cref="EncryptedLogStream"/> supports writing log data, which is encrypted before being written to the underlying stream.
+    /// <see cref="LogWriter"/> supports writing log data, which is encrypted before being written to the underlying stream.
     /// </summary>
     public override bool CanWrite => true;
 
@@ -146,7 +159,7 @@ public sealed class EncryptedLogStream : Stream
     /// The current position within the buffered log data.
     /// </summary>
     /// <exception cref="NotSupportedException">
-    /// Setting the position is not supported on <see cref="EncryptedLogStream"/> as it is designed for sequential writes.
+    /// Setting the position is not supported on <see cref="LogWriter"/> as it is designed for sequential writes.
     /// </exception>
     public override long Position
     {
@@ -163,14 +176,14 @@ public sealed class EncryptedLogStream : Stream
     }
 
     /// <summary>
-    /// Reading from <see cref="EncryptedLogStream"/> is not supported as it is designed for write-only log encryption.
+    /// Reading from <see cref="LogWriter"/> is not supported as it is designed for write-only log encryption.
     /// </summary>
     /// <param name="buffer"></param>
     /// <param name="offset"></param>
     /// <param name="count"></param>
     /// <returns></returns>
     /// <exception cref="NotSupportedException">
-    /// Reading is not supported on <see cref="EncryptedLogStream"/> as it is designed for write-only log encryption.
+    /// Reading is not supported on <see cref="LogWriter"/> as it is designed for write-only log encryption.
     /// </exception>
     public override int Read(byte[] buffer, int offset, int count) =>
         throw new NotSupportedException();

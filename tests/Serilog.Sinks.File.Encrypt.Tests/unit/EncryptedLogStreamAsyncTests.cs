@@ -142,16 +142,16 @@ public sealed class EncryptedLogStreamAsyncTests : EncryptionTestBase
         using RSA rsa = RSA.Create();
         rsa.FromXmlString(publicKey);
         EncryptionOptions options = new(rsa);
-        await using EncryptedLogStream encStream = new(fs, options);
+        await using LogWriter logWriter = new(fs, options);
 
         byte[] data = "Hello Async"u8.ToArray();
 
         // Act
-        await encStream.WriteAsync(data, TestContext.Current.CancellationToken);
-        await encStream.FlushAsync(TestContext.Current.CancellationToken);
+        await logWriter.WriteAsync(data, TestContext.Current.CancellationToken);
+        await logWriter.FlushAsync(TestContext.Current.CancellationToken);
 
         // Assert
-        encStream.Position.ShouldBeGreaterThan(data.Length);
+        logWriter.Position.ShouldBeGreaterThan(data.Length);
     }
 
     [Fact]
@@ -163,14 +163,14 @@ public sealed class EncryptedLogStreamAsyncTests : EncryptionTestBase
         using RSA rsa = RSA.Create();
         rsa.FromXmlString(publicKey);
         EncryptionOptions options = new(rsa);
-        await using EncryptedLogStream encStream = new(fs, options);
+        await using LogWriter logWriter = new(fs, options);
 
         // Act
-        await encStream.WriteAsync(Array.Empty<byte>(), TestContext.Current.CancellationToken);
-        await encStream.FlushAsync(TestContext.Current.CancellationToken);
+        await logWriter.WriteAsync(Array.Empty<byte>(), TestContext.Current.CancellationToken);
+        await logWriter.FlushAsync(TestContext.Current.CancellationToken);
 
         // Assert
-        encStream.Position.ShouldBeEquivalentTo(0L);
+        logWriter.Position.ShouldBeEquivalentTo(0L);
     }
 
     [Fact]
@@ -182,7 +182,7 @@ public sealed class EncryptedLogStreamAsyncTests : EncryptionTestBase
         using RSA rsa = RSA.Create();
         rsa.FromXmlString(publicKey);
         EncryptionOptions options = new(rsa);
-        await using EncryptedLogStream encStream = new(fs, options);
+        await using LogWriter logWriter = new(fs, options);
 
         byte[] data = "Hello Async"u8.ToArray();
         using var cts = new CancellationTokenSource();
@@ -190,7 +190,7 @@ public sealed class EncryptedLogStreamAsyncTests : EncryptionTestBase
 
         // Act & Assert
         await Should.ThrowAsync<OperationCanceledException>(async () =>
-            await encStream.WriteAsync(data, cts.Token)
+            await logWriter.WriteAsync(data, cts.Token)
         );
     }
 }

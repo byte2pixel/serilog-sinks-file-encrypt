@@ -1,8 +1,9 @@
+using System.Diagnostics.CodeAnalysis;
 using Serilog.Sinks.File.Encrypt.Models;
 
 namespace Serilog.Sinks.File.Encrypt.Tests.unit;
 
-public class EncryptedLogStreamTests
+public class LogWriterTests
 {
     [Fact]
     public void StreamContract_PropertiesAndUnsupportedMethods_ThrowOrReturnExpected()
@@ -13,18 +14,18 @@ public class EncryptedLogStreamTests
         using RSA rsa = RSA.Create();
         rsa.FromXmlString(publicKey);
         EncryptionOptions options = new(rsa);
-        using EncryptedLogStream encStream = new(fs, options);
+        using LogWriter logWriter = new(fs, options);
 
         // Act & Assert
-        encStream.CanRead.ShouldBeFalse();
-        encStream.CanSeek.ShouldBeFalse();
-        encStream.CanWrite.ShouldBeTrue();
-        encStream.Length.ShouldBe(0);
+        logWriter.CanRead.ShouldBeFalse();
+        logWriter.CanSeek.ShouldBeFalse();
+        logWriter.CanWrite.ShouldBeTrue();
+        logWriter.Length.ShouldBe(0);
 
-        Should.Throw<NotSupportedException>(() => encStream.Read(new byte[1], 0, 1));
-        Should.Throw<NotSupportedException>(() => encStream.Seek(0, SeekOrigin.Begin));
-        Should.Throw<NotSupportedException>(() => encStream.SetLength(100));
-        Should.Throw<NotSupportedException>(() => encStream.Position = 0);
+        Should.Throw<NotSupportedException>(() => logWriter.Read(new byte[1], 0, 1));
+        Should.Throw<NotSupportedException>(() => logWriter.Seek(0, SeekOrigin.Begin));
+        Should.Throw<NotSupportedException>(() => logWriter.SetLength(100));
+        Should.Throw<NotSupportedException>(() => logWriter.Position = 0);
     }
 
     [Fact]
@@ -36,14 +37,14 @@ public class EncryptedLogStreamTests
         using RSA rsa = RSA.Create();
         rsa.FromXmlString(publicKey);
         EncryptionOptions options = new(rsa);
-        using EncryptedLogStream encStream = new(fs, options);
+        using LogWriter logWriter = new(fs, options);
 
         // Act
-        encStream.Write("Hello"u8.ToArray(), 0, 5);
-        encStream.Flush();
+        logWriter.Write("Hello"u8.ToArray(), 0, 5);
+        logWriter.Flush();
 
         // Assert
-        encStream.Position.ShouldBeGreaterThan(5);
+        logWriter.Position.ShouldBeGreaterThan(5);
     }
 
     [Fact]
@@ -55,21 +56,31 @@ public class EncryptedLogStreamTests
         using RSA rsa = RSA.Create();
         rsa.FromXmlString(publicKey);
         EncryptionOptions options = new(rsa);
-        using EncryptedLogStream encStream = new(fs, options);
+        using LogWriter logWriter = new(fs, options);
 
         // Act
-        encStream.Write([0x00], 0, 1);
-        encStream.Flush();
-        encStream.Write([0x01], 0, 1);
-        encStream.Flush();
-        encStream.Write([0x02], 0, 1);
-        encStream.Flush();
+        logWriter.Write([0x00], 0, 1);
+        logWriter.Flush();
+        logWriter.Write([0x01], 0, 1);
+        logWriter.Flush();
+        logWriter.Write([0x02], 0, 1);
+        logWriter.Flush();
 
         // Assert
-        encStream.Position.ShouldBeGreaterThan(3);
+        logWriter.Position.ShouldBeGreaterThan(3);
     }
 
     [Fact]
+    [SuppressMessage(
+        "ReSharper",
+        "DisposeOnUsingVariable",
+        Justification = "We want to test that Dispose can be called multiple times without throwing."
+    )]
+    [SuppressMessage(
+        "ReSharper",
+        "AccessToDisposedClosure",
+        Justification = "We want to test that Dispose can be called multiple times without throwing."
+    )]
     public void Dispose_CanBeCalledMultipleTimesSafely()
     {
         // Arrange
@@ -78,13 +89,13 @@ public class EncryptedLogStreamTests
         using RSA rsa = RSA.Create();
         rsa.FromXmlString(publicKey);
         EncryptionOptions options = new(rsa);
-        using EncryptedLogStream encStream = new(fs, options);
+        using LogWriter logWriter = new(fs, options);
 
         // Act
         Exception? exception = Record.Exception(() =>
         {
-            encStream.Dispose();
-            encStream.Dispose();
+            logWriter.Dispose();
+            logWriter.Dispose();
         });
 
         // Assert
@@ -100,15 +111,15 @@ public class EncryptedLogStreamTests
         using RSA rsa = RSA.Create();
         rsa.FromXmlString(publicKey);
         EncryptionOptions options = new(rsa);
-        using EncryptedLogStream encStream = new(fs, options);
+        using LogWriter logWriter = new(fs, options);
 
-        long staringPosition = encStream.Position;
+        long staringPosition = logWriter.Position;
         // Act
-        encStream.Write([], 0, 0);
-        encStream.Flush();
+        logWriter.Write([], 0, 0);
+        logWriter.Flush();
 
         // Assert
-        encStream.Position.ShouldBeEquivalentTo(staringPosition);
+        logWriter.Position.ShouldBeEquivalentTo(staringPosition);
     }
 
     [Fact]
@@ -120,7 +131,7 @@ public class EncryptedLogStreamTests
         rsa.FromXmlString(publicKey);
         EncryptionOptions options = new(rsa);
         // Act & Assert
-        Should.Throw<ArgumentNullException>(() => new EncryptedLogStream(null!, options));
+        Should.Throw<ArgumentNullException>(() => new LogWriter(null!, options));
     }
 
     [Fact]
@@ -130,6 +141,6 @@ public class EncryptedLogStreamTests
         using MemoryStream fs = new();
 
         // Act & Assert
-        Should.Throw<ArgumentNullException>(() => new EncryptedLogStream(fs, null!));
+        Should.Throw<ArgumentNullException>(() => new LogWriter(fs, null!));
     }
 }

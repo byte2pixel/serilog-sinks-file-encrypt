@@ -10,7 +10,7 @@ namespace Serilog.Sinks.File.Encrypt;
 /// <summary>
 /// Reads an encrypted log stream, decrypting messages on-the-fly using the provided decryption keys and options.
 /// </summary>
-public sealed class EncryptedLogReader : IAsyncDisposable, IDisposable
+public sealed class LogReader : IAsyncDisposable, IDisposable
 {
     private enum ReaderState
     {
@@ -35,7 +35,7 @@ public sealed class EncryptedLogReader : IAsyncDisposable, IDisposable
     /// </summary>
     /// <param name="input">The input stream</param>
     /// <param name="options">The decryption options</param>
-    public EncryptedLogReader(Stream input, DecryptionOptions options)
+    public LogReader(Stream input, DecryptionOptions options)
     {
         _input = input;
         _options = options;
