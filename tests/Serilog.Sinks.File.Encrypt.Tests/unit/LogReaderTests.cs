@@ -6,7 +6,7 @@ public class LogReaderTests
 {
     // This test is a placeholder for future tests that will validate the functionality of the DecryptedLogReader class.
     private const string LogFilePath =
-        @"D:\repos\serilog-sinks-file-encrypt\examples\Example.Console\bin\Debug\net8.0\Logs\log20260215.txt";
+        @"D:\repos\serilog-sinks-file-encrypt\examples\Example.Console\bin\Debug\net8.0\Logs\log20260218.txt";
 
     private const string PrivateKeyPath =
         @"D:\repos\serilog-sinks-file-encrypt\examples\Example.Console\private_key.xml";
@@ -28,7 +28,7 @@ public class LogReaderTests
         await using var inputStream = new FileStream(LogFilePath, FileMode.Open, FileAccess.Read);
         using var outputStream = new MemoryStream();
         var decryptedLogReader = new LogReader(inputStream, _options);
-        await decryptedLogReader.DecryptToStreamAsync(
+        DecryptionResult result = await decryptedLogReader.DecryptToStreamAsync(
             outputStream,
             TestContext.Current.CancellationToken
         );

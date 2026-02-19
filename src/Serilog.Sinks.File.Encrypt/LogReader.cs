@@ -26,8 +26,11 @@ public sealed class LogReader : IAsyncDisposable, IDisposable
     private DecryptionContext _context = DecryptionContext.Empty;
     private StreamWriter? _auditLogWriter;
     private readonly Dictionary<string, RSA> _rsaKeyCache = new();
-    private long _decryptedSessions;
-    private long _decryptedMessages;
+    private int _decryptedSessions;
+    private int _decryptedMessages;
+    private int _failedHeaders;
+    private int _failedMessages;
+    private int _resyncAttempts;
     private long _nextSyncPosition;
 
     /// <summary>
@@ -53,17 +56,14 @@ public sealed class LogReader : IAsyncDisposable, IDisposable
     /// </summary>
     /// <param name="output">The output stream.</param>
     /// <param name="cancellationToken">The cancellation token</param>
-    public async Task DecryptToStreamAsync(
+    public async Task<DecryptionResult> DecryptToStreamAsync(
         Stream output,
         CancellationToken cancellationToken = default
     )
     {
         if (_state == ReaderState.NotInitialized)
         {
-            if (!string.IsNullOrWhiteSpace(_options.ErrorLogPath))
-            {
-                _auditLogWriter = await CreateAuditLogWriterAsync(cancellationToken);
-            }
+            _auditLogWriter = await CreateAuditLogWriterAsync(cancellationToken);
             _state = ReaderState.ReadingHeader;
         }
 
@@ -76,6 +76,14 @@ public sealed class LogReader : IAsyncDisposable, IDisposable
             $"Decryption completed. Sessions decrypted: {_decryptedSessions}, Messages decrypted: {_decryptedMessages}",
             cancellationToken
         );
+        return new DecryptionResult
+        {
+            DecryptedSessions = _decryptedSessions,
+            DecryptedMessages = _decryptedMessages,
+            FailedMessages = _failedMessages,
+            FailedHeaders = _failedHeaders,
+            ResyncAttempts = _resyncAttempts,
+        };
     }
 
     private async Task ProcessStreamAsync(Stream output, CancellationToken cancellationToken)
@@ -94,6 +102,11 @@ public sealed class LogReader : IAsyncDisposable, IDisposable
             case ReaderState.ReadingMessages:
                 // Read and decrypt entries, write to output
                 // If end of stream is reached, set state to Completed
+                if (IsEndOfStream())
+                {
+                    _state = ReaderState.Completed;
+                    break;
+                }
                 await ProcessMessagesAsync(output, cancellationToken);
                 break;
             case ReaderState.Completed:
@@ -123,9 +136,12 @@ public sealed class LogReader : IAsyncDisposable, IDisposable
             int messageLength = BinaryPrimitives.ReadInt32BigEndian(lengthBuffer);
 
             // Sanity check on message length
-            if (messageLength is <= 0 or > 100 * 1024 * 1024) // Max 100MB per message
+            if (messageLength == EncryptionConstants.MagicByteDetection)
             {
-                throw new InvalidDataException($"Invalid message length: {messageLength}");
+                // Not a valid message length, likely a new session marker - go back to header processing
+                throw new SessionHeaderEncounteredException(
+                    "Session header marker likely encountered while reading messages."
+                );
             }
 
             // Read the encrypted message (ciphertext + tag)
@@ -188,6 +204,13 @@ public sealed class LogReader : IAsyncDisposable, IDisposable
                 ArrayPool<byte>.Shared.Return(encryptedMessage);
             }
         }
+        catch (SessionHeaderEncounteredException ex)
+        {
+            await WriteToAuditLogAsync(ex.Message, cancellationToken);
+            _context = DecryptionContext.Empty;
+            _state = ReaderState.ReadingHeader;
+            _nextSyncPosition = _input.Position - sizeof(int); // Rewind to start of potential header
+        }
         catch (Exception ex)
         {
             // Handle message processing errors, try to recover if possible
@@ -195,6 +218,8 @@ public sealed class LogReader : IAsyncDisposable, IDisposable
                 $"Message processing error: {ex.Message}",
                 cancellationToken
             );
+            _resyncAttempts++;
+            _failedMessages++;
             _context = DecryptionContext.Empty;
             _state = ReaderState.ReadingHeader;
         }
@@ -206,24 +231,25 @@ public sealed class LogReader : IAsyncDisposable, IDisposable
         {
             try
             {
-                // Read and validate header from _input
-                // If valid, prepare for reading messages
-                // No active session - look for a session header
                 await ReadMarkerAndHeaderAsync(cancellationToken);
                 _state = ReaderState.ReadingMessages;
             }
             catch (Exception ex)
             {
-                // Handle header processing errors, try to recover if possible
-                await WriteToAuditLogAsync(
-                    $"Header processing error: {ex.Message}",
-                    cancellationToken
-                );
                 _state = ReaderState.ReadingHeader;
-                _input.Position = _nextSyncPosition;
-                _nextSyncPosition++;
-                if (IsEndOfStream())
+
+                // Try Boyer-Moore search from current position
+                int foundPos = BoyerMooreSearch(EncryptionConstants.MagicBytes, _nextSyncPosition);
+
+                if (foundPos >= 0)
                 {
+                    _nextSyncPosition = foundPos;
+                    _resyncAttempts++;
+                    _input.Position = _nextSyncPosition;
+                }
+                else
+                {
+                    // No header found - we're done
                     _state = ReaderState.Completed;
                 }
             }
@@ -240,6 +266,7 @@ public sealed class LogReader : IAsyncDisposable, IDisposable
         }
         else
         {
+            _nextSyncPosition++;
             throw new InvalidDataException(
                 $"Invalid header marker at position {_input.Position - EncryptionConstants.MagicBytes.Length}"
             );
@@ -249,14 +276,14 @@ public sealed class LogReader : IAsyncDisposable, IDisposable
     private async Task ProcessSessionHeaderAsync(CancellationToken cancellationToken)
     {
         await WriteToAuditLogAsync(
-            $"Session header marker found at position {_input.Position - EncryptionConstants.MagicBytes.Length}",
+            "Possible header marker found staring processing after header.",
             cancellationToken
         );
-        byte[] versionBuffer = new byte[1];
-        await _input.ReadExactlyAsync(versionBuffer, cancellationToken);
+        byte[] version = new byte[1];
+        await _input.ReadExactlyAsync(version, cancellationToken);
         try
         {
-            ISessionReader sessionReader = SessionReaderFactory.GetSessionReader(versionBuffer[0]);
+            ISessionReader sessionReader = SessionReaderFactory.GetSessionReader(version[0]);
             _context = await sessionReader.ReadSessionAsync(
                 _input,
                 _rsaKeyCache,
@@ -267,6 +294,8 @@ public sealed class LogReader : IAsyncDisposable, IDisposable
         }
         catch (Exception ex)
         {
+            _failedHeaders++;
+            _nextSyncPosition++;
             throw new CryptographicException(
                 $"Failed to process session at position {_input.Position}: {ex.Message}",
                 ex
@@ -286,17 +315,18 @@ public sealed class LogReader : IAsyncDisposable, IDisposable
             return;
         }
         string timestamp = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss.fff");
-        string logEntry = $"[{timestamp}] {message}";
+        string logEntry = $"[{timestamp}] [Position: {_input.Position}] {message}";
         await _auditLogWriter.WriteLineAsync(logEntry.AsMemory(), cancellationToken);
         await _auditLogWriter.FlushAsync(cancellationToken);
     }
 
-    /// <summary>
-    /// Creates a StreamWriter for the error log file
-    /// </summary>
-    private async Task<StreamWriter> CreateAuditLogWriterAsync(CancellationToken cancellationToken)
+    private async Task<StreamWriter?> CreateAuditLogWriterAsync(CancellationToken cancellationToken)
     {
-        string errorLogPath = GetErrorLogPath();
+        if (string.IsNullOrEmpty(_options.ErrorLogPath))
+        {
+            return null;
+        }
+        string errorLogPath = _options.ErrorLogPath;
 
         // Ensure the directory exists
         string? directory = Path.GetDirectoryName(errorLogPath);
@@ -326,32 +356,11 @@ public sealed class LogReader : IAsyncDisposable, IDisposable
             return writer;
         }
 
-        await writer.WriteLineAsync(
-            $"Decryption Error Log - Started at {DateTime.UtcNow:yyyy-MM-dd HH:mm:ss.fff} UTC".AsMemory(),
-            cancellationToken
-        );
+        await writer.WriteLineAsync($"Decryption Error Log Started!".AsMemory(), cancellationToken);
         await writer.WriteLineAsync(new string('-', 80).AsMemory(), cancellationToken);
         await writer.FlushAsync(cancellationToken);
 
         return writer;
-    }
-
-    /// <summary>
-    /// Gets the error log file path, using the configured path or generating a default one
-    /// </summary>
-    private string GetErrorLogPath()
-    {
-        if (!string.IsNullOrWhiteSpace(_options.ErrorLogPath))
-        {
-            return _options.ErrorLogPath;
-        }
-
-        // Generate a default error log path based on timestamp
-        string timestamp = DateTime.UtcNow.ToString("yyyyMMdd_HHmmss");
-        return Path.Join(
-            Path.GetTempPath(),
-            $"decryption_errors_{timestamp}_{Guid.NewGuid():N}.log"
-        );
     }
 
     /// <inheritdoc />
@@ -374,5 +383,68 @@ public sealed class LogReader : IAsyncDisposable, IDisposable
             await _auditLogWriter.FlushAsync();
             await _auditLogWriter.DisposeAsync();
         }
+    }
+
+    private int BoyerMooreSearch(byte[] pattern, long startPosition)
+    {
+        int patternLength = pattern.Length;
+        int[] badCharShift = new int[256];
+
+        // Preprocessing
+        for (int i = 0; i < 256; i++)
+        {
+            badCharShift[i] = patternLength;
+        }
+
+        for (int i = 0; i < patternLength - 1; i++)
+        {
+            badCharShift[pattern[i]] = patternLength - 1 - i;
+        }
+
+        // Search
+        _input.Position = startPosition;
+        byte[] buffer = new byte[8192];
+        int bufferPos = 0;
+        int bytesRead = _input.Read(buffer, 0, buffer.Length);
+
+        while (bytesRead > 0)
+        {
+            int i = bufferPos + patternLength - 1;
+            while (i < bytesRead)
+            {
+                int j = patternLength - 1;
+                while (j >= 0 && buffer[i] == pattern[j])
+                {
+                    i--;
+                    j--;
+                }
+
+                if (j < 0)
+                {
+                    return (int)(_input.Position - bytesRead + i + 1);
+                }
+
+                i += Math.Max(badCharShift[buffer[i]], patternLength - j);
+            }
+
+            // Handle buffer overlap
+            bufferPos = bytesRead - patternLength + 1;
+            Array.Copy(buffer, bufferPos, buffer, 0, patternLength - 1);
+            int newBytesRead = _input.Read(
+                buffer,
+                patternLength - 1,
+                buffer.Length - patternLength + 1
+            );
+
+            // Check for EOF
+            if (newBytesRead == 0)
+            {
+                break;
+            }
+
+            bytesRead = newBytesRead + patternLength - 1;
+        }
+
+        return -1; // Not found
     }
 }

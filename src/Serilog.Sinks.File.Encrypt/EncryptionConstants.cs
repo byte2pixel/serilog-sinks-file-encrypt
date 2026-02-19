@@ -4,12 +4,17 @@ internal static class EncryptionConstants
 {
     /// <summary>
     /// The fixed magic bytes that identify the file format.
-    /// 0x00: Reserved byte (must be 0)
+    /// 0xFF: Reserved byte (must be 0xFF) to easily detect when parsing messages, that a new session started.
     /// 0x42, 0x32, 0x50: ASCII "B2P" (stands for "Byte2Pixel")
     /// 0xFF, 0xDA, 0x7E: Random bytes for additional uniqueness
     /// 0x00: Reserved byte (must be 0)
     /// </summary>
-    public static readonly byte[] MagicBytes = [0x00, 0x42, 0x32, 0x50, 0xFF, 0xDA, 0x7E, 0x00];
+    public static readonly byte[] MagicBytes = [0xFF, 0x42, 0x32, 0x50, 0xFF, 0xDA, 0x7E, 0x00];
+
+    /// <summary>
+    /// Precomputed integer value of the first 4 magic bytes for efficient detection.
+    /// </summary>
+    public static int MagicByteDetection => -12438960;
 
     /// <summary>
     /// 96 bits, NIST recommended for AES-GCM

@@ -172,7 +172,7 @@ public static class EncryptionUtils
     /// );
     /// </code>
     /// </example>
-    public static async Task DecryptLogFileAsync(
+    public static async Task<DecryptionResult> DecryptLogFileAsync(
         Stream inputStream,
         Stream outputStream,
         DecryptionOptions options,
@@ -180,7 +180,7 @@ public static class EncryptionUtils
     )
     {
         await using LogReader reader = new(inputStream, options);
-        await reader.DecryptToStreamAsync(outputStream, cancellationToken);
+        return await reader.DecryptToStreamAsync(outputStream, cancellationToken);
     }
 
     /// <summary>
@@ -188,7 +188,7 @@ public static class EncryptionUtils
     /// </summary>
     /// <param name="encryptedFilePath">Path to the encrypted log file. File must exist and be readable.</param>
     /// <param name="outputFilePath">Path where the decrypted content will be written. Will be created or overwritten.</param>
-    /// <param name="options">Streaming options for the decryption process. If null, uses <see cref="StreamingOptions.Default"/>.</param>
+    /// <param name="options">Streaming options for the decryption process.</param>
     /// <param name="cancellationToken">Cancellation token to cancel the decryption operation.</param>
     /// <returns>A task representing the asynchronous decryption operation.</returns>
     /// <exception cref="ArgumentNullException">Thrown when any string parameter is null or whitespace.</exception>

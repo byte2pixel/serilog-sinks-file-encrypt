@@ -21,9 +21,8 @@ public class FrameWriterTests
         frameWriter.WriteHeader(ms, Version, keyIdBytes, header);
 
         // Assert
-        byte[] expectedMagicBytes = [0x00, 0x42, 0x32, 0x50, 0xFF, 0xDA, 0x7E, 0x00];
-        byte[] expectedOutput = expectedMagicBytes
-            .Concat([Version])
+        byte[] expectedOutput = EncryptionConstants
+            .MagicBytes.Concat([Version])
             .Concat(keyIdBytes.ToArray())
             .Concat(header)
             .ToArray();
