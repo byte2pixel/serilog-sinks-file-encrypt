@@ -9,6 +9,9 @@ namespace Serilog.Sinks.File.Encrypt;
 
 /// <summary>
 /// Reads an encrypted log stream, decrypting messages on-the-fly using the provided decryption keys and options.
+/// This class is not thread-safe and is designed to be used for a single decryption operation on a given input stream.
+/// It maintains internal state to handle the streaming nature of the log file, allowing it to recover from errors
+/// and continue processing subsequent messages or sessions as needed.
 /// </summary>
 public sealed class LogReader : IAsyncDisposable, IDisposable
 {
@@ -24,7 +27,7 @@ public sealed class LogReader : IAsyncDisposable, IDisposable
     private readonly Stream _input;
     private readonly DecryptionOptions _options;
     private DecryptionContext _context = DecryptionContext.Empty;
-    private StreamWriter? _auditLogWriter;
+    private readonly StreamWriter? _auditLogWriter;
     private readonly Dictionary<string, RSA> _rsaKeyCache = new();
     private int _decryptedSessions;
     private int _decryptedMessages;
@@ -38,15 +41,49 @@ public sealed class LogReader : IAsyncDisposable, IDisposable
     /// </summary>
     /// <param name="input">The input stream</param>
     /// <param name="options">The decryption options</param>
+    /// <exception cref="ArgumentException"></exception>
+    /// <remarks>
+    /// This class is not thread-safe and should be used for a single decryption operation on a given input stream.
+    /// </remarks>
     public LogReader(Stream input, DecryptionOptions options)
     {
+        ArgumentNullException.ThrowIfNull(input);
+        ArgumentNullException.ThrowIfNull(options);
+
+        if (options.DecryptionKeys is null || options.DecryptionKeys.Count == 0)
+        {
+            throw new InvalidOperationException("At least one decryption key must be provided.");
+        }
+
         _input = input;
         _options = options;
+
+        if (!Enum.IsDefined(options.ErrorHandlingMode))
+        {
+            throw new InvalidOperationException(
+                $"Invalid error handling mode: {options.ErrorHandlingMode}"
+            );
+        }
+
         foreach (KeyValuePair<string, string> key in options.DecryptionKeys)
         {
-            _rsaKeyCache.Add(key.Key, RSA.Create());
-            _rsaKeyCache[key.Key].FromString(key.Value);
+            try
+            {
+                var rsa = RSA.Create();
+                rsa.FromString(key.Value);
+                _rsaKeyCache.Add(key.Key, rsa);
+            }
+            catch (Exception ex)
+            {
+                throw new InvalidOperationException(
+                    $"Invalid RSA key for key ID '{key.Key}': {ex.Message}",
+                    ex
+                );
+            }
         }
+
+        _auditLogWriter = CreateAuditLogWriter();
+        WriteToAuditLog("LogReader initialized, ready to process input stream.");
     }
 
     /// <summary>
@@ -63,7 +100,6 @@ public sealed class LogReader : IAsyncDisposable, IDisposable
     {
         if (_state == ReaderState.NotInitialized)
         {
-            _auditLogWriter = await CreateAuditLogWriterAsync(cancellationToken);
             _state = ReaderState.ReadingHeader;
         }
 
@@ -135,10 +171,10 @@ public sealed class LogReader : IAsyncDisposable, IDisposable
 
             int messageLength = BinaryPrimitives.ReadInt32BigEndian(lengthBuffer);
 
-            // Sanity check on message length
+            // MagicByteDetection is a special negative value that indicates we've likely encountered
+            // a new session header marker instead of a valid message length.
             if (messageLength == EncryptionConstants.MagicByteDetection)
             {
-                // Not a valid message length, likely a new session marker - go back to header processing
                 throw new SessionHeaderEncounteredException(
                     "Session header marker likely encountered while reading messages."
                 );
@@ -148,49 +184,12 @@ public sealed class LogReader : IAsyncDisposable, IDisposable
             byte[] encryptedMessage = ArrayPool<byte>.Shared.Rent(messageLength);
             try
             {
-                await _input.ReadExactlyAsync(
+                await ReadAndDecryptMessage(
+                    output,
                     encryptedMessage,
-                    0,
                     messageLength,
                     cancellationToken
                 );
-
-                // Decrypt the message
-                int ciphertextLength = messageLength - EncryptionConstants.TagLength;
-                if (ciphertextLength < 0)
-                {
-                    throw new InvalidDataException(
-                        "Message too short to contain authentication tag"
-                    );
-                }
-
-                byte[] plaintext = ArrayPool<byte>.Shared.Rent(ciphertextLength);
-                try
-                {
-                    using var aes = new AesGcm(_context.SessionKey, EncryptionConstants.TagLength);
-                    aes.Decrypt(
-                        _context.Nonce,
-                        encryptedMessage.AsSpan(0, ciphertextLength),
-                        encryptedMessage.AsSpan(ciphertextLength, EncryptionConstants.TagLength),
-                        plaintext.AsSpan(0, ciphertextLength)
-                    );
-
-                    // Increment nonce for next message
-                    _context.Nonce.IncreaseNonce();
-
-                    // Write decrypted chunk
-                    await output.WriteAsync(
-                        plaintext.AsMemory(0, ciphertextLength),
-                        cancellationToken
-                    );
-                    await output.FlushAsync(cancellationToken);
-                    _decryptedMessages++;
-                    _nextSyncPosition = _input.Position;
-                }
-                finally
-                {
-                    ArrayPool<byte>.Shared.Return(plaintext);
-                }
             }
             catch (Exception ex)
             {
@@ -225,6 +224,48 @@ public sealed class LogReader : IAsyncDisposable, IDisposable
         }
     }
 
+    private async Task ReadAndDecryptMessage(
+        Stream output,
+        byte[] encryptedMessage,
+        int messageLength,
+        CancellationToken cancellationToken
+    )
+    {
+        await _input.ReadExactlyAsync(encryptedMessage, 0, messageLength, cancellationToken);
+
+        // Decrypt the message
+        int ciphertextLength = messageLength - EncryptionConstants.TagLength;
+        if (ciphertextLength < 0)
+        {
+            throw new InvalidDataException("Message too short to contain authentication tag");
+        }
+
+        byte[] plaintext = ArrayPool<byte>.Shared.Rent(ciphertextLength);
+        try
+        {
+            using var aes = new AesGcm(_context.SessionKey, EncryptionConstants.TagLength);
+            aes.Decrypt(
+                _context.Nonce,
+                encryptedMessage.AsSpan(0, ciphertextLength),
+                encryptedMessage.AsSpan(ciphertextLength, EncryptionConstants.TagLength),
+                plaintext.AsSpan(0, ciphertextLength)
+            );
+
+            // Increment nonce for next message
+            _context.Nonce.IncreaseNonce();
+
+            // Write decrypted chunk
+            await output.WriteAsync(plaintext.AsMemory(0, ciphertextLength), cancellationToken);
+            await output.FlushAsync(cancellationToken);
+            _decryptedMessages++;
+            _nextSyncPosition = _input.Position;
+        }
+        finally
+        {
+            ArrayPool<byte>.Shared.Return(plaintext);
+        }
+    }
+
     private async Task ProcessHeaderAsync(CancellationToken cancellationToken)
     {
         while (_state == ReaderState.ReadingHeader)
@@ -234,9 +275,14 @@ public sealed class LogReader : IAsyncDisposable, IDisposable
                 await ReadMarkerAndHeaderAsync(cancellationToken);
                 _state = ReaderState.ReadingMessages;
             }
-            catch (Exception ex)
+            catch (Exception)
             {
                 _state = ReaderState.ReadingHeader;
+
+                await WriteToAuditLogAsync(
+                    $"Header processing error at position {_input.Position}, attempting to resync using Boyer-Moore search.",
+                    cancellationToken
+                );
 
                 // Try Boyer-Moore search from current position
                 int foundPos = BoyerMooreSearch(EncryptionConstants.MagicBytes, _nextSyncPosition);
@@ -320,13 +366,25 @@ public sealed class LogReader : IAsyncDisposable, IDisposable
         await _auditLogWriter.FlushAsync(cancellationToken);
     }
 
-    private async Task<StreamWriter?> CreateAuditLogWriterAsync(CancellationToken cancellationToken)
+    private void WriteToAuditLog(string message)
     {
-        if (string.IsNullOrEmpty(_options.ErrorLogPath))
+        if (_auditLogWriter is null)
+        {
+            return;
+        }
+        string timestamp = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss.fff");
+        string logEntry = $"[{timestamp}] [Position: {_input.Position}] {message}";
+        _auditLogWriter.WriteLine(logEntry);
+        _auditLogWriter.Flush();
+    }
+
+    private StreamWriter? CreateAuditLogWriter()
+    {
+        if (string.IsNullOrEmpty(_options.AuditLogPath))
         {
             return null;
         }
-        string errorLogPath = _options.ErrorLogPath;
+        string errorLogPath = _options.AuditLogPath;
 
         // Ensure the directory exists
         string? directory = Path.GetDirectoryName(errorLogPath);
@@ -350,16 +408,6 @@ public sealed class LogReader : IAsyncDisposable, IDisposable
             AutoFlush = false, // We'll flush manually for better control
         };
 
-        // Write header if file is new/empty
-        if (fileStream.Position != 0)
-        {
-            return writer;
-        }
-
-        await writer.WriteLineAsync($"Decryption Error Log Started!".AsMemory(), cancellationToken);
-        await writer.WriteLineAsync(new string('-', 80).AsMemory(), cancellationToken);
-        await writer.FlushAsync(cancellationToken);
-
         return writer;
     }
 
@@ -368,23 +416,31 @@ public sealed class LogReader : IAsyncDisposable, IDisposable
     {
         _auditLogWriter?.Flush();
         _auditLogWriter?.Dispose();
+        DisposeRsaKeys();
+    }
+
+    /// <inheritdoc />
+    public async ValueTask DisposeAsync()
+    {
+        if (_auditLogWriter is not null)
+        {
+            await _auditLogWriter.FlushAsync();
+            await _auditLogWriter.DisposeAsync();
+        }
+        DisposeRsaKeys();
+    }
+
+    private void DisposeRsaKeys()
+    {
         foreach (RSA value in _rsaKeyCache.Values)
         {
             value.Dispose();
         }
     }
 
-    /// <inheritdoc />
-    public async ValueTask DisposeAsync()
-    {
-        Dispose();
-        if (_auditLogWriter is not null)
-        {
-            await _auditLogWriter.FlushAsync();
-            await _auditLogWriter.DisposeAsync();
-        }
-    }
-
+    // TODO: Make this more efficient by reading directly from the stream in chunks and handling buffer overlaps,
+    // rather than reading byte-by-byte, make it asynchronous, and consider edge cases like
+    // the pattern being split across buffer boundaries
     private int BoyerMooreSearch(byte[] pattern, long startPosition)
     {
         int patternLength = pattern.Length;

@@ -71,7 +71,7 @@ public sealed class DecryptCommand(IAnsiConsole console, IFileSystem fileSystem)
         /// </summary>
         [CommandOption("--error-log <PATH>")]
         [Description("Write detailed error information to a separate log file")]
-        public string? ErrorLogPath { get; init; }
+        public string? AuditLogPath { get; init; }
     }
 
     /// <summary>
@@ -115,39 +115,27 @@ public sealed class DecryptCommand(IAnsiConsole console, IFileSystem fileSystem)
             );
 
             // Configure streaming options based on user settings
-            ErrorHandlingMode errorMode;
-            bool continueOnError;
+            ErrorHandlingMode errorMode = settings.Strict
+                ? ErrorHandlingMode.ThrowException
+                : ErrorHandlingMode.Skip;
 
-            if (settings.Strict)
+            if (!string.IsNullOrWhiteSpace(settings.AuditLogPath))
             {
-                // Strict mode: fail on first error
-                errorMode = ErrorHandlingMode.ThrowException;
-                continueOnError = false;
-            }
-            else if (!string.IsNullOrWhiteSpace(settings.ErrorLogPath))
-            {
-                // Error log specified: write errors to separate file
-                errorMode = ErrorHandlingMode.WriteToErrorLog;
-                continueOnError = true;
-                console.MarkupLineInterpolated($"[dim]Error log:[/] {settings.ErrorLogPath}");
-            }
-            else
-            {
-                // Default: skip errors silently
-                errorMode = ErrorHandlingMode.Skip;
-                continueOnError = true;
+                console.MarkupLineInterpolated($"[dim]Audit log:[/] {settings.AuditLogPath}");
             }
 
+            // TODO: need a way to support multiple keys with key IDs for rotation scenarios.
+            // For now, we will just use a single default key with an empty key ID since the CLI only accepts one key file.
             var decryptionKeys = new Dictionary<string, string>
             {
                 { "", rsaPrivateKey }, // Default key with empty key ID
             };
+
             DecryptionOptions decryptionOptions = new()
             {
                 DecryptionKeys = decryptionKeys,
                 ErrorHandlingMode = errorMode,
-                ErrorLogPath = settings.ErrorLogPath,
-                ContinueOnError = continueOnError,
+                AuditLogPath = settings.AuditLogPath,
             };
 
             console.WriteLine();

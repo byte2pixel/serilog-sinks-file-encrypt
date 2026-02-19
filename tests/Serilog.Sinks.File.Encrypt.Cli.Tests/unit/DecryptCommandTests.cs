@@ -216,7 +216,7 @@ public class DecryptCommandTests : CommandTestBase
             KeyFile = privateKeyPath,
             InputPath = encryptedFilePath,
             OutputPath = decryptedFilePath,
-            ErrorLogPath = errorLogPath,
+            AuditLogPath = errorLogPath,
         };
 
         // Act

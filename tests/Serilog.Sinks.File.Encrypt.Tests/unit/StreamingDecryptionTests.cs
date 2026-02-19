@@ -37,7 +37,7 @@ public sealed class StreamingDecryptionTests : EncryptionTestBase
         DecryptionOptions customOptions = new()
         {
             DecryptionKeys = DecryptOptions.DecryptionKeys,
-            ContinueOnError = false,
+            ErrorHandlingMode = ErrorHandlingMode.ThrowException,
         };
 
         MemoryStream encryptedStream = await CreateEncryptedStreamAsync(TestMessage);
@@ -123,7 +123,6 @@ public sealed class StreamingDecryptionTests : EncryptionTestBase
         DecryptionOptions skipErrorOptions = new()
         {
             DecryptionKeys = DecryptOptions.DecryptionKeys,
-            ContinueOnError = true,
             ErrorHandlingMode = ErrorHandlingMode.Skip,
         };
 
@@ -142,32 +141,6 @@ public sealed class StreamingDecryptionTests : EncryptionTestBase
     }
 
     [Fact]
-    public async Task DecryptLogFileAsync_WithWriteInlineErrorMode_WritesErrorInline()
-    {
-        // Arrange
-        string[] messages = ["Good message 1", "Good message 2"];
-        DecryptionOptions writeInlineOptions = new()
-        {
-            DecryptionKeys = DecryptOptions.DecryptionKeys,
-            ContinueOnError = true,
-            ErrorHandlingMode = ErrorHandlingMode.WriteInline,
-        };
-
-        MemoryStream encryptedStream = await CreateEncryptedStreamAsync(messages);
-
-        // Corrupt part of the stream
-        byte[] fileBytes = encryptedStream.ToArray();
-        byte[] corrupted = CorruptData(fileBytes, fileBytes.Length / 2);
-        MemoryStream corruptedStream = CreateMemoryStream(corrupted);
-
-        // Act
-        string result = await DecryptStreamToStringAsync(corruptedStream, writeInlineOptions);
-
-        // Assert
-        result.ShouldContain("[DECRYPTION ERROR");
-    }
-
-    [Fact]
     public async Task DecryptLogFileAsync_WithWriteToErrorLogMode_WritesErrorsToSeparateLog()
     {
         // Arrange
@@ -176,9 +149,7 @@ public sealed class StreamingDecryptionTests : EncryptionTestBase
         DecryptionOptions errorLogOptions = new()
         {
             DecryptionKeys = DecryptOptions.DecryptionKeys,
-            ContinueOnError = true,
-            ErrorHandlingMode = ErrorHandlingMode.WriteToErrorLog,
-            ErrorLogPath = errorLogPath,
+            AuditLogPath = errorLogPath,
         };
 
         MemoryStream encryptedStream = await CreateEncryptedStreamAsync(messages);
@@ -218,7 +189,6 @@ public sealed class StreamingDecryptionTests : EncryptionTestBase
         DecryptionOptions throwExceptionOptions = new()
         {
             DecryptionKeys = DecryptOptions.DecryptionKeys,
-            ContinueOnError = false,
             ErrorHandlingMode = ErrorHandlingMode.ThrowException,
         };
 
@@ -243,7 +213,6 @@ public sealed class StreamingDecryptionTests : EncryptionTestBase
         DecryptionOptions throwExceptionOptions = new()
         {
             DecryptionKeys = DecryptOptions.DecryptionKeys,
-            ContinueOnError = false,
             ErrorHandlingMode = ErrorHandlingMode.ThrowException,
         };
 

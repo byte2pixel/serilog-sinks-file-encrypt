@@ -1,3 +1,4 @@
+using System.ComponentModel.DataAnnotations;
 using System.Security.Cryptography;
 
 namespace Serilog.Sinks.File.Encrypt.Models;
@@ -13,22 +14,7 @@ public sealed record DecryptionOptions
     public required Dictionary<string, string> DecryptionKeys { get; init; } = [];
 
     /// <summary>
-    /// Whether to continue processing after encountering decryption errors.
-    /// </summary>
-    /// <remarks>
-    /// <para>
-    /// When true (default), corrupted sections are handled according to <see cref="ErrorHandlingMode"/>.
-    /// When false, decryption stops immediately on first error.
-    /// </para>
-    /// <para>
-    /// <b>Recommendation:</b> Set to true for production logs where partial recovery is acceptable.
-    /// Set to false for audit logs where completeness is critical.
-    /// </para>
-    /// </remarks>
-    public bool ContinueOnError { get; init; } = true;
-
-    /// <summary>
-    /// Defines how decryption errors should be handled when <see cref="ContinueOnError"/> is true.
+    /// Defines how decryption errors should be handled.
     /// </summary>
     /// <remarks>
     /// See <see cref="Models.ErrorHandlingMode"/> for detailed descriptions of each mode.
@@ -37,26 +23,8 @@ public sealed record DecryptionOptions
     public ErrorHandlingMode ErrorHandlingMode { get; init; } = ErrorHandlingMode.Skip;
 
     /// <summary>
-    /// Path to write error log file when <see cref="ErrorHandlingMode"/> is <see cref="Models.ErrorHandlingMode.WriteToErrorLog"/>.
+    /// Optional path to an audit log files where decryption errors and related events will be recorded.
+    /// If not specified, no audit logging will occur.
     /// </summary>
-    /// <remarks>
-    /// <para>
-    /// If null when using <see cref="ErrorHandlingMode.WriteToErrorLog"/>, a default path will be generated
-    /// in the system temp directory with a timestamp.
-    /// </para>
-    /// <para>
-    /// <b>File Format:</b> Plain text with timestamps, positions, and error messages.
-    /// The directory will be created if it doesn't exist.
-    /// </para>
-    /// </remarks>
-    /// <example>
-    /// <code>
-    /// var options = new StreamingOptions
-    /// {
-    ///     ErrorHandlingMode = ErrorHandlingMode.WriteToErrorLog,
-    ///     ErrorLogPath = Path.Join("logs", "decryption_errors.log")
-    /// };
-    /// </code>
-    /// </example>
-    public string? ErrorLogPath { get; init; }
+    public string? AuditLogPath { get; init; }
 };
