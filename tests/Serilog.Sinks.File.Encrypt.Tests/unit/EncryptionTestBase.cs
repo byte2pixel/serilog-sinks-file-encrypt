@@ -317,7 +317,7 @@ public abstract class EncryptionTestBase : IDisposable, IAsyncDisposable
                 {
                     await _streamsToDispose[i].DisposeAsync().ConfigureAwait(false);
                 }
-                catch
+                catch (ObjectDisposedException)
                 {
                     // Ignore disposal errors in tests
                 }
