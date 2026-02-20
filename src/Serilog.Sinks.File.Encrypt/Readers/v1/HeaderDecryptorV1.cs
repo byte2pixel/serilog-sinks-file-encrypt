@@ -18,9 +18,7 @@ public class HeaderDecryptorV1 : IHeaderDecryptor
         // Read AES key
         if (decryptedPayload.Length < HeaderMetadataV1.AesKeyLength)
         {
-            throw new InvalidOperationException(
-                "Decrypted payload is too short to read AES key length"
-            );
+            throw new InvalidDataException("Decrypted payload is too short to read AES key");
         }
 
         byte[] aesKey = decryptedPayload[offset..(HeaderMetadataV1.AesKeyLength)];
@@ -28,9 +26,7 @@ public class HeaderDecryptorV1 : IHeaderDecryptor
 
         if (decryptedPayload.Length < offset + HeaderMetadataV1.NonceLength)
         {
-            throw new InvalidOperationException(
-                $"Decrypted payload is too short to read nonce of length {HeaderMetadataV1.NonceLength}"
-            );
+            throw new InvalidDataException("Decrypted payload is too short to read the nonce.");
         }
 
         byte[] nonce = decryptedPayload[offset..(offset + HeaderMetadataV1.NonceLength)];

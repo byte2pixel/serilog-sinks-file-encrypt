@@ -290,7 +290,7 @@ public abstract class EncryptionTestBase : IDisposable, IAsyncDisposable
                 {
                     _streamsToDispose[i].Dispose();
                 }
-                catch
+                catch (ObjectDisposedException)
                 {
                     // Ignore disposal errors in tests
                 }

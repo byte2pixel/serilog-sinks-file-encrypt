@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Security.Cryptography;
 using System.Text;
 using Serilog.Sinks.File.Encrypt.Models;
@@ -41,6 +42,7 @@ namespace Serilog.Sinks.File.Encrypt;
 /// </example>
 public class EncryptHooks : FileLifecycleHooks
 {
+    private static readonly ConcurrentDictionary<string, RSA> _rsaCache = new();
     private readonly EncryptionOptions _encryptionOptions;
 
     /// <summary>
@@ -68,24 +70,16 @@ public class EncryptHooks : FileLifecycleHooks
     /// </example>
     public EncryptHooks(string publicKey, string keyId = "")
     {
-        var rsa = RSA.Create();
-        rsa.FromString(publicKey);
+        ArgumentNullException.ThrowIfNull(publicKey);
+        RSA rsa = _rsaCache.GetOrAdd(publicKey, CreateRsaFromString);
         _encryptionOptions = new EncryptionOptions(rsa, keyId);
     }
 
-    /// <summary>
-    /// Creates a new instance of <see cref="EncryptHooks"/> with the provided <see cref="EncryptionOptions"/>.
-    /// </summary>
-    /// <param name="encryptionOptions">Options used to encrypt the stream.</param>
-    /// <exception cref="ArgumentNullException">Thrown when <paramref name="encryptionOptions"/> is null.</exception>
-    public EncryptHooks(EncryptionOptions encryptionOptions)
+    private static RSA CreateRsaFromString(string publicKey)
     {
-        ArgumentOutOfRangeException.ThrowIfLessThan(
-            encryptionOptions.Rsa.KeySize,
-            EncryptionConstants.MinimumRsaKeySize
-        );
-        ArgumentNullException.ThrowIfNull(encryptionOptions);
-        _encryptionOptions = encryptionOptions;
+        var r = RSA.Create();
+        r.FromString(publicKey);
+        return r;
     }
 
     /// <summary>

@@ -301,29 +301,46 @@ public sealed class LogReader : IDisposable
                 await ReadMarkerAndHeaderAsync(cancellationToken);
                 _state = ReaderState.ReadingMessages;
             }
-            catch (Exception) when (_options.ErrorHandlingMode != ErrorHandlingMode.ThrowException)
+            catch (EndOfStreamException ex)
             {
-                _state = ReaderState.ReadingHeader;
-
-                WriteToAuditLog(
-                    $"Header processing error at position {_input.Position}, attempting to resync using Boyer-Moore search."
-                );
-
-                // Try Boyer-Moore search from current position
-                int foundPos = BoyerMooreSearch(EncryptionConstants.MagicBytes, _nextSyncPosition);
-
-                if (foundPos >= 0)
-                {
-                    _nextSyncPosition = foundPos;
-                    _resyncAttempts++;
-                    _input.Position = _nextSyncPosition;
-                }
-                else
-                {
-                    // No header found - we're done
-                    _state = ReaderState.Completed;
-                }
+                WriteToAuditLog($"End of stream reached while reading header: {ex.Message}");
+                _state = ReaderState.Completed;
             }
+            catch (InvalidDataException ex)
+                when (_options.ErrorHandlingMode != ErrorHandlingMode.ThrowException)
+            {
+                WriteToAuditLog($"Invalid data encountered while reading header: {ex.Message}");
+                HandleHeaderError();
+            }
+            catch (CryptographicException)
+                when (_options.ErrorHandlingMode != ErrorHandlingMode.ThrowException)
+            {
+                HandleHeaderError();
+            }
+        }
+    }
+
+    private void HandleHeaderError()
+    {
+        _state = ReaderState.ReadingHeader;
+
+        WriteToAuditLog(
+            $"Header processing error at position {_input.Position}, attempting to resync using Boyer-Moore search."
+        );
+
+        // Try Boyer-Moore search from current position
+        int foundPos = BoyerMooreSearch(EncryptionConstants.MagicBytes, _nextSyncPosition);
+
+        if (foundPos >= 0)
+        {
+            _nextSyncPosition = foundPos;
+            _resyncAttempts++;
+            _input.Position = _nextSyncPosition;
+        }
+        else
+        {
+            // No header found - we're done
+            _state = ReaderState.Completed;
         }
     }
 
@@ -404,11 +421,11 @@ public sealed class LogReader : IDisposable
         }
     }
 
-    // TODO: Make this more efficient by reading directly from the stream in chunks and handling buffer overlaps,
-    // rather than reading byte-by-byte, make it asynchronous, and consider edge cases like
-    // the pattern being split across buffer boundaries
     private int BoyerMooreSearch(byte[] pattern, long startPosition)
     {
+        // Consider making this more efficient by reading directly from the stream in chunks and handling buffer overlaps,
+        // rather than reading byte-by-byte, make it asynchronous, and consider edge cases like
+        // the pattern being split across buffer boundaries
         int patternLength = pattern.Length;
         int[] badCharShift = new int[256];
 
