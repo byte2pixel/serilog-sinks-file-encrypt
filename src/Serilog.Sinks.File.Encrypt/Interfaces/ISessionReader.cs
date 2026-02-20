@@ -4,17 +4,19 @@ using Serilog.Sinks.File.Encrypt.Models;
 namespace Serilog.Sinks.File.Encrypt.Interfaces;
 
 /// <summary>
-/// The <see cref="ISessionReader"/> interface defines the contract for reading and decrypting session information from
-/// encrypted log entries, including the AES session key, nonce, and timestamp, using RSA decryption for the header.
+/// The ISessionReader interface defines the contract for reading and decrypting the session header from an encrypted log file. Implementations of this interface are responsible for extracting the AES session key and nonce from the encrypted header using the appropriate RSA private key from the provided key map.
+/// This allows subsequent log entries to be decrypted using the obtained session key and nonce.
 /// </summary>
-public interface ISessionReader
+internal interface ISessionReader
 {
     /// <summary>
-    /// Reads the session information from the given header, using the provided RSA instance to decrypt the session key and nonce.
-    /// Messages following the header are read separately using IMessageDecryptor.
+    /// Reads the session header from the input stream, decrypts it using the appropriate RSA key from the key map
     /// </summary>
-    /// <returns>A DecryptionContext containing the AES key, nonce, and timestamp for decrypting subsequent messages.</returns>
-    Task<DecryptionContext> ReadSessionAsync(
+    /// <param name="input">The input to decrypt.</param>
+    /// <param name="keyMap">The key map to look up the proper RSA key.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>A DecryptionContext containing the AES key, nonce for decrypting subsequent messages.</returns>
+    internal Task<DecryptionContext> ReadSessionAsync(
         Stream input,
         Dictionary<string, RSA> keyMap,
         CancellationToken cancellationToken

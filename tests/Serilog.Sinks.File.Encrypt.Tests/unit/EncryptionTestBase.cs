@@ -15,6 +15,7 @@ public abstract class EncryptionTestBase : IDisposable, IAsyncDisposable
     private RSA? _rsa;
     protected EncryptionOptions EncryptOptions;
     protected DecryptionOptions DecryptOptions;
+    protected readonly ILogger Log = Substitute.For<ILogger>();
 
     protected EncryptionTestBase()
     {
@@ -166,7 +167,7 @@ public abstract class EncryptionTestBase : IDisposable, IAsyncDisposable
         return await DecryptStreamToStringAsync(
             encryptedStream,
             decryptionOptions,
-            cancellationToken
+            cancellationToken: cancellationToken
         );
     }
 
@@ -194,6 +195,7 @@ public abstract class EncryptionTestBase : IDisposable, IAsyncDisposable
     protected async Task<string> DecryptStreamToStringAsync(
         Stream inputStream,
         DecryptionOptions? options = null,
+        ILogger? logger = null,
         CancellationToken? cancellationToken = null
     )
     {
@@ -204,6 +206,7 @@ public abstract class EncryptionTestBase : IDisposable, IAsyncDisposable
             inputStream,
             outputStream,
             options ?? DecryptOptions,
+            logger,
             cancellationToken: ct
         );
 

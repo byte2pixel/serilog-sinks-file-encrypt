@@ -5,7 +5,7 @@ namespace Serilog.Sinks.File.Encrypt.Interfaces;
 /// This interface and the implementation should not be changed as it defines the core framing format for the encrypted log file
 /// including the magic bytes, version, key ID, and header.
 /// </summary>
-public interface IFrameWriter
+internal interface IFrameWriter
 {
     /// <summary>
     /// Responsible for writing the session header to the output stream according to the specified format:
@@ -19,7 +19,7 @@ public interface IFrameWriter
     /// <param name="version">The version of the encrypted log format being used.</param>
     /// <param name="keyId">The key identifier for RSA key lookup during decryption.</param>
     /// <param name="header">The RSA encrypted header bytes containing the session metadata.</param>
-    void WriteHeader(
+    internal void WriteHeader(
         Stream output,
         byte version,
         ReadOnlySpan<byte> keyId,

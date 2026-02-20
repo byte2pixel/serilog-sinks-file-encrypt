@@ -1,5 +1,4 @@
 using Serilog.Sinks.File.Encrypt.Models;
-using Serilog.Sinks.File.Encrypt.Writers;
 using Serilog.Sinks.File.Encrypt.Writers.v1;
 
 namespace Serilog.Sinks.File.Encrypt.Tests.unit.v1;

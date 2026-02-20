@@ -145,11 +145,9 @@ public sealed class StreamingDecryptionTests : EncryptionTestBase
     {
         // Arrange
         string[] messages = ["Good message 1", "Good message 2"];
-        string errorLogPath = Path.GetTempFileName();
         DecryptionOptions errorLogOptions = new()
         {
             DecryptionKeys = DecryptOptions.DecryptionKeys,
-            AuditLogPath = errorLogPath,
         };
 
         MemoryStream encryptedStream = await CreateEncryptedStreamAsync(messages);
@@ -160,25 +158,16 @@ public sealed class StreamingDecryptionTests : EncryptionTestBase
         MemoryStream corruptedStream = CreateMemoryStream(corrupted);
 
         // Act
-        string result = await DecryptStreamToStringAsync(corruptedStream, errorLogOptions);
+        string result = await DecryptStreamToStringAsync(
+            corruptedStream,
+            errorLogOptions,
+            logger: Log
+        );
 
         // Assert
         result.ShouldBeEmpty();
 
-        // Error log file should exist (in real file system for this test)
-        string fileContents = await System.IO.File.ReadAllTextAsync(
-            errorLogPath,
-            TestContext.Current.CancellationToken
-        );
-        fileContents.ShouldContain("DECRYPTION ERROR");
-        try
-        {
-            System.IO.File.Delete(errorLogPath);
-        }
-        catch
-        {
-            // Ignore cleanup errors
-        }
+        Log.Received(1).Information(Arg.Is<string>(x => x.Contains("error at position")));
     }
 
     [Fact]

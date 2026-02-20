@@ -5,7 +5,7 @@ using Serilog.Sinks.File.Encrypt.Models;
 namespace Serilog.Sinks.File.Encrypt.Readers.v1;
 
 /// <inheritdoc />
-public class SessionReaderV1 : ISessionReader
+internal class SessionReaderV1 : ISessionReader
 {
     private readonly IHeaderDecryptor _headerDecryptor;
 

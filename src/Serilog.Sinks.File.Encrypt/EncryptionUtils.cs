@@ -1,6 +1,5 @@
 using System.Security.Cryptography;
 using Serilog.Sinks.File.Encrypt.Models;
-using Serilog.Sinks.File.Encrypt.Readers;
 
 namespace Serilog.Sinks.File.Encrypt;
 
@@ -115,60 +114,32 @@ public static class EncryptionUtils
     }
 
     /// <summary>
-    /// Decrypts an encrypted log file asynchronously using streaming for efficient memory usage.
+    /// Decrypts an encrypted log file from an input stream and writes the decrypted content to an output stream.
     /// </summary>
-    /// <param name="inputStream">Stream containing the encrypted log data. Must be readable and seekable.</param>
-    /// <param name="outputStream">Stream where the decrypted content will be written. Must be writable.</param>
-    /// <param name="options">Streaming options for the decryption process. If null, uses <see cref="StreamingOptions.Default"/>.</param>
+    /// <param name="inputStream">The input stream to decrypt.</param>
+    /// <param name="outputStream">The output stream for plaintext.</param>
+    /// <param name="options">Decryption options.</param>
+    /// <param name="logger">Optional audit logger for decryption errors. If provided, decryption errors will be logged with details about the error and the position in the stream where it occurred.</param>
     /// <param name="cancellationToken">Cancellation token to cancel the decryption operation.</param>
-    /// <returns>A task representing the asynchronous decryption operation.</returns>
-    /// <exception cref="ArgumentNullException">Thrown when <paramref name="inputStream"/>, <paramref name="outputStream"/></exception>
-    /// <exception cref="CryptographicException">Thrown when decryption fails due to wrong key, corrupted data, or invalid format.</exception>
-    /// <exception cref="InvalidOperationException">Thrown when the input stream does not contain valid encryption markers.</exception>
-    /// <exception cref="OperationCanceledException">Thrown when the operation is cancelled via <paramref name="cancellationToken"/>.</exception>
-    /// <remarks>
-    /// <para>
-    /// <b>Memory Usage:</b> Uses a producer-consumer pattern with bounded channels to limit memory usage.
-    /// Memory consumption is controlled by <see cref="StreamingOptions.BufferSize"/> and <see cref="StreamingOptions.QueueDepth"/>.
-    /// Typical memory usage: BufferSize × QueueDepth (e.g., 16KB × 10 = 160KB).
-    /// </para>
-    /// <para>
-    /// <b>Error Handling:</b> Behavior depends on <see cref="StreamingOptions.ErrorHandlingMode"/>:
-    /// - <see cref="ErrorHandlingMode.Skip"/>: Silently skips corrupted sections (safest for structured logs)
-    /// - <see cref="ErrorHandlingMode.WriteInline"/>: Writes error messages to output stream
-    /// - <see cref="ErrorHandlingMode.WriteToErrorLog"/>: Logs errors to separate file
-    /// - <see cref="ErrorHandlingMode.ThrowException"/>: Throws exception on first error
-    /// </para>
-    /// </remarks>
+    /// <returns>
+    /// A <see cref="DecryptionResult"/> containing counts of decrypted sessions, messages, failures, and resync attempts.
+    /// </returns>
     /// <example>
     /// <code>
-    /// // Basic decryption with default options
+    /// // Decrypt a log file with error logging
     /// using var inputStream = File.OpenRead("encrypted.log");
     /// using var outputStream = File.Create("decrypted.log");
-    ///
-    /// await EncryptionUtils.DecryptLogFileAsync(
-    ///     inputStream,
-    ///     outputStream,
-    ///     privateKey,
-    ///     cancellationToken: cts.Token
-    /// );
-    ///
-    /// // Decryption with custom error handling
-    /// var options = new StreamingOptions
+    /// var options = new DecryptionOptions
     /// {
-    ///     ContinueOnError = true,
-    ///     ErrorHandlingMode = ErrorHandlingMode.WriteToErrorLog,
-    ///     ErrorLogPath = "decryption_errors.log",
-    ///     BufferSize = 32 * 1024, // 32KB chunks
-    ///     QueueDepth = 20 // Allow more buffering
+    ///     DecryptionKeys = new Dictionary&lt;string, string&gt; { { "keyId", privateKey } },
     /// };
-    ///
-    /// await EncryptionUtils.DecryptLogFileAsync(
+    /// var logger = new LoggerConfiguration().WriteTo.File("decryption_errors.log").CreateLogger();
+    /// var result = await EncryptionUtils.DecryptLogFileAsync(
     ///     inputStream,
     ///     outputStream,
-    ///     privateKey,
     ///     options,
-    ///     cts.Token
+    ///     logger,
+    ///     cancellationToken
     /// );
     /// </code>
     /// </example>
@@ -176,10 +147,11 @@ public static class EncryptionUtils
         Stream inputStream,
         Stream outputStream,
         DecryptionOptions options,
+        ILogger? logger = null,
         CancellationToken cancellationToken = default
     )
     {
-        await using LogReader reader = new(inputStream, options);
+        using LogReader reader = new(inputStream, options, logger);
         return await reader.DecryptToStreamAsync(outputStream, cancellationToken);
     }
 
@@ -189,8 +161,10 @@ public static class EncryptionUtils
     /// <param name="encryptedFilePath">Path to the encrypted log file. File must exist and be readable.</param>
     /// <param name="outputFilePath">Path where the decrypted content will be written. Will be created or overwritten.</param>
     /// <param name="options">Streaming options for the decryption process.</param>
+    /// <param name="logger">Optional audit logger for decryption errors. If provided, decryption errors will be logged with details about the error and the position in the file where it occurred.</param>
     /// <param name="cancellationToken">Cancellation token to cancel the decryption operation.</param>
     /// <returns>A task representing the asynchronous decryption operation.</returns>
+    /// <exception cref="ArgumentException">Thrown when <paramref name="encryptedFilePath"/> or <paramref name="outputFilePath"/> cannot be opened or created.</exception>
     /// <exception cref="ArgumentNullException">Thrown when any string parameter is null or whitespace.</exception>
     /// <exception cref="FileNotFoundException">Thrown when <paramref name="encryptedFilePath"/> does not exist.</exception>
     /// <exception cref="CryptographicException">Thrown when decryption fails due to wrong key, corrupted data, or invalid format.</exception>
@@ -199,7 +173,7 @@ public static class EncryptionUtils
     /// <exception cref="OperationCanceledException">Thrown when the operation is canceled via <paramref name="cancellationToken"/>.</exception>
     /// <remarks>
     /// This is a convenience overload that automatically manages file streams. For more control over stream handling,
-    /// use the <see cref="DecryptLogFileAsync(Stream, Stream, DecryptionOptions, CancellationToken)"/> overload.
+    /// use the <see cref="DecryptLogFileAsync(string, string, DecryptionOptions, ILogger?, CancellationToken)"/> overload.
     /// </remarks>
     /// <example>
     /// <code>
@@ -230,12 +204,13 @@ public static class EncryptionUtils
         string encryptedFilePath,
         string outputFilePath,
         DecryptionOptions options,
+        ILogger? logger = null,
         CancellationToken cancellationToken = default
     )
     {
         await using FileStream inputStream = System.IO.File.OpenRead(encryptedFilePath);
         await using FileStream outputStream = System.IO.File.Create(outputFilePath);
 
-        await DecryptLogFileAsync(inputStream, outputStream, options, cancellationToken);
+        await DecryptLogFileAsync(inputStream, outputStream, options, logger, cancellationToken);
     }
 }

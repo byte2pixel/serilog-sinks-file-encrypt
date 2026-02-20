@@ -228,7 +228,7 @@ public class DecryptCommandTests : CommandTestBase
 
         // Assert
         result.ShouldBe(0);
-        TestConsole.Output.ShouldContain("Error log:");
+        TestConsole.Output.ShouldContain("Audit log:");
         TestConsole.Output.ShouldContain(errorLogPath);
     }
 
@@ -450,7 +450,7 @@ public class DecryptCommandTests : CommandTestBase
         result.ShouldBe(1); // Error
         // Could be either FormatException or CryptographicException depending on the error
         bool hasError =
-            TestConsole.Output.Contains("Invalid key or file format:")
+            TestConsole.Output.Contains("Invalid RSA key for key ID")
             || TestConsole.Output.Contains("Decryption failed:");
         hasError.ShouldBeTrue();
     }
@@ -530,7 +530,7 @@ public class DecryptCommandTests : CommandTestBase
         result.ShouldBe(1); // Error
         // Should detect that the file has no valid encryption markers
         // With ThrowException mode, the InvalidOperationException bubbles up to the top-level handler
-        TestConsole.Output.ShouldContain("✗ Invalid");
+        TestConsole.Output.ShouldContain("✗ Decryption failed:");
         TestConsole.Output.ShouldContain("No valid sessions found in the file.");
     }
 

@@ -10,7 +10,7 @@ namespace Serilog.Sinks.File.Encrypt;
 /// <remarks>
 /// <para>
 /// This class integrates with Serilog.Sinks.File to automatically encrypt log files as they are written.
-/// It intercepts file stream creation and wraps it with <see cref="EncryptedStream"/> for transparent encryption.
+/// It intercepts file stream creation and wraps it with <see cref="LogWriter"/> for transparent encryption.
 /// </para>
 /// <para>
 /// <b>Thread Safety:</b> This class is thread-safe. Serilog.Sinks.File handles synchronization internally,

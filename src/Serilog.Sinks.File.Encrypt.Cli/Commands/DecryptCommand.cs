@@ -67,10 +67,10 @@ public sealed class DecryptCommand(IAnsiConsole console, IFileSystem fileSystem)
         public bool Strict { get; init; }
 
         /// <summary>
-        /// Path to write detailed error information. If specified, errors are logged to this file instead of being skipped silently.
+        /// Path to write detailed audit information. If specified, audit info is logged to this file instead of being skipped silently.
         /// </summary>
-        [CommandOption("--error-log <PATH>")]
-        [Description("Write detailed error information to a separate log file")]
+        [CommandOption("--audit-log <PATH>")]
+        [Description("Write detailed audit information to a separate log file")]
         public string? AuditLogPath { get; init; }
     }
 
@@ -135,7 +135,6 @@ public sealed class DecryptCommand(IAnsiConsole console, IFileSystem fileSystem)
             {
                 DecryptionKeys = decryptionKeys,
                 ErrorHandlingMode = errorMode,
-                AuditLogPath = settings.AuditLogPath,
             };
 
             console.WriteLine();
@@ -230,7 +229,7 @@ public sealed class DecryptCommand(IAnsiConsole console, IFileSystem fileSystem)
                     inputStream,
                     outputStream,
                     decryptionOptions,
-                    cancellationToken
+                    cancellationToken: cancellationToken
                 );
 
                 console.MarkupLineInterpolated($"[green]✓ Decrypted:[/] {inputFile}");

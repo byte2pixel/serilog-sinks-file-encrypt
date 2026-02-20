@@ -1,7 +1,6 @@
 using System.Buffers;
 using System.Buffers.Binary;
 using System.Security.Cryptography;
-using System.Text;
 using Serilog.Sinks.File.Encrypt.Interfaces;
 using Serilog.Sinks.File.Encrypt.Models;
 
@@ -13,7 +12,7 @@ namespace Serilog.Sinks.File.Encrypt;
 /// It maintains internal state to handle the streaming nature of the log file, allowing it to recover from errors
 /// and continue processing subsequent messages or sessions as needed.
 /// </summary>
-public sealed class LogReader : IAsyncDisposable, IDisposable
+public sealed class LogReader : IDisposable
 {
     private enum ReaderState
     {
@@ -27,7 +26,7 @@ public sealed class LogReader : IAsyncDisposable, IDisposable
     private readonly Stream _input;
     private readonly DecryptionOptions _options;
     private DecryptionContext _context = DecryptionContext.Empty;
-    private readonly StreamWriter? _auditLogWriter;
+    private readonly ILogger? _logger;
     private readonly Dictionary<string, RSA> _rsaKeyCache = new();
     private int _decryptedSessions;
     private int _decryptedMessages;
@@ -41,11 +40,12 @@ public sealed class LogReader : IAsyncDisposable, IDisposable
     /// </summary>
     /// <param name="input">The input stream</param>
     /// <param name="options">The decryption options</param>
+    /// <param name="logger">Optional logger for auditing decryption operations and errors. If not provided, no audit logging will occur.</param>
     /// <exception cref="ArgumentException"></exception>
     /// <remarks>
     /// This class is not thread-safe and should be used for a single decryption operation on a given input stream.
     /// </remarks>
-    public LogReader(Stream input, DecryptionOptions options)
+    public LogReader(Stream input, DecryptionOptions options, ILogger? logger = null)
     {
         ArgumentNullException.ThrowIfNull(input);
         ArgumentNullException.ThrowIfNull(options);
@@ -57,6 +57,7 @@ public sealed class LogReader : IAsyncDisposable, IDisposable
 
         _input = input;
         _options = options;
+        _logger = logger;
 
         if (!Enum.IsDefined(options.ErrorHandlingMode))
         {
@@ -81,8 +82,6 @@ public sealed class LogReader : IAsyncDisposable, IDisposable
                 );
             }
         }
-
-        _auditLogWriter = CreateAuditLogWriter();
         WriteToAuditLog("LogReader initialized, ready to process input stream.");
     }
 
@@ -93,6 +92,7 @@ public sealed class LogReader : IAsyncDisposable, IDisposable
     /// </summary>
     /// <param name="output">The output stream.</param>
     /// <param name="cancellationToken">The cancellation token</param>
+    /// <exception cref="CryptographicException">Thrown if decryption fails and the error handling mode is set to ThrowException, or if no messages were decrypted from the input stream.</exception>
     public async Task<DecryptionResult> DecryptToStreamAsync(
         Stream output,
         CancellationToken cancellationToken = default
@@ -108,10 +108,39 @@ public sealed class LogReader : IAsyncDisposable, IDisposable
             await ProcessStreamAsync(output, cancellationToken);
         }
 
-        await WriteToAuditLogAsync(
-            $"Decryption completed. Sessions decrypted: {_decryptedSessions}, Messages decrypted: {_decryptedMessages}",
-            cancellationToken
+        WriteToAuditLog(
+            $"Decryption completed. Sessions decrypted: {_decryptedSessions}, Messages decrypted: {_decryptedMessages}"
         );
+
+        if (_options.ErrorHandlingMode != ErrorHandlingMode.ThrowException)
+        {
+            return new DecryptionResult
+            {
+                DecryptedSessions = _decryptedSessions,
+                DecryptedMessages = _decryptedMessages,
+                FailedMessages = _failedMessages,
+                FailedHeaders = _failedHeaders,
+                ResyncAttempts = _resyncAttempts,
+            };
+        }
+
+        if (_decryptedSessions == 0)
+        {
+            throw new CryptographicException("No valid sessions found in the file.");
+        }
+
+        if (_decryptedMessages == 0)
+        {
+            throw new CryptographicException("No messages were decrypted from the input stream.");
+        }
+
+        if (_failedMessages > 0 || _failedHeaders > 0)
+        {
+            throw new CryptographicException(
+                $"Decryption completed with errors. Failed headers: {_failedHeaders}, Failed messages: {_failedMessages}."
+            );
+        }
+
         return new DecryptionResult
         {
             DecryptedSessions = _decryptedSessions,
@@ -175,9 +204,11 @@ public sealed class LogReader : IAsyncDisposable, IDisposable
             // a new session header marker instead of a valid message length.
             if (messageLength == EncryptionConstants.MagicByteDetection)
             {
-                throw new SessionHeaderEncounteredException(
-                    "Session header marker likely encountered while reading messages."
-                );
+                WriteToAuditLog("Session header marker likely encountered while reading messages.");
+                _context = DecryptionContext.Empty;
+                _state = ReaderState.ReadingHeader;
+                _nextSyncPosition = _input.Position - sizeof(int); // Rewind to start of potential header
+                return;
             }
 
             // Read the encrypted message (ciphertext + tag)
@@ -203,20 +234,10 @@ public sealed class LogReader : IAsyncDisposable, IDisposable
                 ArrayPool<byte>.Shared.Return(encryptedMessage);
             }
         }
-        catch (SessionHeaderEncounteredException ex)
-        {
-            await WriteToAuditLogAsync(ex.Message, cancellationToken);
-            _context = DecryptionContext.Empty;
-            _state = ReaderState.ReadingHeader;
-            _nextSyncPosition = _input.Position - sizeof(int); // Rewind to start of potential header
-        }
-        catch (Exception ex)
+        catch (Exception ex) when (_options.ErrorHandlingMode != ErrorHandlingMode.ThrowException)
         {
             // Handle message processing errors, try to recover if possible
-            await WriteToAuditLogAsync(
-                $"Message processing error: {ex.Message}",
-                cancellationToken
-            );
+            WriteToAuditLog($"Message processing error: {ex.Message}");
             _resyncAttempts++;
             _failedMessages++;
             _context = DecryptionContext.Empty;
@@ -270,18 +291,22 @@ public sealed class LogReader : IAsyncDisposable, IDisposable
     {
         while (_state == ReaderState.ReadingHeader)
         {
+            if (!IsRoomForMagicBytes())
+            {
+                _state = ReaderState.Completed;
+                return;
+            }
             try
             {
                 await ReadMarkerAndHeaderAsync(cancellationToken);
                 _state = ReaderState.ReadingMessages;
             }
-            catch (Exception)
+            catch (Exception) when (_options.ErrorHandlingMode != ErrorHandlingMode.ThrowException)
             {
                 _state = ReaderState.ReadingHeader;
 
-                await WriteToAuditLogAsync(
-                    $"Header processing error at position {_input.Position}, attempting to resync using Boyer-Moore search.",
-                    cancellationToken
+                WriteToAuditLog(
+                    $"Header processing error at position {_input.Position}, attempting to resync using Boyer-Moore search."
                 );
 
                 // Try Boyer-Moore search from current position
@@ -321,10 +346,7 @@ public sealed class LogReader : IAsyncDisposable, IDisposable
 
     private async Task ProcessSessionHeaderAsync(CancellationToken cancellationToken)
     {
-        await WriteToAuditLogAsync(
-            "Possible header marker found staring processing after header.",
-            cancellationToken
-        );
+        WriteToAuditLog("Possible header marker found staring processing after header.");
         byte[] version = new byte[1];
         await _input.ReadExactlyAsync(version, cancellationToken);
         try
@@ -354,79 +376,23 @@ public sealed class LogReader : IAsyncDisposable, IDisposable
 
     private bool IsEndOfStream() => _input.Position >= _input.Length;
 
-    private async Task WriteToAuditLogAsync(string message, CancellationToken cancellationToken)
-    {
-        if (_auditLogWriter is null)
-        {
-            return;
-        }
-        string timestamp = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss.fff");
-        string logEntry = $"[{timestamp}] [Position: {_input.Position}] {message}";
-        await _auditLogWriter.WriteLineAsync(logEntry.AsMemory(), cancellationToken);
-        await _auditLogWriter.FlushAsync(cancellationToken);
-    }
+    private bool IsRoomForMagicBytes() =>
+        _input.Length - _input.Position >= EncryptionConstants.MagicBytes.Length;
 
     private void WriteToAuditLog(string message)
     {
-        if (_auditLogWriter is null)
+        if (_logger is null)
         {
             return;
         }
         string timestamp = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss.fff");
         string logEntry = $"[{timestamp}] [Position: {_input.Position}] {message}";
-        _auditLogWriter.WriteLine(logEntry);
-        _auditLogWriter.Flush();
-    }
-
-    private StreamWriter? CreateAuditLogWriter()
-    {
-        if (string.IsNullOrEmpty(_options.AuditLogPath))
-        {
-            return null;
-        }
-        string errorLogPath = _options.AuditLogPath;
-
-        // Ensure the directory exists
-        string? directory = Path.GetDirectoryName(errorLogPath);
-        if (!string.IsNullOrEmpty(directory))
-        {
-            Directory.CreateDirectory(directory);
-        }
-
-        // Create or append to the error log file
-        FileStream fileStream = new(
-            errorLogPath,
-            FileMode.Create,
-            FileAccess.Write,
-            FileShare.Read,
-            bufferSize: 4096,
-            useAsync: true
-        );
-
-        StreamWriter writer = new(fileStream, Encoding.UTF8)
-        {
-            AutoFlush = false, // We'll flush manually for better control
-        };
-
-        return writer;
+        _logger.Information(logEntry);
     }
 
     /// <inheritdoc />
     public void Dispose()
     {
-        _auditLogWriter?.Flush();
-        _auditLogWriter?.Dispose();
-        DisposeRsaKeys();
-    }
-
-    /// <inheritdoc />
-    public async ValueTask DisposeAsync()
-    {
-        if (_auditLogWriter is not null)
-        {
-            await _auditLogWriter.FlushAsync();
-            await _auditLogWriter.DisposeAsync();
-        }
         DisposeRsaKeys();
     }
 

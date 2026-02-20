@@ -1,5 +1,3 @@
-using System.Buffers.Binary;
-using Serilog.Sinks.File.Encrypt.Models;
 using Serilog.Sinks.File.Encrypt.Writers;
 
 namespace Serilog.Sinks.File.Encrypt.Tests.unit;

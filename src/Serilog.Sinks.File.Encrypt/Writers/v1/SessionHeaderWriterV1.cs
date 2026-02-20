@@ -1,4 +1,3 @@
-using System.Collections.ObjectModel;
 using System.Text;
 using Serilog.Sinks.File.Encrypt.Interfaces;
 using Serilog.Sinks.File.Encrypt.Models;

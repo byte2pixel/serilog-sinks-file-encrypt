@@ -1,6 +1,3 @@
-using System.ComponentModel.DataAnnotations;
-using System.Security.Cryptography;
-
 namespace Serilog.Sinks.File.Encrypt.Models;
 
 /// <summary>
@@ -21,10 +18,4 @@ public sealed record DecryptionOptions
     /// Default is <see cref="ErrorHandlingMode.Skip"/> which silently skips corrupted sections.
     /// </remarks>
     public ErrorHandlingMode ErrorHandlingMode { get; init; } = ErrorHandlingMode.Skip;
-
-    /// <summary>
-    /// Optional path to an audit log files where decryption errors and related events will be recorded.
-    /// If not specified, no audit logging will occur.
-    /// </summary>
-    public string? AuditLogPath { get; init; }
 };
