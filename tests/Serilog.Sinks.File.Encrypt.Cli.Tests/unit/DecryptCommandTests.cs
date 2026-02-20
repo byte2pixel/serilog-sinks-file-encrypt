@@ -14,7 +14,7 @@ public class DecryptCommandTests : CommandTestBase
         string encryptedFilePath = Path.Join("logs", "encrypted.log");
         string decryptedFilePath = Path.Join("logs", "decrypted.log");
 
-        (string publicKey, string privateKey) = EncryptionUtils.GenerateRsaKeyPair(
+        (string publicKey, string privateKey) = CryptographicUtils.GenerateRsaKeyPair(
             format: KeyFormat.Pem
         );
 
@@ -63,7 +63,7 @@ public class DecryptCommandTests : CommandTestBase
         string encryptedFilePath = Path.Join("logs", "encrypted.log");
         string decryptedFilePath = Path.Join("logs", "decrypted.log");
 
-        (string publicKey, string privateKey) = EncryptionUtils.GenerateRsaKeyPair(
+        (string publicKey, string privateKey) = CryptographicUtils.GenerateRsaKeyPair(
             format: KeyFormat.Xml
         );
 
@@ -167,7 +167,7 @@ public class DecryptCommandTests : CommandTestBase
         string encryptedFilePath = Path.Join("logs", "encrypted.log");
         string decryptedFilePath = Path.Join("logs", "decrypted.log");
 
-        (string publicKey, string privateKey) = EncryptionUtils.GenerateRsaKeyPair();
+        (string publicKey, string privateKey) = CryptographicUtils.GenerateRsaKeyPair();
 
         byte[] encryptedContent = CreateEncryptedLogFile(TestLogContent, publicKey);
 
@@ -203,7 +203,7 @@ public class DecryptCommandTests : CommandTestBase
         string decryptedFilePath = Path.Join("logs", "decrypted.log");
         string errorLogPath = Path.Join("logs", "errors.log");
 
-        (string publicKey, string privateKey) = EncryptionUtils.GenerateRsaKeyPair();
+        (string publicKey, string privateKey) = CryptographicUtils.GenerateRsaKeyPair();
 
         byte[] encryptedContent = CreateEncryptedLogFile(TestLogContent, publicKey);
 
@@ -241,7 +241,7 @@ public class DecryptCommandTests : CommandTestBase
         string encryptedFilePath = Path.Join("logs", "encrypted.log");
         string decryptedFilePath = Path.Join("logs", "decrypted.log");
 
-        (string publicKey, string privateKey) = EncryptionUtils.GenerateRsaKeyPair();
+        (string publicKey, string privateKey) = CryptographicUtils.GenerateRsaKeyPair();
 
         byte[] encryptedContent = CreateEncryptedLogFile(TestLogContent, publicKey);
 
@@ -277,7 +277,7 @@ public class DecryptCommandTests : CommandTestBase
         string encryptedFilePath = Path.Join("logs", "encrypted.log");
         string decryptedFilePath = Path.Join("logs", "decrypted.log");
 
-        (string publicKey, string _) = EncryptionUtils.GenerateRsaKeyPair();
+        (string publicKey, string _) = CryptographicUtils.GenerateRsaKeyPair();
         byte[] encryptedContent = CreateEncryptedLogFile(TestLogContent, publicKey);
 
         // Create properly encrypted file
@@ -321,7 +321,7 @@ public class DecryptCommandTests : CommandTestBase
         string encryptedFilePath = Path.Join("logs", "encrypted.log");
         string decryptedFilePath = Path.Join("logs", "decrypted.log");
 
-        (string publicKey, string privateKey) = EncryptionUtils.GenerateRsaKeyPair();
+        (string publicKey, string privateKey) = CryptographicUtils.GenerateRsaKeyPair();
         byte[] encryptedContent = CreateEncryptedLogFile(TestLogContent, publicKey);
 
         // Add files to MockFileSystem
@@ -370,7 +370,7 @@ public class DecryptCommandTests : CommandTestBase
         string encryptedFilePath = Path.Join("logs", "encrypted.log");
         string decryptedFilePath = Path.Join("logs", "decrypted.log");
 
-        (string publicKey, string privateKey) = EncryptionUtils.GenerateRsaKeyPair();
+        (string publicKey, string privateKey) = CryptographicUtils.GenerateRsaKeyPair();
 
         byte[] encryptedContent = CreateEncryptedLogFile(TestLogContent, publicKey);
 
@@ -423,7 +423,7 @@ public class DecryptCommandTests : CommandTestBase
         string encryptedFilePath = Path.Join("logs", "encrypted.log");
         string decryptedFilePath = Path.Join("logs", "decrypted.log");
 
-        (string publicKey, string _) = EncryptionUtils.GenerateRsaKeyPair();
+        (string publicKey, string _) = CryptographicUtils.GenerateRsaKeyPair();
         string invalidPrivateKey = "<RSAKeyValue><Invalid>data</Invalid></RSAKeyValue>";
 
         byte[] encryptedContent = CreateEncryptedLogFile(TestLogContent, publicKey);
@@ -465,8 +465,8 @@ public class DecryptCommandTests : CommandTestBase
         string decryptedFilePath = Path.Join("logs", "decrypted.log");
 
         // Generate two different key pairs
-        (string publicKey, string _) = EncryptionUtils.GenerateRsaKeyPair();
-        (string _, string wrongPrivateKey) = EncryptionUtils.GenerateRsaKeyPair();
+        (string publicKey, string _) = CryptographicUtils.GenerateRsaKeyPair();
+        (string _, string wrongPrivateKey) = CryptographicUtils.GenerateRsaKeyPair();
 
         byte[] encryptedContent = CreateEncryptedLogFile(TestLogContent, publicKey);
 
@@ -502,7 +502,7 @@ public class DecryptCommandTests : CommandTestBase
         string encryptedFilePath = Path.Join("logs", "encrypted.log");
         string decryptedFilePath = Path.Join("logs", "decrypted.log");
 
-        (string _, string privateKey) = EncryptionUtils.GenerateRsaKeyPair();
+        (string _, string privateKey) = CryptographicUtils.GenerateRsaKeyPair();
 
         // Create a corrupted encrypted file (just random bytes that won't decrypt properly)
         byte[] corruptedContent = [0x00, 0x01, 0x02, 0x03, 0xFF, 0xFE, 0xFD];
@@ -548,7 +548,7 @@ public class DecryptCommandTests : CommandTestBase
         string encryptedFile3 = Path.Join("logs", "app3.log");
         string outputDir = Path.Join("decrypted");
 
-        (string publicKey, string privateKey) = EncryptionUtils.GenerateRsaKeyPair();
+        (string publicKey, string privateKey) = CryptographicUtils.GenerateRsaKeyPair();
 
         FileSystem.AddFile(privateKeyPath, new MockFileData(privateKey));
         FileSystem.AddFile(
@@ -616,7 +616,7 @@ public class DecryptCommandTests : CommandTestBase
         string encryptedFile1 = Path.Join(logsDir, "app.log");
         string encryptedFile2 = Path.Join(logsDir, "service.log");
 
-        (string publicKey, string privateKey) = EncryptionUtils.GenerateRsaKeyPair();
+        (string publicKey, string privateKey) = CryptographicUtils.GenerateRsaKeyPair();
 
         FileSystem.AddFile(privateKeyPath, new MockFileData(privateKey));
         FileSystem.AddFile(
@@ -661,7 +661,7 @@ public class DecryptCommandTests : CommandTestBase
         string encryptedFile1 = Path.Join(logsDir, "app.log");
         string encryptedFile2 = Path.Join(subDir, "sub.log");
 
-        (string publicKey, string privateKey) = EncryptionUtils.GenerateRsaKeyPair();
+        (string publicKey, string privateKey) = CryptographicUtils.GenerateRsaKeyPair();
 
         FileSystem.AddFile(privateKeyPath, new MockFileData(privateKey));
         FileSystem.AddFile(
@@ -708,7 +708,7 @@ public class DecryptCommandTests : CommandTestBase
         string encryptedFile = Path.Join("logs", "app.log");
         string decryptedFile = Path.Join("logs", "app.decrypted.log");
 
-        (string publicKey, string privateKey) = EncryptionUtils.GenerateRsaKeyPair();
+        (string publicKey, string privateKey) = CryptographicUtils.GenerateRsaKeyPair();
 
         FileSystem.AddFile(privateKeyPath, new MockFileData(privateKey));
         FileSystem.AddFile(
@@ -752,7 +752,7 @@ public class DecryptCommandTests : CommandTestBase
         string validFile = Path.Join("logs", "valid.log");
         string lockedFile = Path.Join("logs", "locked.log");
 
-        (string publicKey, string privateKey) = EncryptionUtils.GenerateRsaKeyPair();
+        (string publicKey, string privateKey) = CryptographicUtils.GenerateRsaKeyPair();
 
         FileSystem.AddFile(privateKeyPath, new MockFileData(privateKey));
         FileSystem.AddFile(
@@ -833,7 +833,7 @@ public class DecryptCommandTests : CommandTestBase
         string txtFile = Path.Join(logsDir, "app.txt");
         string logFile = Path.Join(logsDir, "app.log");
 
-        (string publicKey, string privateKey) = EncryptionUtils.GenerateRsaKeyPair();
+        (string publicKey, string privateKey) = CryptographicUtils.GenerateRsaKeyPair();
 
         FileSystem.AddFile(privateKeyPath, new MockFileData(privateKey));
         FileSystem.AddFile(
@@ -876,7 +876,7 @@ public class DecryptCommandTests : CommandTestBase
         string encryptedFile = Path.Join("logs", "app.log");
         string outputDir = Path.Join("decrypted");
 
-        (string publicKey, string privateKey) = EncryptionUtils.GenerateRsaKeyPair();
+        (string publicKey, string privateKey) = CryptographicUtils.GenerateRsaKeyPair();
 
         FileSystem.AddFile(privateKeyPath, new MockFileData(privateKey));
         FileSystem.AddFile(
@@ -918,7 +918,7 @@ public class DecryptCommandTests : CommandTestBase
         string privateKeyPath = Path.Join("keys", "private_key.xml");
         string logsDir = Path.Join("logs");
 
-        (string _, string privateKey) = EncryptionUtils.GenerateRsaKeyPair();
+        (string _, string privateKey) = CryptographicUtils.GenerateRsaKeyPair();
 
         FileSystem.AddFile(privateKeyPath, new MockFileData(privateKey));
         FileSystem.AddDirectory(logsDir);
@@ -947,7 +947,7 @@ public class DecryptCommandTests : CommandTestBase
     {
         // Arrange
         string privateKeyPath = Path.Join("keys", "private_key.xml");
-        (string _, string privateKey) = EncryptionUtils.GenerateRsaKeyPair();
+        (string _, string privateKey) = CryptographicUtils.GenerateRsaKeyPair();
         FileSystem.AddFile(privateKeyPath, new MockFileData(privateKey));
 
         DecryptCommand command = new(TestConsole, FileSystem);
@@ -975,7 +975,7 @@ public class DecryptCommandTests : CommandTestBase
         string encryptedFile = Path.Join("logs", "app.log");
         string outputFile = Path.Join("new-dir", "output.log");
 
-        (string publicKey, string privateKey) = EncryptionUtils.GenerateRsaKeyPair();
+        (string publicKey, string privateKey) = CryptographicUtils.GenerateRsaKeyPair();
 
         FileSystem.AddFile(privateKeyPath, new MockFileData(privateKey));
         FileSystem.AddFile(
@@ -1016,7 +1016,7 @@ public class DecryptCommandTests : CommandTestBase
         string encryptedFile = Path.Join(logsDir, "app1.log");
         string alreadyDecryptedFile = Path.Join(logsDir, "app2.decrypted.log");
 
-        (string publicKey, string privateKey) = EncryptionUtils.GenerateRsaKeyPair();
+        (string publicKey, string privateKey) = CryptographicUtils.GenerateRsaKeyPair();
 
         FileSystem.AddFile(privateKeyPath, new MockFileData(privateKey));
         FileSystem.AddFile(
@@ -1064,7 +1064,7 @@ public class DecryptCommandTests : CommandTestBase
         string encryptedFile2 = Path.Join(logsDir, "service.log");
         string alreadyDecryptedFile = Path.Join(logsDir, "old.decrypted.log");
 
-        (string publicKey, string privateKey) = EncryptionUtils.GenerateRsaKeyPair();
+        (string publicKey, string privateKey) = CryptographicUtils.GenerateRsaKeyPair();
 
         FileSystem.AddFile(privateKeyPath, new MockFileData(privateKey));
         FileSystem.AddFile(

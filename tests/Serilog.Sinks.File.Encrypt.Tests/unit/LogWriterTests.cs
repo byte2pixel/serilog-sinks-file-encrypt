@@ -9,7 +9,7 @@ public class LogWriterTests
     public void StreamContract_PropertiesAndUnsupportedMethods_ThrowOrReturnExpected()
     {
         // Arrange
-        (string publicKey, _) = EncryptionUtils.GenerateRsaKeyPair();
+        (string publicKey, _) = CryptographicUtils.GenerateRsaKeyPair();
         using MemoryStream fs = new();
         using RSA rsa = RSA.Create();
         rsa.FromXmlString(publicKey);
@@ -32,7 +32,7 @@ public class LogWriterTests
     public void WriteAndFlush_Moves_Position()
     {
         // Arrange
-        (string publicKey, _) = EncryptionUtils.GenerateRsaKeyPair();
+        (string publicKey, _) = CryptographicUtils.GenerateRsaKeyPair();
         using MemoryStream fs = new();
         using RSA rsa = RSA.Create();
         rsa.FromXmlString(publicKey);
@@ -51,7 +51,7 @@ public class LogWriterTests
     public void MultipleFlushes_DoNotThrow()
     {
         // Arrange
-        (string publicKey, _) = EncryptionUtils.GenerateRsaKeyPair();
+        (string publicKey, _) = CryptographicUtils.GenerateRsaKeyPair();
         using MemoryStream fs = new();
         using RSA rsa = RSA.Create();
         rsa.FromXmlString(publicKey);
@@ -84,7 +84,7 @@ public class LogWriterTests
     public void Dispose_CanBeCalledMultipleTimesSafely()
     {
         // Arrange
-        (string publicKey, _) = EncryptionUtils.GenerateRsaKeyPair();
+        (string publicKey, _) = CryptographicUtils.GenerateRsaKeyPair();
         using MemoryStream fs = new();
         using RSA rsa = RSA.Create();
         rsa.FromXmlString(publicKey);
@@ -106,7 +106,7 @@ public class LogWriterTests
     public void WritingZeroBytes_DoesNot_WriteData()
     {
         // Arrange
-        (string publicKey, _) = EncryptionUtils.GenerateRsaKeyPair();
+        (string publicKey, _) = CryptographicUtils.GenerateRsaKeyPair();
         using MemoryStream fs = new();
         using RSA rsa = RSA.Create();
         rsa.FromXmlString(publicKey);
@@ -126,7 +126,7 @@ public class LogWriterTests
     public void Ctor_NullStream_ThrowsArgumentNullException()
     {
         // Arrange
-        (string publicKey, _) = EncryptionUtils.GenerateRsaKeyPair();
+        (string publicKey, _) = CryptographicUtils.GenerateRsaKeyPair();
         using RSA rsa = RSA.Create();
         rsa.FromXmlString(publicKey);
         EncryptionOptions options = new(rsa);

@@ -9,7 +9,7 @@ namespace Serilog.Sinks.File.Encrypt.Tests.unit;
 public abstract class EncryptionTestBase : IDisposable, IAsyncDisposable
 {
     protected (string publicKey, string privateKey) RsaKeyPair { get; } =
-        EncryptionUtils.GenerateRsaKeyPair();
+        CryptographicUtils.GenerateRsaKeyPair();
     private readonly List<Stream> _streamsToDispose = [];
     private bool _disposed;
     private RSA? _rsa;
@@ -202,7 +202,7 @@ public abstract class EncryptionTestBase : IDisposable, IAsyncDisposable
         CancellationToken ct = cancellationToken ?? TestContext.Current.CancellationToken;
         MemoryStream outputStream = CreateMemoryStream();
 
-        await EncryptionUtils.DecryptLogFileAsync(
+        await CryptographicUtils.DecryptLogFileAsync(
             inputStream,
             outputStream,
             options ?? DecryptOptions,

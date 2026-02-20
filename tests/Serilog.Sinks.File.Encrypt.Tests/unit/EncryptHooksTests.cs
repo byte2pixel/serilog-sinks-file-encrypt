@@ -6,7 +6,7 @@ public class EncryptHooksTests
     public void OnFileOpened_ReturnsEncryptedStream()
     {
         // Arrange
-        (string publicKey, string _) = EncryptionUtils.GenerateRsaKeyPair();
+        (string publicKey, string _) = CryptographicUtils.GenerateRsaKeyPair();
         EncryptHooks hooks = new(publicKey);
         using MemoryStream memoryStream = new();
         Encoding encoding = Encoding.UTF8;

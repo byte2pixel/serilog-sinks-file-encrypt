@@ -234,7 +234,11 @@ public sealed class LogReader : IDisposable
                 ArrayPool<byte>.Shared.Return(encryptedMessage);
             }
         }
-        catch (Exception ex) when (_options.ErrorHandlingMode != ErrorHandlingMode.ThrowException)
+        catch (Exception ex)
+            when (_options.ErrorHandlingMode != ErrorHandlingMode.ThrowException
+                && ex is not OperationCanceledException
+                && ex is CryptographicException or FormatException or InvalidDataException
+            )
         {
             // Handle message processing errors, try to recover if possible
             WriteToAuditLog($"Message processing error: {ex.Message}");

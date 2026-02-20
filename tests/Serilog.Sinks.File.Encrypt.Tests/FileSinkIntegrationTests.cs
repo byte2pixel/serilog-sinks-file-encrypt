@@ -23,7 +23,7 @@ public sealed class FileSinkIntegrationTests : IDisposable
         _logFilePath = Path.Join(_testDirectory, "test.log");
 
         // Generate a key pair for testing
-        _rsaKeyPair = EncryptionUtils.GenerateRsaKeyPair();
+        _rsaKeyPair = CryptographicUtils.GenerateRsaKeyPair();
         _rsaKeyMap.Add("", _rsaKeyPair.privateKey);
         _decryptionOptions = new DecryptionOptions { DecryptionKeys = _rsaKeyMap };
     }
@@ -121,7 +121,7 @@ public sealed class FileSinkIntegrationTests : IDisposable
         // Act - Decrypt the log file
         await using FileStream inputStream = System.IO.File.OpenRead(_logFilePath);
         using MemoryStream outputStream = new();
-        await EncryptionUtils.DecryptLogFileAsync(
+        await CryptographicUtils.DecryptLogFileAsync(
             inputStream,
             outputStream,
             _decryptionOptions,
@@ -159,7 +159,7 @@ public sealed class FileSinkIntegrationTests : IDisposable
         logger.Information("This is a second log message");
         await logger.DisposeAsync();
         // Act - Decrypt the log file to a specified file
-        await EncryptionUtils.DecryptLogFileAsync(
+        await CryptographicUtils.DecryptLogFileAsync(
             _logFilePath,
             decryptedFilePath,
             _decryptionOptions,
@@ -186,12 +186,12 @@ public sealed class FileSinkIntegrationTests : IDisposable
 
         // Generate a different key pair
         (string publicKey, string privateKey) differentKeyPair =
-            EncryptionUtils.GenerateRsaKeyPair();
+            CryptographicUtils.GenerateRsaKeyPair();
 
         // Act & Assert
         await using FileStream inputStream = System.IO.File.OpenRead(_logFilePath);
         using MemoryStream outputStream = new();
-        await EncryptionUtils.DecryptLogFileAsync(
+        await CryptographicUtils.DecryptLogFileAsync(
             inputStream,
             outputStream,
             new DecryptionOptions()
@@ -230,7 +230,7 @@ public sealed class FileSinkIntegrationTests : IDisposable
         // Decrypt and verify
         await using FileStream inputStream = System.IO.File.OpenRead(_logFilePath);
         using MemoryStream outputStream = new();
-        await EncryptionUtils.DecryptLogFileAsync(
+        await CryptographicUtils.DecryptLogFileAsync(
             inputStream,
             outputStream,
             _decryptionOptions,
@@ -280,7 +280,7 @@ public sealed class FileSinkIntegrationTests : IDisposable
         // Act - Decrypt the log file
         await using FileStream inputStream = System.IO.File.OpenRead(_logFilePath);
         using MemoryStream outputStream = new();
-        await EncryptionUtils.DecryptLogFileAsync(
+        await CryptographicUtils.DecryptLogFileAsync(
             inputStream,
             outputStream,
             _decryptionOptions,
@@ -320,7 +320,7 @@ public sealed class FileSinkIntegrationTests : IDisposable
         // Assert
         await using FileStream inputStream = System.IO.File.OpenRead(logFilePath);
         using MemoryStream outputStream = new();
-        await EncryptionUtils.DecryptLogFileAsync(
+        await CryptographicUtils.DecryptLogFileAsync(
             inputStream,
             outputStream,
             _decryptionOptions,
@@ -363,7 +363,7 @@ public sealed class FileSinkIntegrationTests : IDisposable
         // Verify it's encrypted
         await using FileStream inputStream = System.IO.File.OpenRead(logFiles[0]);
         using MemoryStream outputStream = new();
-        await EncryptionUtils.DecryptLogFileAsync(
+        await CryptographicUtils.DecryptLogFileAsync(
             inputStream,
             outputStream,
             _decryptionOptions,
@@ -386,7 +386,8 @@ public sealed class FileSinkIntegrationTests : IDisposable
         string logFile2 = Path.Join(_testDirectory, "log2.log");
 
         // Generate a second key pair
-        (string publicKey, string privateKey) secondKeyPair = EncryptionUtils.GenerateRsaKeyPair();
+        (string publicKey, string privateKey) secondKeyPair =
+            CryptographicUtils.GenerateRsaKeyPair();
         _decryptionOptions.DecryptionKeys.Add("Key1", _rsaKeyPair.privateKey);
         _decryptionOptions.DecryptionKeys.Add("Key2", secondKeyPair.privateKey);
 
@@ -410,7 +411,7 @@ public sealed class FileSinkIntegrationTests : IDisposable
         // Assert - Decrypt with corresponding private keys
         await using FileStream inputStream1 = System.IO.File.OpenRead(logFile1);
         using MemoryStream outputStream1 = new();
-        await EncryptionUtils.DecryptLogFileAsync(
+        await CryptographicUtils.DecryptLogFileAsync(
             inputStream1,
             outputStream1,
             _decryptionOptions,
@@ -419,7 +420,7 @@ public sealed class FileSinkIntegrationTests : IDisposable
 
         await using FileStream inputStream2 = System.IO.File.OpenRead(logFile2);
         using MemoryStream outputStream2 = new();
-        await EncryptionUtils.DecryptLogFileAsync(
+        await CryptographicUtils.DecryptLogFileAsync(
             inputStream2,
             outputStream2,
             _decryptionOptions,
@@ -440,7 +441,7 @@ public sealed class FileSinkIntegrationTests : IDisposable
         // Verify cross-decryption fails
         await using FileStream crossInputStream1 = System.IO.File.OpenRead(logFile1);
         using MemoryStream crossOutputStream1 = new();
-        await EncryptionUtils.DecryptLogFileAsync(
+        await CryptographicUtils.DecryptLogFileAsync(
             crossInputStream1,
             crossOutputStream1,
             new DecryptionOptions
@@ -455,7 +456,7 @@ public sealed class FileSinkIntegrationTests : IDisposable
 
         await using FileStream crossInputStream2 = System.IO.File.OpenRead(logFile2);
         using MemoryStream crossOutputStream2 = new();
-        await EncryptionUtils.DecryptLogFileAsync(
+        await CryptographicUtils.DecryptLogFileAsync(
             crossInputStream2,
             crossOutputStream2,
             new DecryptionOptions

@@ -14,7 +14,7 @@ public abstract class V1EncryptionTestBase : IDisposable
 
     protected V1EncryptionTestBase()
     {
-        (string publicKey, string privateKey) keyPair = EncryptionUtils.GenerateRsaKeyPair(
+        (string publicKey, string privateKey) keyPair = CryptographicUtils.GenerateRsaKeyPair(
             format: KeyFormat.Xml
         );
         PublicRsa.FromString(keyPair.publicKey);

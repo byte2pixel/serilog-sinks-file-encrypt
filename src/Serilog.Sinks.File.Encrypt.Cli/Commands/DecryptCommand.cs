@@ -225,7 +225,7 @@ public sealed class DecryptCommand(IAnsiConsole console, IFileSystem fileSystem)
                 // Perform the decryption using streaming API
                 await using FileSystemStream inputStream = fileSystem.File.OpenRead(inputFile);
                 await using FileSystemStream outputStream = fileSystem.File.Create(outputFile);
-                await EncryptionUtils.DecryptLogFileAsync(
+                await CryptographicUtils.DecryptLogFileAsync(
                     inputStream,
                     outputStream,
                     decryptionOptions,

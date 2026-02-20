@@ -43,7 +43,9 @@ public sealed class EncryptedLogStreamAsyncTests : EncryptionTestBase
     public async Task FlushAsync_With4096BitKey_EncryptsAndDecryptsSuccessfully()
     {
         // Arrange
-        (string publicKey, string privateKey) = EncryptionUtils.GenerateRsaKeyPair(keySize: 4096);
+        (string publicKey, string privateKey) = CryptographicUtils.GenerateRsaKeyPair(
+            keySize: 4096
+        );
         const string TestMessage = "Testing FlushAsync with 4096-bit RSA key!";
 
         // Act - Use async stream creation which calls FlushAsync
@@ -137,7 +139,7 @@ public sealed class EncryptedLogStreamAsyncTests : EncryptionTestBase
     public async Task WriteAsync_WritesDataAndFlushes()
     {
         // Arrange
-        (string publicKey, _) = EncryptionUtils.GenerateRsaKeyPair();
+        (string publicKey, _) = CryptographicUtils.GenerateRsaKeyPair();
         using MemoryStream fs = new();
         using RSA rsa = RSA.Create();
         rsa.FromXmlString(publicKey);
@@ -158,7 +160,7 @@ public sealed class EncryptedLogStreamAsyncTests : EncryptionTestBase
     public async Task WriteAsync_ZeroBytes_DoesNot_WriteData()
     {
         // Arrange
-        (string publicKey, _) = EncryptionUtils.GenerateRsaKeyPair();
+        (string publicKey, _) = CryptographicUtils.GenerateRsaKeyPair();
         using MemoryStream fs = new();
         using RSA rsa = RSA.Create();
         rsa.FromXmlString(publicKey);
@@ -177,7 +179,7 @@ public sealed class EncryptedLogStreamAsyncTests : EncryptionTestBase
     public async Task WriteAsync_CancellationRequested_ThrowsOperationCanceledException()
     {
         // Arrange
-        (string publicKey, _) = EncryptionUtils.GenerateRsaKeyPair();
+        (string publicKey, _) = CryptographicUtils.GenerateRsaKeyPair();
         using MemoryStream fs = new();
         using RSA rsa = RSA.Create();
         rsa.FromXmlString(publicKey);
