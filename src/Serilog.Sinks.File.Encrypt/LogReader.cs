@@ -75,6 +75,7 @@ public sealed class LogReader : IDisposable
                 _rsaKeyCache.Add(key.Key, rsa);
             }
             catch (Exception ex)
+                when (ex is CryptographicException or ArgumentNullException or ArgumentException)
             {
                 throw new InvalidOperationException(
                     $"Invalid RSA key for key ID '{key.Key}': {ex.Message}",
@@ -230,7 +231,11 @@ public sealed class LogReader : IDisposable
         catch (Exception ex)
             when (_options.ErrorHandlingMode != ErrorHandlingMode.ThrowException
                 && ex is not OperationCanceledException
-                && ex is CryptographicException or FormatException or InvalidDataException or EndOfStreamException
+                && ex
+                    is CryptographicException
+                        or FormatException
+                        or InvalidDataException
+                        or EndOfStreamException
             )
         {
             // Handle message processing errors, try to recover if possible
@@ -376,7 +381,13 @@ public sealed class LogReader : IDisposable
         }
         catch (Exception ex)
             when (_options.ErrorHandlingMode != ErrorHandlingMode.ThrowException
-                && (ex is CryptographicException or InvalidDataException or NotSupportedException)
+                && (
+                    ex
+                    is CryptographicException
+                        or InvalidDataException
+                        or NotSupportedException
+                        or InvalidOperationException
+                )
             )
         {
             _failedHeaders++;
