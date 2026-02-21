@@ -77,10 +77,7 @@ public sealed class LogWriter : Stream
             return;
         }
 
-        if (_aesGcm == null)
-        {
-            StartNewSession();
-        }
+        _aesGcm ??= StartNewSession();
 
         // Write session header only once per session
         if (!_sessionHeaderWritten)
@@ -99,7 +96,7 @@ public sealed class LogWriter : Stream
         try
         {
             // Encrypt directly into pooled buffers
-            _aesGcm?.Encrypt(
+            _aesGcm.Encrypt(
                 _nonce,
                 buffer,
                 ciphertext.AsSpan(0, plaintextLength),
@@ -127,12 +124,12 @@ public sealed class LogWriter : Stream
         }
     }
 
-    private void StartNewSession()
+    private AesGcm StartNewSession()
     {
         // Generate random values directly into reusable buffers (no allocation)
         RandomNumberGenerator.Fill(_aesKey);
         RandomNumberGenerator.Fill(_nonce);
-        _aesGcm = new AesGcm(_aesKey, EncryptionConstants.TagLength);
+        return new AesGcm(_aesKey, EncryptionConstants.TagLength);
     }
 
     /// <summary>
