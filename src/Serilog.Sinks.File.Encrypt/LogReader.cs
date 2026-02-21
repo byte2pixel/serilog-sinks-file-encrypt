@@ -382,6 +382,9 @@ public sealed class LogReader : IDisposable
             _nextSyncPosition = _input.Position;
         }
         catch (Exception ex)
+            when (_options.ErrorHandlingMode != ErrorHandlingMode.ThrowException
+                && (ex is CryptographicException or InvalidDataException or NotSupportedException)
+            )
         {
             _failedHeaders++;
             _nextSyncPosition++;

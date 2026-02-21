@@ -15,7 +15,7 @@ internal static class SessionReaderFactory
     {
         return version switch
         {
-            1 => new SessionReaderV1(new HeaderDecryptorV1()),
+            1 => new SessionReaderV1(),
             _ => throw new NotSupportedException($"Unsupported encryption version: {version}"),
         };
     }

@@ -13,9 +13,9 @@ internal class SessionReaderV1 : ISessionReader
     /// Initializes a new instance of the <see cref="SessionReaderV1"/> class with the specified header decryptor.
     /// </summary>
     /// <param name="headerDecryptor"></param>
-    public SessionReaderV1(IHeaderDecryptor headerDecryptor)
+    public SessionReaderV1(IHeaderDecryptor? headerDecryptor = null)
     {
-        _headerDecryptor = headerDecryptor;
+        _headerDecryptor = headerDecryptor ?? new HeaderDecryptorV1();
     }
 
     /// <inheritdoc />
@@ -32,7 +32,9 @@ internal class SessionReaderV1 : ISessionReader
         string keyIdStr = System.Text.Encoding.UTF8.GetString(keyId.Span).TrimEnd('\0');
         if (!keyMap.TryGetValue(keyIdStr, out RSA? rsa))
         {
-            throw new CryptographicException($"No RSA private key found for KeyId: '{keyIdStr}'.");
+            throw new InvalidOperationException(
+                $"No RSA private key found for KeyId: '{keyIdStr}'."
+            );
         }
 
         int headerSize = rsa.KeySize / 8;

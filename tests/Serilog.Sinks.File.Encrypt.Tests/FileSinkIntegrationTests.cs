@@ -448,7 +448,7 @@ public sealed class FileSinkIntegrationTests : IDisposable
             {
                 DecryptionKeys = new Dictionary<string, string>
                 {
-                    { "Key2", secondKeyPair.privateKey },
+                    { "Key1", secondKeyPair.privateKey }, // add the wrong key with correct key id for cross decryption
                 },
             },
             cancellationToken: TestContext.Current.CancellationToken
@@ -463,7 +463,7 @@ public sealed class FileSinkIntegrationTests : IDisposable
             {
                 DecryptionKeys = new Dictionary<string, string>
                 {
-                    { "Key1", _rsaKeyPair.privateKey },
+                    { "Key2", _rsaKeyPair.privateKey }, // add the wrong key with correct key id for cross decryption
                 },
             },
             cancellationToken: TestContext.Current.CancellationToken
