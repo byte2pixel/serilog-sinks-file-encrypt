@@ -222,13 +222,6 @@ public sealed class LogReader : IDisposable
                     cancellationToken
                 );
             }
-            catch (Exception ex)
-            {
-                throw new CryptographicException(
-                    $"Failed to decrypt message at position {_input.Position}: {ex.Message}",
-                    ex
-                );
-            }
             finally
             {
                 ArrayPool<byte>.Shared.Return(encryptedMessage);
@@ -237,7 +230,7 @@ public sealed class LogReader : IDisposable
         catch (Exception ex)
             when (_options.ErrorHandlingMode != ErrorHandlingMode.ThrowException
                 && ex is not OperationCanceledException
-                && ex is CryptographicException or FormatException or InvalidDataException
+                && ex is CryptographicException or FormatException or InvalidDataException or EndOfStreamException
             )
         {
             // Handle message processing errors, try to recover if possible
