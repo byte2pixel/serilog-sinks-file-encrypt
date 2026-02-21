@@ -8,7 +8,7 @@ namespace Serilog.Sinks.File.Encrypt.Writers.v1;
 /// <summary>
 /// Version 1 header encoder that constructs a header containing the AES session key, nonce, and optional KeyId,
 /// </summary>
-internal sealed class HeaderEncryptorV1 : IHeaderEncryptor
+internal sealed class HeaderWriterV1 : IHeaderWriter
 {
     private readonly RSA _rsa;
 
@@ -18,7 +18,7 @@ internal sealed class HeaderEncryptorV1 : IHeaderEncryptor
     /// <param name="options">The encryption options containing the RSA public key and optional KeyId.</param>
     /// <exception cref="ArgumentOutOfRangeException">Thrown when the KeyId is too long for the RSA key size.</exception>
     /// <exception cref="ArgumentNullException">Thrown when the options or public key is null.</exception>
-    internal HeaderEncryptorV1(EncryptionOptions options)
+    internal HeaderWriterV1(EncryptionOptions options)
     {
         ArgumentNullException.ThrowIfNull(options);
         _rsa = options.Rsa;

@@ -14,7 +14,7 @@ namespace Serilog.Sinks.File.Encrypt;
 public sealed class LogWriter : Stream
 {
     private readonly Stream _inner;
-    private readonly ISessionHeaderWriter _headerWriter;
+    private readonly ISessionWriter _writer;
 
     /// <summary>
     /// Reusable buffer for AES key
@@ -44,7 +44,7 @@ public sealed class LogWriter : Stream
         ArgumentNullException.ThrowIfNull(inner);
         ArgumentNullException.ThrowIfNull(options);
         _inner = inner;
-        _headerWriter = SessionHeaderWriterFactory.Create(options);
+        _writer = SessionWriterFactory.Create(options);
     }
 
     /// <summary>
@@ -82,7 +82,7 @@ public sealed class LogWriter : Stream
         // Write session header only once per session
         if (!_sessionHeaderWritten)
         {
-            _headerWriter.WriteHeader(_inner, _aesKey, _nonce);
+            _writer.WriteHeader(_inner, _aesKey, _nonce);
             _sessionHeaderWritten = true;
         }
 

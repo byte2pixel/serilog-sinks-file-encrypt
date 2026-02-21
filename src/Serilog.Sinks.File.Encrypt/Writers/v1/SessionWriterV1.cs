@@ -8,27 +8,27 @@ namespace Serilog.Sinks.File.Encrypt.Writers.v1;
 /// Session header writer for version 1 of the encrypted log format.
 /// Writes the session header (magic bytes, version, keyId, RSA-encrypted session info) once per session.
 /// </summary>
-internal sealed class SessionHeaderWriterV1 : ISessionHeaderWriter
+internal sealed class SessionWriterV1 : ISessionWriter
 {
     private readonly IFrameWriter _frameWriter;
-    private readonly IHeaderEncryptor _headerEncryptor;
+    private readonly IHeaderWriter _headerWriter;
     private readonly string _keyId;
 
     /// <summary>
-    /// Initializes a new instance of the <see cref="SessionHeaderWriterV1"/> class.
+    /// Initializes a new instance of the <see cref="SessionWriterV1"/> class.
     /// </summary>
-    /// <param name="headerEncryptor">The header encryptor responsible for RSA-encrypting the session metadata.</param>
+    /// <param name="headerWriter">The header encryptor responsible for RSA-encrypting the session metadata.</param>
     /// <param name="keyId">The key ID for the RSA key used to encrypt the session data.</param>
     /// <param name="frameWriter">Optional frame writer for writing the framed header. Defaults to <see cref="FrameWriter"/>.</param>
-    internal SessionHeaderWriterV1(
-        IHeaderEncryptor headerEncryptor,
+    internal SessionWriterV1(
+        IHeaderWriter headerWriter,
         string keyId = "",
         IFrameWriter? frameWriter = null
     )
     {
         _keyId = keyId;
         _frameWriter = frameWriter ?? new FrameWriter();
-        _headerEncryptor = headerEncryptor;
+        _headerWriter = headerWriter;
     }
 
     /// <inheritdoc />
@@ -42,7 +42,7 @@ internal sealed class SessionHeaderWriterV1 : ISessionHeaderWriter
             );
         }
         // 1. Encrypt header using RSA
-        ReadOnlySpan<byte> header = _headerEncryptor.Encrypt(aesKey, nonce);
+        ReadOnlySpan<byte> header = _headerWriter.Encrypt(aesKey, nonce);
 
         // 2. Write the 32 byte keyId padded or throw if too long for the header format
         Span<byte> paddedKeyIdBytes = stackalloc byte[HeaderMetadataV1.KeyIdLength];

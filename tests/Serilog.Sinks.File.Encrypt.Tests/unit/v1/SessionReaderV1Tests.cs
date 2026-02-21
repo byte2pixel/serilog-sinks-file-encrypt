@@ -20,7 +20,7 @@ public sealed class SessionReaderV1Tests : IDisposable
         _encOptions = TestUtils.GetEncryptionOptions(publicKey, "test-key-id");
         _decOptions = TestUtils.GetDecryptionOptions(privateKey, "test-key-id");
         _input = new MemoryStream();
-        _sut = new SessionReaderV1(new HeaderDecryptorV1());
+        _sut = new SessionReaderV1(new HeaderReaderV1());
         (_aesKey, _nonce) = TestUtils.CreateSessionData();
         BuildKeyMap();
     }
@@ -67,7 +67,7 @@ public sealed class SessionReaderV1Tests : IDisposable
     {
         // write the plaintext key ID 32 bytes padded with zeros
         // then add the encrypted session key and nonce (for simplicity, we just concatenate them here)
-        var encryptor = new HeaderEncryptorV1(_encOptions);
+        var encryptor = new HeaderWriterV1(_encOptions);
         byte[] header = new byte[HeaderMetadataV1.KeyIdLength + _encOptions.Rsa.KeySize / 8];
         // padded with 0s to ensure fixed length
         byte[] keyIdBytes = new byte[HeaderMetadataV1.KeyIdLength];

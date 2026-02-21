@@ -3,9 +3,9 @@ using System.Security.Cryptography;
 namespace Serilog.Sinks.File.Encrypt.Interfaces;
 
 /// <summary>
-/// The <see cref="IHeaderDecryptor"/> interface defines the contract for decoding the session header information.
+/// The <see cref="IHeaderReader"/> interface defines the contract for decoding the session header information.
 /// </summary>
-internal interface IHeaderDecryptor
+internal interface IHeaderReader
 {
     /// <summary>
     /// Decrypts the session header information, which includes the RSA-encrypted session key and nonce.

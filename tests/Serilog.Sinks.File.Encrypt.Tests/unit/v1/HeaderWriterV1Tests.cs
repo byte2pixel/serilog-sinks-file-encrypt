@@ -3,29 +3,29 @@ using Serilog.Sinks.File.Encrypt.Writers.v1;
 
 namespace Serilog.Sinks.File.Encrypt.Tests.unit.v1;
 
-public class HeaderEncryptorV1Tests : V1EncryptionTestBase
+public class HeaderWriterV1Tests : V1EncryptionTestBase
 {
     private readonly EncryptionOptions _options;
 
-    public HeaderEncryptorV1Tests()
+    public HeaderWriterV1Tests()
     {
         _options = TestUtils.GetEncryptionOptions(PublicRsa);
     }
 
-    private HeaderEncryptorV1 GetSut(EncryptionOptions? options = null)
+    private HeaderWriterV1 GetSut(EncryptionOptions? options = null)
     {
-        return new HeaderEncryptorV1(options ?? _options);
+        return new HeaderWriterV1(options ?? _options);
     }
 
     [Fact]
     public void Encrypt_And_Decrypts_Correctly()
     {
         // Arrange
-        HeaderEncryptorV1 encryptor = GetSut();
+        HeaderWriterV1 writer = GetSut();
         (byte[] aesKey, byte[] nonce) = TestUtils.CreateSessionData();
 
         // Act
-        ReadOnlySpan<byte> header = encryptor.Encrypt(aesKey, nonce);
+        ReadOnlySpan<byte> header = writer.Encrypt(aesKey, nonce);
 
         // Assert - Verify encrypted header has correct size
         int totalLen = PublicRsa.KeySize / 8;

@@ -5,7 +5,7 @@ using Serilog.Sinks.File.Encrypt.Models;
 namespace Serilog.Sinks.File.Encrypt.Readers.v1;
 
 /// <inheritdoc />
-public class HeaderDecryptorV1 : IHeaderDecryptor
+public class HeaderReaderV1 : IHeaderReader
 {
     /// <inheritdoc />
     public (byte[] AesKey, byte[] Nonce) Decrypt(RSA rsa, ReadOnlySpan<byte> headerData)

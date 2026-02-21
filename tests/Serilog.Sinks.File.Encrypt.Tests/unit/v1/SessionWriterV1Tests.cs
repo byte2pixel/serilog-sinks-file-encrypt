@@ -5,14 +5,14 @@ using Serilog.Sinks.File.Encrypt.Writers.v1;
 
 namespace Serilog.Sinks.File.Encrypt.Tests.unit.v1;
 
-public class SessionHeaderWriterV1Tests
+public class SessionWriterV1Tests
 {
-    private readonly MockHeaderEncryptorV1 _headerEncryptor = new();
+    private readonly MockHeaderWriterV1 _headerWriter = new();
     private readonly IFrameWriter _frameWriter = new FrameWriter();
     private readonly byte[] _aesKey;
     private readonly byte[] _nonce;
 
-    public SessionHeaderWriterV1Tests()
+    public SessionWriterV1Tests()
     {
         (_aesKey, _nonce) = TestUtils.CreateSessionData();
     }
@@ -23,14 +23,12 @@ public class SessionHeaderWriterV1Tests
         // Arrange
         string keyId = new('A', HeaderMetadataV1.KeyIdLength + 1); // 33 bytes when UTF-8 encoded
 
-        SessionHeaderWriterV1 headerWriter = new(_headerEncryptor, keyId, _frameWriter);
+        SessionWriterV1 writer = new(_headerWriter, keyId, _frameWriter);
         using MemoryStream output = new();
 
         // Act & Assert
         Should
-            .Throw<InvalidOperationException>(() =>
-                headerWriter.WriteHeader(output, _aesKey, _nonce)
-            )
+            .Throw<InvalidOperationException>(() => writer.WriteHeader(output, _aesKey, _nonce))
             .Message.ShouldContain(
                 "KeyId is too long for the header format. Maximum length is 32 bytes, but was 33 bytes."
             );
@@ -46,14 +44,14 @@ public class SessionHeaderWriterV1Tests
 
         byte[] expectedHeader = [.. _aesKey, .. _nonce];
 
-        SessionHeaderWriterV1 headerWriter = new(_headerEncryptor, KeyId, _frameWriter);
+        SessionWriterV1 writer = new(_headerWriter, KeyId, _frameWriter);
         using MemoryStream output = new();
 
         // Act
-        headerWriter.WriteHeader(output, _aesKey, _nonce);
+        writer.WriteHeader(output, _aesKey, _nonce);
 
         // Assert
-        _headerEncryptor.ExpectedHeader.ShouldBe(expectedHeader);
+        _headerWriter.ExpectedHeader.ShouldBe(expectedHeader);
         byte[] outputBytes = output.ToArray();
         int offset = 0;
         outputBytes

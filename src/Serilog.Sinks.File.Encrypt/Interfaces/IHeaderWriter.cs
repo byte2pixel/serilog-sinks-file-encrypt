@@ -1,12 +1,12 @@
 namespace Serilog.Sinks.File.Encrypt.Interfaces;
 
 /// <summary>
-/// The <see cref="IHeaderEncryptor"/> interface defines the contract for encoding the session header information,
+/// The <see cref="IHeaderWriter"/> interface defines the contract for encoding the session header information,
 /// which includes the RSA-encrypted session key and nonce.
 /// This header is essential for securely transmitting the session key and nonce to the decryption tool,
 /// allowing it to decrypt the log messages correctly.
 /// </summary>
-internal interface IHeaderEncryptor
+internal interface IHeaderWriter
 {
     /// <summary>
     /// Encodes the session header information, which includes the RSA-encrypted session key and nonce.

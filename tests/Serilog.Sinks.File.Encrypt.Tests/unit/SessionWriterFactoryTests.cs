@@ -4,17 +4,15 @@ using Serilog.Sinks.File.Encrypt.Writers.v1;
 
 namespace Serilog.Sinks.File.Encrypt.Tests.unit;
 
-public class SessionHeaderWriterFactoryTests
+public class SessionWriterFactoryTests
 {
     [Fact]
     public void GivenSupportedVersion_WhenCreate_ThenSessionWriterIsReturned()
     {
         // Arrange
         using RSA rsa = RSA.Create();
-        ISessionHeaderWriter writer = SessionHeaderWriterFactory.Create(
-            TestUtils.GetEncryptionOptions(rsa)
-        );
-        writer.ShouldBeOfType<SessionHeaderWriterV1>();
+        ISessionWriter writer = SessionWriterFactory.Create(TestUtils.GetEncryptionOptions(rsa));
+        writer.ShouldBeOfType<SessionWriterV1>();
     }
 
     [Fact]
@@ -26,7 +24,7 @@ public class SessionHeaderWriterFactoryTests
 
         // Act & Assert
         NotSupportedException exception = Should.Throw<NotSupportedException>(() =>
-            SessionHeaderWriterFactory.Create(options)
+            SessionWriterFactory.Create(options)
         );
         exception.Message.ShouldBe("Version 999 is not supported.");
     }

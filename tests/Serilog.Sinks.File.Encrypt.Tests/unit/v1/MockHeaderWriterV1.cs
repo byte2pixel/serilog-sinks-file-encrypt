@@ -3,9 +3,9 @@ using Serilog.Sinks.File.Encrypt.Interfaces;
 namespace Serilog.Sinks.File.Encrypt.Tests.unit.v1;
 
 /// <summary>
-/// Mock implementation of IHeaderEncryptor for testing purposes. This class simulates the behavior of the header encryptor used in version 1 of the encrypted log format.
+/// Mock implementation of IHeaderWriter for testing purposes. This class simulates the behavior of the header writer used in version 1 of the encrypted log format.
 /// </summary>
-public class MockHeaderEncryptorV1 : IHeaderEncryptor
+public class MockHeaderWriterV1 : IHeaderWriter
 {
     public byte[] ExpectedHeader { get; private set; } = [];
 

@@ -7,15 +7,15 @@ namespace Serilog.Sinks.File.Encrypt.Readers.v1;
 /// <inheritdoc />
 internal class SessionReaderV1 : ISessionReader
 {
-    private readonly IHeaderDecryptor _headerDecryptor;
+    private readonly IHeaderReader _headerReader;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="SessionReaderV1"/> class with the specified header decryptor.
     /// </summary>
     /// <param name="headerDecryptor"></param>
-    public SessionReaderV1(IHeaderDecryptor? headerDecryptor = null)
+    public SessionReaderV1(IHeaderReader? headerDecryptor = null)
     {
-        _headerDecryptor = headerDecryptor ?? new HeaderDecryptorV1();
+        _headerReader = headerDecryptor ?? new HeaderReaderV1();
     }
 
     /// <inheritdoc />
@@ -42,7 +42,7 @@ internal class SessionReaderV1 : ISessionReader
         await input.ReadExactlyAsync(header, cancellationToken);
 
         // Decrypt the header to get the session key and nonce
-        (byte[] aesKey, byte[] nonce) = _headerDecryptor.Decrypt(rsa, header.Span);
+        (byte[] aesKey, byte[] nonce) = _headerReader.Decrypt(rsa, header.Span);
 
         return new DecryptionContext(nonce, aesKey);
     }

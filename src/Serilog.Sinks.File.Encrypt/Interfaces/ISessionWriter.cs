@@ -5,7 +5,7 @@ namespace Serilog.Sinks.File.Encrypt.Interfaces;
 /// The session header contains the magic bytes, version, key ID, and RSA-encrypted session information.
 /// This is written once per session, followed by multiple messages encrypted with the session's AES key.
 /// </summary>
-internal interface ISessionHeaderWriter
+internal interface ISessionWriter
 {
     /// <summary>
     /// Writes the session header to the output stream.
