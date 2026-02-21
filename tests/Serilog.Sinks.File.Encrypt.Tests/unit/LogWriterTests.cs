@@ -11,10 +11,7 @@ public class LogWriterTests
         // Arrange
         (string publicKey, _) = CryptographicUtils.GenerateRsaKeyPair();
         using MemoryStream fs = new();
-        using RSA rsa = RSA.Create();
-        rsa.FromXmlString(publicKey);
-        EncryptionOptions options = new(rsa);
-        using LogWriter logWriter = new(fs, options);
+        using LogWriter logWriter = new(fs, TestUtils.GetEncryptionOptions(publicKey));
 
         // Act & Assert
         logWriter.CanRead.ShouldBeFalse();
@@ -34,10 +31,7 @@ public class LogWriterTests
         // Arrange
         (string publicKey, _) = CryptographicUtils.GenerateRsaKeyPair();
         using MemoryStream fs = new();
-        using RSA rsa = RSA.Create();
-        rsa.FromXmlString(publicKey);
-        EncryptionOptions options = new(rsa);
-        using LogWriter logWriter = new(fs, options);
+        using LogWriter logWriter = new(fs, TestUtils.GetEncryptionOptions(publicKey));
 
         // Act
         logWriter.Write("Hello"u8.ToArray(), 0, 5);
@@ -53,10 +47,7 @@ public class LogWriterTests
         // Arrange
         (string publicKey, _) = CryptographicUtils.GenerateRsaKeyPair();
         using MemoryStream fs = new();
-        using RSA rsa = RSA.Create();
-        rsa.FromXmlString(publicKey);
-        EncryptionOptions options = new(rsa);
-        using LogWriter logWriter = new(fs, options);
+        using LogWriter logWriter = new(fs, TestUtils.GetEncryptionOptions(publicKey));
 
         // Act
         logWriter.Write([0x00], 0, 1);
@@ -86,10 +77,7 @@ public class LogWriterTests
         // Arrange
         (string publicKey, _) = CryptographicUtils.GenerateRsaKeyPair();
         using MemoryStream fs = new();
-        using RSA rsa = RSA.Create();
-        rsa.FromXmlString(publicKey);
-        EncryptionOptions options = new(rsa);
-        using LogWriter logWriter = new(fs, options);
+        using LogWriter logWriter = new(fs, TestUtils.GetEncryptionOptions(publicKey));
 
         // Act
         Exception? exception = Record.Exception(() =>
@@ -108,10 +96,7 @@ public class LogWriterTests
         // Arrange
         (string publicKey, _) = CryptographicUtils.GenerateRsaKeyPair();
         using MemoryStream fs = new();
-        using RSA rsa = RSA.Create();
-        rsa.FromXmlString(publicKey);
-        EncryptionOptions options = new(rsa);
-        using LogWriter logWriter = new(fs, options);
+        using LogWriter logWriter = new(fs, TestUtils.GetEncryptionOptions(publicKey));
 
         long staringPosition = logWriter.Position;
         // Act
@@ -127,9 +112,7 @@ public class LogWriterTests
     {
         // Arrange
         (string publicKey, _) = CryptographicUtils.GenerateRsaKeyPair();
-        using RSA rsa = RSA.Create();
-        rsa.FromXmlString(publicKey);
-        EncryptionOptions options = new(rsa);
+        EncryptionOptions options = TestUtils.GetEncryptionOptions(publicKey);
         // Act & Assert
         Should.Throw<ArgumentNullException>(() => new LogWriter(null!, options));
     }

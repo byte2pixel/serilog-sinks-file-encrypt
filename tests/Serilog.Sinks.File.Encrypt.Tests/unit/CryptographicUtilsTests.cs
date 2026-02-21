@@ -100,10 +100,10 @@ public class CryptographicUtilsTests : EncryptionTestBase
             format: KeyFormat.Xml
         );
 
-        using RSA privateKeyRsa = RSA.Create();
+        using var privateKeyRsa = RSA.Create();
         privateKeyRsa.FromXmlString(privateKey);
 
-        using RSA publicKeyRsa = RSA.Create();
+        using var publicKeyRsa = RSA.Create();
         publicKeyRsa.FromXmlString(publicKey);
 
         byte[] data = "ABCD"u8.ToArray();
@@ -122,10 +122,10 @@ public class CryptographicUtilsTests : EncryptionTestBase
             format: KeyFormat.Pem
         );
 
-        using RSA privateKeyRsa = RSA.Create();
+        using var privateKeyRsa = RSA.Create();
         privateKeyRsa.ImportFromPem(privateKey);
 
-        using RSA publicKeyRsa = RSA.Create();
+        using var publicKeyRsa = RSA.Create();
         publicKeyRsa.ImportFromPem(publicKey);
 
         byte[] data = "ABCD"u8.ToArray();
@@ -145,10 +145,10 @@ public class CryptographicUtilsTests : EncryptionTestBase
             format: KeyFormat.Xml
         );
 
-        using RSA privateKeyRsa = RSA.Create();
+        using var privateKeyRsa = RSA.Create();
         privateKeyRsa.FromXmlString(privateKey);
 
-        using RSA publicKeyRsa = RSA.Create();
+        using var publicKeyRsa = RSA.Create();
         publicKeyRsa.FromXmlString(publicKey);
 
         // Assert - Verify key size is 4096 bits
@@ -172,10 +172,10 @@ public class CryptographicUtilsTests : EncryptionTestBase
             format: KeyFormat.Pem
         );
 
-        using RSA privateKeyRsa = RSA.Create();
+        using var privateKeyRsa = RSA.Create();
         privateKeyRsa.ImportFromPem(privateKey);
 
-        using RSA publicKeyRsa = RSA.Create();
+        using var publicKeyRsa = RSA.Create();
         publicKeyRsa.ImportFromPem(publicKey);
 
         // Assert - Verify key size is 4096 bits
@@ -233,14 +233,11 @@ public class CryptographicUtilsTests : EncryptionTestBase
     public async Task EncryptedStream_With4096BitKey_EncryptsAndDecryptsSuccessfully()
     {
         // Arrange
-        (string publicKey, string _) = CryptographicUtils.GenerateRsaKeyPair(
-            keySize: 4096
-        );
+        (string publicKey, string _) = CryptographicUtils.GenerateRsaKeyPair(keySize: 4096);
         const string OriginalText = "Testing 4096-bit RSA key with encrypted stream!";
 
-        using RSA rsa = RSA.Create();
+        using var rsa = RSA.Create();
         rsa.FromXmlString(publicKey);
-        rsa.KeySize.ShouldBe(4096); // Verify key size
 
         // Act - Use helper that manages streams automatically
         string decrypted = await EncryptAndDecryptAsync(OriginalText);

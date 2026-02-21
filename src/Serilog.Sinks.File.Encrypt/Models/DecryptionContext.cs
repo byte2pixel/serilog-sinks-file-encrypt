@@ -5,7 +5,7 @@ namespace Serilog.Sinks.File.Encrypt.Models;
 /// </summary>
 /// <param name="nonce"></param>
 /// <param name="sessionKey"></param>
-internal class DecryptionContext(byte[] nonce, byte[] sessionKey)
+public class DecryptionContext(byte[] nonce, byte[] sessionKey)
 {
     /// <summary>
     /// The AES-GCM Session Key.

@@ -58,7 +58,7 @@ public sealed class StreamingDecryptionTests : EncryptionTestBase
 
         // Corrupt part of the stream
         byte[] fileBytes = encryptedStream.ToArray();
-        byte[] corrupted = CorruptData(fileBytes, fileBytes.Length / 2);
+        byte[] corrupted = TestUtils.CorruptData(fileBytes, fileBytes.Length / 2);
         MemoryStream corruptedStream = CreateMemoryStream(corrupted);
 
         // Act
@@ -101,7 +101,7 @@ public sealed class StreamingDecryptionTests : EncryptionTestBase
 
         // Corrupt part of the first session with a marker that corrupts the length of the 2nd message.
         byte[] fileBytes = encryptedStream.ToArray();
-        byte[] corrupted = CorruptDataAddingMarker(
+        byte[] corrupted = TestUtils.CorruptDataAddingMarker(
             fileBytes,
             EncryptionConstants.MagicBytes,
             corruptionOffset
@@ -130,7 +130,7 @@ public sealed class StreamingDecryptionTests : EncryptionTestBase
 
         // Corrupt part of the stream
         byte[] fileBytes = encryptedStream.ToArray();
-        byte[] corrupted = CorruptData(fileBytes, fileBytes.Length / 2);
+        byte[] corrupted = TestUtils.CorruptData(fileBytes, fileBytes.Length / 2);
         MemoryStream corruptedStream = CreateMemoryStream(corrupted);
 
         // Act
@@ -154,7 +154,7 @@ public sealed class StreamingDecryptionTests : EncryptionTestBase
 
         // Corrupt part of the stream
         byte[] fileBytes = encryptedStream.ToArray();
-        byte[] corrupted = CorruptData(fileBytes, fileBytes.Length / 2);
+        byte[] corrupted = TestUtils.CorruptData(fileBytes, fileBytes.Length / 2);
         MemoryStream corruptedStream = CreateMemoryStream(corrupted);
 
         // Act
@@ -185,7 +185,7 @@ public sealed class StreamingDecryptionTests : EncryptionTestBase
 
         // Corrupt part of the stream
         byte[] fileBytes = encryptedStream.ToArray();
-        byte[] corrupted = CorruptData(fileBytes, fileBytes.Length / 2);
+        byte[] corrupted = TestUtils.CorruptData(fileBytes, fileBytes.Length / 2);
         MemoryStream corruptedStream = CreateMemoryStream(corrupted);
 
         // Act & Assert

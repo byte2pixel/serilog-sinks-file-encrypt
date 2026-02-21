@@ -9,7 +9,7 @@ public class HeaderEncryptorV1Tests : V1EncryptionTestBase
 
     public HeaderEncryptorV1Tests()
     {
-        _options = CreateDefaultOptions();
+        _options = TestUtils.GetEncryptionOptions(PublicRsa);
     }
 
     private HeaderEncryptorV1 GetSut(EncryptionOptions? options = null)
@@ -22,7 +22,7 @@ public class HeaderEncryptorV1Tests : V1EncryptionTestBase
     {
         // Arrange
         HeaderEncryptorV1 encryptor = GetSut();
-        (byte[] aesKey, byte[] nonce) = CreateSessionData();
+        (byte[] aesKey, byte[] nonce) = TestUtils.CreateSessionData();
 
         // Act
         ReadOnlySpan<byte> header = encryptor.Encrypt(aesKey, nonce);

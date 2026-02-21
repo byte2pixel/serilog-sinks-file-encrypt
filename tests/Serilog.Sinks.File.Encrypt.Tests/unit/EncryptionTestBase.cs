@@ -12,15 +12,14 @@ public abstract class EncryptionTestBase : IDisposable, IAsyncDisposable
         CryptographicUtils.GenerateRsaKeyPair();
     private readonly List<Stream> _streamsToDispose = [];
     private bool _disposed;
-    private RSA? _rsa;
-    protected EncryptionOptions EncryptOptions;
-    protected DecryptionOptions DecryptOptions;
+    protected readonly EncryptionOptions EncryptOptions;
+    protected readonly DecryptionOptions DecryptOptions;
     protected readonly ILogger Log = Substitute.For<ILogger>();
 
     protected EncryptionTestBase()
     {
         EncryptOptions = CreateEncryptionOptions();
-        DecryptOptions = CreateDecryptionOptions();
+        DecryptOptions = TestUtils.GetDecryptionOptions(RsaKeyPair.privateKey);
     }
 
     public async ValueTask DisposeAsync()
@@ -132,7 +131,7 @@ public abstract class EncryptionTestBase : IDisposable, IAsyncDisposable
     /// <summary>
     /// Creates a memory stream and tracks it for disposal. Use for manual stream creation.
     /// </summary>
-    protected MemoryStream CreateMemoryStream()
+    private MemoryStream CreateMemoryStream()
     {
         MemoryStream stream = new();
         _streamsToDispose.Add(stream);
@@ -215,63 +214,13 @@ public abstract class EncryptionTestBase : IDisposable, IAsyncDisposable
         return await reader.ReadToEndAsync(ct);
     }
 
-    /// <summary>
-    /// Creates a corrupted version of encrypted data by flipping bits at the specified position
-    /// </summary>
-    protected static byte[] CorruptData(byte[] data, int position)
-    {
-        byte[] corrupted = new byte[data.Length];
-        Array.Copy(data, corrupted, data.Length);
-        corrupted[position] ^= 0xFF; // Flip all bits at position
-        return corrupted;
-    }
-
-    /// <summary>
-    /// Corrupts data by inserting specific marker bytes at the given position
-    /// </summary>
-    /// <param name="data">The data to corrupt</param>
-    /// <param name="position">The position to insert the marker</param>
-    /// <param name="marker">The marker to insert</param>
-    /// <returns>
-    /// The corrupted data with the marker inserted at the specified position
-    /// </returns>
-    protected static byte[] CorruptDataAddingMarker(byte[] data, byte[] marker, int position)
-    {
-        byte[] corrupted = new byte[data.Length];
-        Array.Copy(data, corrupted, data.Length);
-        // Insert marker at position
-        for (int i = 0; i < marker.Length && (position + i) < corrupted.Length; i++)
-        {
-            corrupted[position + i] = marker[i];
-        }
-        return corrupted;
-    }
-
-    protected DecryptionOptions CreateDecryptionOptions(
-        Dictionary<string, string>? decryptionKeys = null
-    )
-    {
-        if (decryptionKeys is not null && decryptionKeys.Count == 0)
-        {
-            throw new ArgumentException(
-                "Decryption keys dictionary cannot be empty",
-                nameof(decryptionKeys)
-            );
-        }
-        Dictionary<string, string> keyMap =
-            decryptionKeys ?? new Dictionary<string, string> { { "", RsaKeyPair.privateKey } };
-        return new DecryptionOptions { DecryptionKeys = keyMap };
-    }
-
     protected EncryptionOptions CreateEncryptionOptions(
         string? publicKey = null,
-        string? keyId = null
+        string? keyId = null,
+        int version = 1
     )
     {
-        _rsa?.Dispose();
-        _rsa = RSA.Create();
-        _rsa.FromString(publicKey ?? RsaKeyPair.publicKey);
-        return new EncryptionOptions(_rsa, keyId ?? "");
+        return TestUtils.GetEncryptionOptions(publicKey ?? RsaKeyPair.publicKey, keyId, version);
     }
 
     protected virtual void Dispose(bool disposing)

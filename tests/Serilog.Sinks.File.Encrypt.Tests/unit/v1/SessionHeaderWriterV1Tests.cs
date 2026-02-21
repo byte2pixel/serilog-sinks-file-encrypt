@@ -9,13 +9,12 @@ public class SessionHeaderWriterV1Tests
 {
     private readonly MockHeaderEncryptorV1 _headerEncryptor = new();
     private readonly IFrameWriter _frameWriter = new FrameWriter();
-    private readonly byte[] _aesKey = new byte[HeaderMetadataV1.AesKeyLength];
-    private readonly byte[] _nonce = new byte[HeaderMetadataV1.NonceLength];
+    private readonly byte[] _aesKey;
+    private readonly byte[] _nonce;
 
     public SessionHeaderWriterV1Tests()
     {
-        RandomNumberGenerator.Fill(_aesKey);
-        RandomNumberGenerator.Fill(_nonce);
+        (_aesKey, _nonce) = TestUtils.CreateSessionData();
     }
 
     [Fact]
