@@ -13,8 +13,11 @@ public class HeaderDecryptorV1 : IHeaderDecryptor
         int offset = 0;
 
         // Decrypt the RSA payload
-        byte[] decryptedPayload = rsa.Decrypt(headerData, RSAEncryptionPadding.OaepSHA256);
-
+        byte[] decryptedPayload = new byte[rsa.KeySize / 8];
+        if (!rsa.TryDecrypt(headerData, decryptedPayload, RSAEncryptionPadding.OaepSHA256, out int _))
+        {
+            throw new CryptographicException("RSA decryption of header failed.");
+        }
         // Read AES key
         if (decryptedPayload.Length < HeaderMetadataV1.AesKeyLength)
         {
