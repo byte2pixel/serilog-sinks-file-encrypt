@@ -189,8 +189,9 @@ public sealed class StreamingDecryptionTests : EncryptionTestBase
         MemoryStream corruptedStream = CreateMemoryStream(corrupted);
 
         // Act & Assert
-            // await DecryptStreamToStringAsync(corruptedStream, throwExceptionOptions)
-        await Should.ThrowAsync<Exception>(() => DecryptStreamToStringAsync(corruptedStream, throwExceptionOptions));
+        await Should.ThrowAsync<CryptographicException>(() =>
+            DecryptStreamToStringAsync(corruptedStream, throwExceptionOptions)
+        );
     }
 
     [Fact]

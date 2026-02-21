@@ -13,10 +13,19 @@ public class HeaderDecryptorV1 : IHeaderDecryptor
         int offset = 0;
 
         // Decrypt the RSA payload
-        byte[] decryptedPayload = new byte[rsa.KeySize / 8];
-        if (!rsa.TryDecrypt(headerData, decryptedPayload, RSAEncryptionPadding.OaepSHA256, out int _))
+        byte[] decryptedPayload;
+        try
         {
-            throw new CryptographicException("RSA decryption of header failed.");
+            decryptedPayload = rsa.Decrypt(headerData, RSAEncryptionPadding.OaepSHA256);
+        }
+        // this catch is needed because of Interop+Crypto+OpenSslCryptographicException on GitHub Actions Ubuntu runners.
+        // The OpenSSL implementation throws a different exception type that derives from CryptographicException, so we catch both.
+        catch (Exception ex)
+            when (ex is CryptographicException
+                || ex.GetType().Name.Contains("CryptographicException")
+            )
+        {
+            throw new CryptographicException("RSA decryption of header failed.", ex);
         }
         // Read AES key
         if (decryptedPayload.Length < HeaderMetadataV1.AesKeyLength)
