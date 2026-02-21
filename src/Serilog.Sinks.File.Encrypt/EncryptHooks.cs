@@ -52,10 +52,9 @@ public class EncryptHooks : FileLifecycleHooks
     /// <param name="keyId">Optional key ID to include in the header for key rotation. Default is an empty string.</param>
     /// <exception cref="ArgumentNullException">Thrown when <paramref name="publicKey"/> is null or whitespace.</exception>
     /// <exception cref="FormatException">Thrown when <paramref name="publicKey"/> is in an invalid format.</exception>
-    /// <exception cref="CryptographicException">Thrown when the format is invalid or cannot be parsed as an RSA public key.</exception>
+    /// <exception cref="CryptographicException">Thrown when the key format is invalid, cannot be parsed. or is too small.</exception>
     /// <remarks>
-    /// The public key is loaded and validated during construction. Keep the corresponding private key secure
-    /// for decryption purposes - it should never be deployed with application code.
+    /// The public key is loaded and validated during construction.
     /// </remarks>
     /// <example>
     /// <code>
@@ -79,7 +78,9 @@ public class EncryptHooks : FileLifecycleHooks
     {
         var r = RSA.Create();
         r.FromString(publicKey);
-        return r;
+        return r.KeySize < EncryptionConstants.MinimumRsaKeySize
+            ? throw new CryptographicException("RSA key size is too small")
+            : r;
     }
 
     /// <summary>
