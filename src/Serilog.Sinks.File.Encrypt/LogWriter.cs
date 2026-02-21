@@ -91,7 +91,7 @@ public sealed class LogWriter : Stream
 
         // Rent buffers from pool
         byte[] ciphertext = ArrayPool<byte>.Shared.Rent(plaintextLength);
-        byte[] tag = ArrayPool<byte>.Shared.Rent(EncryptionConstants.TagLength);
+        Span<byte> tag = stackalloc byte[EncryptionConstants.TagLength];
 
         try
         {
@@ -100,7 +100,7 @@ public sealed class LogWriter : Stream
                 _nonce,
                 buffer,
                 ciphertext.AsSpan(0, plaintextLength),
-                tag.AsSpan(0, EncryptionConstants.TagLength),
+                tag,
                 associatedData: null
             );
 
@@ -113,14 +113,13 @@ public sealed class LogWriter : Stream
 
             // Write encrypted data directly to stream from pooled buffers
             _inner.Write(ciphertext, 0, plaintextLength);
-            _inner.Write(tag, 0, EncryptionConstants.TagLength);
+            _inner.Write(tag);
         }
         finally
         {
             // Clear and return buffers to pool
             Array.Clear(ciphertext, 0, plaintextLength);
             ArrayPool<byte>.Shared.Return(ciphertext);
-            ArrayPool<byte>.Shared.Return(tag);
         }
     }
 

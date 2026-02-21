@@ -14,7 +14,7 @@ public class EncryptedLogStreamBenchmarks
 {
     private byte[] _buffer = [];
     private readonly string _publicKey = new KeyService().PublicKey;
-    private readonly string _keyId = Guid.NewGuid().ToString();
+    private readonly string _keyId = Guid.NewGuid().ToString("N");
     private readonly RSA _rsa = RSA.Create();
 
     [Params(512, 1024, 2048)]
