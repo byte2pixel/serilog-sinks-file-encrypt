@@ -1,8 +1,4 @@
-using Serilog.Sinks.File.Encrypt.Models;
-using Serilog.Sinks.File.Encrypt.Readers.v1;
-using Serilog.Sinks.File.Encrypt.Writers.v1;
-
-namespace Serilog.Sinks.File.Encrypt.Tests.unit.v1;
+namespace Serilog.Sinks.File.Encrypt.Tests;
 
 public sealed class SessionReaderV1Tests : IDisposable
 {

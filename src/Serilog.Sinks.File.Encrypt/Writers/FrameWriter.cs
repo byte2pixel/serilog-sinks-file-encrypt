@@ -1,6 +1,6 @@
 using Serilog.Sinks.File.Encrypt.Interfaces;
 
-namespace Serilog.Sinks.File.Encrypt.Writers;
+namespace Serilog.Sinks.File.Encrypt;
 
 /// <inheritdoc />
 internal class FrameWriter : IFrameWriter

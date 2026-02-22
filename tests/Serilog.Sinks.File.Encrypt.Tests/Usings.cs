@@ -3,5 +3,6 @@ global using System.Text;
 global using NSubstitute;
 global using Serilog.Core;
 global using Serilog.Formatting.Json;
+global using Serilog.Sinks.File.Encrypt.Models;
 global using Shouldly;
 global using Xunit;

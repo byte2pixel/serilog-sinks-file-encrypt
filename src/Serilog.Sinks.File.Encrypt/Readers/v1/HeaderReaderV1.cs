@@ -2,7 +2,7 @@ using System.Security.Cryptography;
 using Serilog.Sinks.File.Encrypt.Interfaces;
 using Serilog.Sinks.File.Encrypt.Models;
 
-namespace Serilog.Sinks.File.Encrypt.Readers.v1;
+namespace Serilog.Sinks.File.Encrypt;
 
 /// <inheritdoc />
 public class HeaderReaderV1 : IHeaderReader

@@ -1,5 +1,4 @@
 using Serilog.Sinks.File.Encrypt.Interfaces;
-using Serilog.Sinks.File.Encrypt.Readers.v1;
 
 namespace Serilog.Sinks.File.Encrypt;
 

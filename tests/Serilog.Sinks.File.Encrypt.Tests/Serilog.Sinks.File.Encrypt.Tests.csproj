@@ -37,4 +37,8 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\Serilog.Sinks.File.Encrypt\Serilog.Sinks.File.Encrypt.csproj" />
   </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="unit\Writers\" />
+  </ItemGroup>
 </Project>

@@ -1,6 +1,4 @@
-using Serilog.Sinks.File.Encrypt.Models;
-
-namespace Serilog.Sinks.File.Encrypt.Tests.unit;
+namespace Serilog.Sinks.File.Encrypt.Tests;
 
 /// <summary>
 /// Base class for encryption tests providing common test fixtures and helper methods.

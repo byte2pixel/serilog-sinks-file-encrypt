@@ -1,6 +1,4 @@
-using Serilog.Sinks.File.Encrypt.Models;
-
-namespace Serilog.Sinks.File.Encrypt.Tests.unit.v1;
+namespace Serilog.Sinks.File.Encrypt.Tests;
 
 /// <summary>
 /// Base class for V1 encryption tests that provides common RSA key setup and helper methods.

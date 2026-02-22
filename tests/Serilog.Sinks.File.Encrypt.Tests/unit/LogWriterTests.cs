@@ -1,7 +1,6 @@
 using System.Diagnostics.CodeAnalysis;
-using Serilog.Sinks.File.Encrypt.Models;
 
-namespace Serilog.Sinks.File.Encrypt.Tests.unit;
+namespace Serilog.Sinks.File.Encrypt.Tests;
 
 public class LogWriterTests
 {

@@ -2,7 +2,7 @@ using System.Text;
 using Serilog.Sinks.File.Encrypt.Interfaces;
 using Serilog.Sinks.File.Encrypt.Models;
 
-namespace Serilog.Sinks.File.Encrypt.Writers.v1;
+namespace Serilog.Sinks.File.Encrypt;
 
 /// <summary>
 /// Session header writer for version 1 of the encrypted log format.

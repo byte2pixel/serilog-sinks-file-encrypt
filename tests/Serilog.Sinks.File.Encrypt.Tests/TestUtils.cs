@@ -1,5 +1,3 @@
-using Serilog.Sinks.File.Encrypt.Models;
-
 namespace Serilog.Sinks.File.Encrypt.Tests;
 
 internal static class TestUtils

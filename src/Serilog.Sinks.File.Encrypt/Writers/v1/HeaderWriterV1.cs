@@ -3,7 +3,7 @@ using System.Security.Cryptography;
 using Serilog.Sinks.File.Encrypt.Interfaces;
 using Serilog.Sinks.File.Encrypt.Models;
 
-namespace Serilog.Sinks.File.Encrypt.Writers.v1;
+namespace Serilog.Sinks.File.Encrypt;
 
 /// <summary>
 /// Version 1 header encoder that constructs a header containing the AES session key, nonce, and optional KeyId,

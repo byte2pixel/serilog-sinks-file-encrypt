@@ -1,5 +1,3 @@
-using Serilog.Sinks.File.Encrypt.Models;
-
 namespace Serilog.Sinks.File.Encrypt.Tests;
 
 public sealed class FileSinkIntegrationTests : IDisposable

@@ -1,4 +1,4 @@
-namespace Serilog.Sinks.File.Encrypt.Tests.unit;
+namespace Serilog.Sinks.File.Encrypt.Tests;
 
 public class EncryptHooksTests
 {
