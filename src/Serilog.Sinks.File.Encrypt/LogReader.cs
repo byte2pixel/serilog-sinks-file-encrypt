@@ -40,7 +40,9 @@ public sealed class LogReader : IDisposable
     /// <param name="input">The input stream</param>
     /// <param name="options">The decryption options</param>
     /// <param name="logger">Optional logger for auditing decryption operations and errors. If not provided, no audit logging will occur.</param>
-    /// <exception cref="ArgumentException"></exception>
+    /// <exception cref="ArgumentNullException">Thrown if input or options is null</exception>
+    /// <exception cref="InvalidOperationException">Thrown if the decryption keys are null or empty.</exception>
+    /// <exception cref="CryptographicException">Thrown if there is an issue creating an RSA with any of the decryption keys.</exception>
     /// <remarks>
     /// This class is not thread-safe and should be used for a single decryption operation on a given input stream.
     /// </remarks>
@@ -76,13 +78,13 @@ public sealed class LogReader : IDisposable
             catch (Exception ex)
                 when (ex is CryptographicException or ArgumentNullException or ArgumentException)
             {
-                throw new InvalidOperationException(
+                throw new CryptographicException(
                     $"Invalid RSA key for key ID '{key.Key}': {ex.Message}",
                     ex
                 );
             }
         }
-        WriteToAuditLog("LogReader initialized, ready to process input stream.");
+        _logger?.Information("LogReader initialized, ready to process input stream.");
     }
 
     /// <summary>
@@ -103,8 +105,10 @@ public sealed class LogReader : IDisposable
             await ProcessStreamAsync(output, cancellationToken);
         }
 
-        WriteToAuditLog(
-            $"Decryption completed. Sessions decrypted: {_decryptedSessions}, Messages decrypted: {_decryptedMessages}"
+        _logger?.Information(
+            "Decryption completed. Sessions decrypted: {DecryptedSessions}, Messages decrypted: {DecryptedMessages}",
+            _decryptedSessions,
+            _decryptedMessages
         );
 
         if (_options.ErrorHandlingMode == ErrorHandlingMode.Skip)
@@ -195,7 +199,9 @@ public sealed class LogReader : IDisposable
             // a new session header marker instead of a valid message length.
             if (messageLength == EncryptionConstants.MagicByteDetection)
             {
-                WriteToAuditLog("Session header marker likely encountered while reading messages.");
+                _logger?.Information(
+                    "Session header marker likely encountered while reading messages."
+                );
                 _context = DecryptionContext.Empty;
                 _state = ReaderState.ReadingHeader;
                 _nextSyncPosition = _input.Position - sizeof(int); // Rewind to start of potential header
@@ -229,7 +235,7 @@ public sealed class LogReader : IDisposable
             )
         {
             // Handle message processing errors, try to recover if possible
-            WriteToAuditLog($"Message processing error: {ex.Message}");
+            _logger?.Error(ex, "Message processing error at position: {Position}", _input.Position);
             _resyncAttempts++;
             _failedMessages++;
             _context = DecryptionContext.Empty;
@@ -295,18 +301,22 @@ public sealed class LogReader : IDisposable
             }
             catch (EndOfStreamException ex)
             {
-                WriteToAuditLog($"End of stream reached while reading header: {ex.Message}");
+                _logger?.Error(ex, "End of stream reached while reading header");
                 _state = ReaderState.Completed;
             }
             catch (InvalidDataException ex)
                 when (_options.ErrorHandlingMode != ErrorHandlingMode.ThrowException)
             {
-                WriteToAuditLog($"Invalid data encountered while reading header: {ex.Message}");
+                _logger?.Error(ex, "Invalid data encountered while reading header");
                 HandleHeaderError();
             }
-            catch (CryptographicException)
+            catch (CryptographicException ex)
                 when (_options.ErrorHandlingMode != ErrorHandlingMode.ThrowException)
             {
+                _logger?.Error(
+                    ex,
+                    "Cryptographic error encountered while processing header, likely due to invalid session key or corrupted header data."
+                );
                 HandleHeaderError();
             }
         }
@@ -316,8 +326,9 @@ public sealed class LogReader : IDisposable
     {
         _state = ReaderState.ReadingHeader;
 
-        WriteToAuditLog(
-            $"Header processing error at position {_input.Position}, attempting to resync using Boyer-Moore search."
+        _logger?.Information(
+            "Header processing error at position {InputPosition}, attempting to resync using Boyer-Moore search.",
+            _input.Position
         );
 
         // Try Boyer-Moore search from current position
@@ -355,7 +366,9 @@ public sealed class LogReader : IDisposable
 
     private async Task ProcessSessionHeaderAsync(CancellationToken cancellationToken)
     {
-        WriteToAuditLog("Possible header marker found staring processing after header.");
+        _logger?.Information(
+            "Possible header marker found at position attempting to read session header."
+        );
         byte[] version = new byte[1];
         await _input.ReadExactlyAsync(version, cancellationToken);
         try
@@ -396,17 +409,6 @@ public sealed class LogReader : IDisposable
 
     private bool IsRoomForMagicBytes() =>
         _input.Length - _input.Position >= EncryptionConstants.MagicBytes.Length;
-
-    private void WriteToAuditLog(string message)
-    {
-        if (_logger is null)
-        {
-            return;
-        }
-        string timestamp = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss.fff");
-        string logEntry = $"[{timestamp}] [Position: {_input.Position}] {message}";
-        _logger.Information(logEntry);
-    }
 
     /// <inheritdoc />
     public void Dispose()

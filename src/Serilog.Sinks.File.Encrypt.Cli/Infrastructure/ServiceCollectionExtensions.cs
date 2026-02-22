@@ -21,7 +21,9 @@ public static class ServiceCollectionExtensions
         IFileSystem? fileSystem = null
     )
     {
-        services.TryAddTransient<IFileSystem>(_ => fileSystem ?? new FileSystem());
+        fileSystem ??= new FileSystem();
+        services.TryAddSingleton(fileSystem);
+        services.TryAddTransient<IFileResolver, FileResolver>();
         services.TryAddSingleton(AnsiConsole.Console);
         return services;
     }
