@@ -321,7 +321,7 @@ public sealed class LogReader : IDisposable
         );
 
         // Try Boyer-Moore search from current position
-        int foundPos = BoyerMooreSearch(EncryptionConstants.MagicBytes, _nextSyncPosition);
+        int foundPos = BoyerMooreSearch();
 
         if (foundPos >= 0)
         {
@@ -422,12 +422,12 @@ public sealed class LogReader : IDisposable
         }
     }
 
-    private int BoyerMooreSearch(byte[] pattern, long startPosition)
+    private int BoyerMooreSearch()
     {
         // Consider making this more efficient by reading directly from the stream in chunks and handling buffer overlaps,
         // rather than reading byte-by-byte, make it asynchronous, and consider edge cases like
         // the pattern being split across buffer boundaries
-        int patternLength = pattern.Length;
+        int patternLength = EncryptionConstants.MagicBytes.Length;
         int[] badCharShift = new int[256];
 
         // Preprocessing
@@ -438,11 +438,11 @@ public sealed class LogReader : IDisposable
 
         for (int i = 0; i < patternLength - 1; i++)
         {
-            badCharShift[pattern[i]] = patternLength - 1 - i;
+            badCharShift[EncryptionConstants.MagicBytes[i]] = patternLength - 1 - i;
         }
 
         // Search
-        _input.Position = startPosition;
+        _input.Position = _nextSyncPosition;
         byte[] buffer = new byte[8192];
         int bufferPos = 0;
         int bytesRead = _input.Read(buffer, 0, buffer.Length);
@@ -453,7 +453,7 @@ public sealed class LogReader : IDisposable
             while (i < bytesRead)
             {
                 int j = patternLength - 1;
-                while (j >= 0 && buffer[i] == pattern[j])
+                while (j >= 0 && buffer[i] == EncryptionConstants.MagicBytes[j])
                 {
                     i--;
                     j--;
