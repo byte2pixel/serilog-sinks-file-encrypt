@@ -16,13 +16,12 @@ public sealed class LogReader : IDisposable
 {
     private enum ReaderState
     {
-        NotInitialized,
         ReadingHeader,
         ReadingMessages,
         Completed,
     }
 
-    private ReaderState _state = ReaderState.NotInitialized;
+    private ReaderState _state = ReaderState.ReadingHeader;
     private readonly Stream _input;
     private readonly DecryptionOptions _options;
     private DecryptionContext _context = DecryptionContext.Empty;
@@ -99,11 +98,6 @@ public sealed class LogReader : IDisposable
         CancellationToken cancellationToken = default
     )
     {
-        if (_state == ReaderState.NotInitialized)
-        {
-            _state = ReaderState.ReadingHeader;
-        }
-
         while (_state != ReaderState.Completed)
         {
             await ProcessStreamAsync(output, cancellationToken);
@@ -113,7 +107,7 @@ public sealed class LogReader : IDisposable
             $"Decryption completed. Sessions decrypted: {_decryptedSessions}, Messages decrypted: {_decryptedMessages}"
         );
 
-        if (_options.ErrorHandlingMode != ErrorHandlingMode.ThrowException)
+        if (_options.ErrorHandlingMode == ErrorHandlingMode.Skip)
         {
             return new DecryptionResult
             {
@@ -156,10 +150,6 @@ public sealed class LogReader : IDisposable
     {
         switch (_state)
         {
-            case ReaderState.NotInitialized:
-                // Read and validate header
-                _state = ReaderState.ReadingHeader;
-                break;
             case ReaderState.ReadingHeader:
                 // Process header and prepare for entries
                 _input.Position = _nextSyncPosition;

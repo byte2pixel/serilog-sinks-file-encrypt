@@ -23,7 +23,8 @@ internal static class TestUtils
     }
 
     internal static DecryptionOptions GetDecryptionOptions(
-        Dictionary<string, string> decryptionKeys
+        Dictionary<string, string> decryptionKeys,
+        ErrorHandlingMode? mode = null
     )
     {
         if (decryptionKeys is null || decryptionKeys.Count == 0)
@@ -33,12 +34,20 @@ internal static class TestUtils
                 nameof(decryptionKeys)
             );
         }
-        return new DecryptionOptions { DecryptionKeys = decryptionKeys };
+        return new DecryptionOptions
+        {
+            DecryptionKeys = decryptionKeys,
+            ErrorHandlingMode = mode ?? ErrorHandlingMode.Skip,
+        };
     }
 
-    internal static DecryptionOptions GetDecryptionOptions(string privateKey, string keyId = "")
+    internal static DecryptionOptions GetDecryptionOptions(
+        string privateKey,
+        string keyId = "",
+        ErrorHandlingMode? mode = null
+    )
     {
-        return GetDecryptionOptions(new Dictionary<string, string> { { keyId, privateKey } });
+        return GetDecryptionOptions(new Dictionary<string, string> { { keyId, privateKey } }, mode);
     }
 
     /// <summary>

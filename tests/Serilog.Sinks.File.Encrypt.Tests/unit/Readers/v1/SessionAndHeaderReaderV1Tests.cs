@@ -1,6 +1,6 @@
 namespace Serilog.Sinks.File.Encrypt.Tests;
 
-public sealed class SessionReaderV1Tests : IDisposable
+public sealed class SessionAndHeaderReaderV1Tests : IDisposable
 {
     private readonly MemoryStream _input;
     private readonly SessionReaderV1 _sut;
@@ -11,7 +11,7 @@ public sealed class SessionReaderV1Tests : IDisposable
     private readonly Dictionary<string, RSA> _keyMap = [];
     private readonly DecryptionOptions _decOptions;
 
-    public SessionReaderV1Tests()
+    public SessionAndHeaderReaderV1Tests()
     {
         (string publicKey, string privateKey) = CryptographicUtils.GenerateRsaKeyPair();
         _encryptionRsa.FromString(publicKey);
