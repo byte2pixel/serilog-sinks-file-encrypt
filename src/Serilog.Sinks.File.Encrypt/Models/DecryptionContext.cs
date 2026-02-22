@@ -3,15 +3,27 @@ namespace Serilog.Sinks.File.Encrypt.Models;
 /// <summary>
 /// Represents the current decryption context with active encryption keys
 /// </summary>
-internal class DecryptionContext(int tagLength, byte[] nonce, byte[] sessionKey)
+/// <param name="nonce"></param>
+/// <param name="sessionKey"></param>
+public class DecryptionContext(byte[] nonce, byte[] sessionKey)
 {
-    public int TagLength { get; } = tagLength;
-
+    /// <summary>
+    /// The AES-GCM Session Key.
+    /// </summary>
     public byte[] SessionKey { get; } = sessionKey;
 
+    /// <summary>
+    /// The AES-GCM Nonce (Initialization Vector) used for decryption.
+    /// </summary>
     public byte[] Nonce { get; } = nonce;
 
-    public static DecryptionContext Empty => new(0, [], []);
+    /// <summary>
+    /// Creates an empty decryption content.
+    /// </summary>
+    public static DecryptionContext Empty => new([], []);
 
-    public bool HasKeys => Nonce.Length > 0 && SessionKey.Length > 0 && TagLength > 0;
+    /// <summary>
+    /// Returns true if both the Nonce and SessionKey are present, indicating that decryption can proceed.
+    /// </summary>
+    public bool HasKeys => Nonce.Length > 0 && SessionKey.Length > 0;
 }

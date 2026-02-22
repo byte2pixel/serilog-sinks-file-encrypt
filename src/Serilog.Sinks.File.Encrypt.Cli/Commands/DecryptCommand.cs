@@ -1,6 +1,7 @@
 using System.ComponentModel;
 using System.Diagnostics.CodeAnalysis;
 using System.IO.Abstractions;
+using System.Security.Cryptography;
 using Serilog.Sinks.File.Encrypt.Models;
 using Spectre.Console;
 using Spectre.Console.Cli;
@@ -66,11 +67,11 @@ public sealed class DecryptCommand(IAnsiConsole console, IFileSystem fileSystem)
         public bool Strict { get; init; }
 
         /// <summary>
-        /// Path to write detailed error information. If specified, errors are logged to this file instead of being skipped silently.
+        /// Path to write detailed audit information. If specified, audit info is logged to this file instead of being skipped silently.
         /// </summary>
-        [CommandOption("--error-log <PATH>")]
-        [Description("Write detailed error information to a separate log file")]
-        public string? ErrorLogPath { get; init; }
+        [CommandOption("--audit-log <PATH>")]
+        [Description("Write detailed audit information to a separate log file")]
+        public string? AuditLogPath { get; init; }
     }
 
     /// <summary>
@@ -114,34 +115,26 @@ public sealed class DecryptCommand(IAnsiConsole console, IFileSystem fileSystem)
             );
 
             // Configure streaming options based on user settings
-            ErrorHandlingMode errorMode;
-            bool continueOnError;
+            ErrorHandlingMode errorMode = settings.Strict
+                ? ErrorHandlingMode.ThrowException
+                : ErrorHandlingMode.Skip;
 
-            if (settings.Strict)
+            if (!string.IsNullOrWhiteSpace(settings.AuditLogPath))
             {
-                // Strict mode: fail on first error
-                errorMode = ErrorHandlingMode.ThrowException;
-                continueOnError = false;
-            }
-            else if (!string.IsNullOrWhiteSpace(settings.ErrorLogPath))
-            {
-                // Error log specified: write errors to separate file
-                errorMode = ErrorHandlingMode.WriteToErrorLog;
-                continueOnError = true;
-                console.MarkupLineInterpolated($"[dim]Error log:[/] {settings.ErrorLogPath}");
-            }
-            else
-            {
-                // Default: skip errors silently
-                errorMode = ErrorHandlingMode.Skip;
-                continueOnError = true;
+                console.MarkupLineInterpolated($"[dim]Audit log:[/] {settings.AuditLogPath}");
             }
 
-            StreamingOptions streamingOptions = new()
+            // TODO: need a way to support multiple keys with key IDs for rotation scenarios.
+            // For now, we will just use a single default key with an empty key ID since the CLI only accepts one key file.
+            var decryptionKeys = new Dictionary<string, string>
             {
+                { "", rsaPrivateKey }, // Default key with empty key ID
+            };
+
+            DecryptionOptions decryptionOptions = new()
+            {
+                DecryptionKeys = decryptionKeys,
                 ErrorHandlingMode = errorMode,
-                ErrorLogPath = settings.ErrorLogPath,
-                ContinueOnError = continueOnError,
             };
 
             console.WriteLine();
@@ -149,8 +142,7 @@ public sealed class DecryptCommand(IAnsiConsole console, IFileSystem fileSystem)
             (int successCount, int failureCount) = await ProcessFilesAsync(
                 settings,
                 filesToDecrypt,
-                rsaPrivateKey,
-                streamingOptions,
+                decryptionOptions,
                 cancellationToken
             );
 
@@ -177,7 +169,7 @@ public sealed class DecryptCommand(IAnsiConsole console, IFileSystem fileSystem)
             console.MarkupLineInterpolated($"[red]✗ Access denied: {ex.Message}[/]");
             return 1;
         }
-        catch (System.Security.Cryptography.CryptographicException ex)
+        catch (CryptographicException ex)
         {
             console.MarkupLineInterpolated($"[red]✗ Decryption failed: {ex.Message}[/]");
             return 1;
@@ -199,15 +191,13 @@ public sealed class DecryptCommand(IAnsiConsole console, IFileSystem fileSystem)
     /// </summary>
     /// <param name="settings">The command settings.</param>
     /// <param name="filesToDecrypt">The list of files to decrypt</param>
-    /// <param name="rsaPrivateKey">The private key.</param>
-    /// <param name="streamingOptions">The streaming decryption options.</param>
+    /// <param name="decryptionOptions">The decryption options.</param>
     /// <param name="cancellationToken">The cancellation token.</param>
     /// <returns></returns>
     private async Task<(int successCount, int failureCount)> ProcessFilesAsync(
         Settings settings,
         List<string> filesToDecrypt,
-        string rsaPrivateKey,
-        StreamingOptions streamingOptions,
+        DecryptionOptions decryptionOptions,
         CancellationToken cancellationToken
     )
     {
@@ -235,13 +225,11 @@ public sealed class DecryptCommand(IAnsiConsole console, IFileSystem fileSystem)
                 // Perform the decryption using streaming API
                 await using FileSystemStream inputStream = fileSystem.File.OpenRead(inputFile);
                 await using FileSystemStream outputStream = fileSystem.File.Create(outputFile);
-
-                await EncryptionUtils.DecryptLogFileAsync(
+                await CryptographicUtils.DecryptLogFileAsync(
                     inputStream,
                     outputStream,
-                    rsaPrivateKey,
-                    streamingOptions,
-                    cancellationToken
+                    decryptionOptions,
+                    cancellationToken: cancellationToken
                 );
 
                 console.MarkupLineInterpolated($"[green]✓ Decrypted:[/] {inputFile}");
@@ -253,7 +241,7 @@ public sealed class DecryptCommand(IAnsiConsole console, IFileSystem fileSystem)
                 console.MarkupLineInterpolated($"[red]✗ Failed:[/] {inputFile} - {ex.Message}");
                 failureCount++;
             }
-            catch (System.Security.Cryptography.CryptographicException ex)
+            catch (CryptographicException ex)
             {
                 console.MarkupLineInterpolated(
                     $"[red]✗ Decryption failed:[/] {inputFile} - {ex.Message}"

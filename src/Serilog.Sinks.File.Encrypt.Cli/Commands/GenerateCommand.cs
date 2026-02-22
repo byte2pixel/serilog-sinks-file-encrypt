@@ -69,7 +69,7 @@ public sealed class GenerateCommand(IAnsiConsole console, IFileSystem fileSystem
             }
 
             // Generate the RSA key pair
-            (string publicKey, string privateKey) keyPair = EncryptionUtils.GenerateRsaKeyPair(
+            (string publicKey, string privateKey) keyPair = CryptographicUtils.GenerateRsaKeyPair(
                 settings.KeySize,
                 settings.Format
             );
@@ -77,8 +77,14 @@ public sealed class GenerateCommand(IAnsiConsole console, IFileSystem fileSystem
             string fileExt = settings.Format.ToString().ToLower();
 
             // Define file paths
-            string privateKeyPath = fileSystem.Path.Join(settings.OutputPath, $"private_key.{fileExt}");
-            string publicKeyPath = fileSystem.Path.Join(settings.OutputPath, $"public_key.{fileExt}");
+            string privateKeyPath = fileSystem.Path.Join(
+                settings.OutputPath,
+                $"private_key.{fileExt}"
+            );
+            string publicKeyPath = fileSystem.Path.Join(
+                settings.OutputPath,
+                $"public_key.{fileExt}"
+            );
 
             // Write keys to files
             fileSystem.File.WriteAllText(privateKeyPath, keyPair.privateKey);

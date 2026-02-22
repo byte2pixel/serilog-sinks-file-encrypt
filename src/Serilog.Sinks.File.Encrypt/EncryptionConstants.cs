@@ -2,14 +2,37 @@ namespace Serilog.Sinks.File.Encrypt;
 
 internal static class EncryptionConstants
 {
-    public static readonly byte[] Marker = [0xFF, 0xFF, 0xFF, 0xFF];
-    public static readonly byte[] Version = [0x01, 0x00, 0x00, 0x00];
-    public const int NonceLength = 12; // 96 bits, NIST recommended for AES-GCM
-    public const int SessionKeyLength = 32; // 256 bits for AES-256
-    public const int TagLength = 16; // 128 bits for AES-GCM authentication tag
-    public const int SizeOfInt = sizeof(int);
-    public const int HeaderUnencryptedSize = SizeOfInt + NonceLength + SessionKeyLength;
-    public const int HeaderNonceOffset = SizeOfInt;
-    public const int HeaderSessionKeyOffset = SizeOfInt + NonceLength;
-    public const int MinRsaKeySize = 2048; // Minimum RSA key size in bits for secure encryption
+    /// <summary>
+    /// The fixed magic bytes that identify the file format.
+    /// 0xFF: Reserved byte (must be 0xFF) to easily detect when parsing messages, that a new session started.
+    /// 0x42, 0x32, 0x50: ASCII "B2P" (stands for "Byte2Pixel")
+    /// 0xFF, 0xDA, 0x7E: Random bytes for additional uniqueness
+    /// 0x00: Reserved byte (must be 0)
+    /// </summary>
+    public static readonly byte[] MagicBytes = [0xFF, 0x42, 0x32, 0x50, 0xFF, 0xDA, 0x7E, 0x00];
+
+    /// <summary>
+    /// Precomputed integer value of the first 4 magic bytes for efficient detection.
+    /// </summary>
+    public static int MagicByteDetection => -12438960;
+
+    /// <summary>
+    /// 96 bits, NIST recommended for AES-GCM
+    /// </summary>
+    public const int NonceLength = 12;
+
+    /// <summary>
+    /// 256 bits for AES-256
+    /// </summary>
+    public const int SessionKeyLength = 32;
+
+    /// <summary>
+    /// 128 bits for AES-GCM authentication tag
+    /// </summary>
+    public const int TagLength = 16;
+
+    /// <summary>
+    /// Minimum RSA key size in bits for secure encryption
+    /// </summary>
+    public const int MinimumRsaKeySize = 2048;
 }

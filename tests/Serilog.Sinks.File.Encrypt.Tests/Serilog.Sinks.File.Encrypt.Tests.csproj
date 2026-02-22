@@ -18,6 +18,11 @@
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
     <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="NSubstitute" />
+    <PackageReference Include="NSubstitute.Analyzers.CSharp">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
     <PackageReference Include="Serilog" />
     <PackageReference Include="Serilog.Sinks.File" />
     <PackageReference Include="Shouldly" />
@@ -31,5 +36,9 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\Serilog.Sinks.File.Encrypt\Serilog.Sinks.File.Encrypt.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="unit\Writers\" />
   </ItemGroup>
 </Project>
