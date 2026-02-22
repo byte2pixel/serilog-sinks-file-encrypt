@@ -1,5 +1,7 @@
+using System.Collections.Concurrent;
 using System.Security.Cryptography;
 using System.Text;
+using Serilog.Sinks.File.Encrypt.Models;
 
 namespace Serilog.Sinks.File.Encrypt;
 
@@ -9,7 +11,7 @@ namespace Serilog.Sinks.File.Encrypt;
 /// <remarks>
 /// <para>
 /// This class integrates with Serilog.Sinks.File to automatically encrypt log files as they are written.
-/// It intercepts file stream creation and wraps it with <see cref="EncryptedStream"/> for transparent encryption.
+/// It intercepts file stream creation and wraps it with <see cref="LogWriter"/> for transparent encryption.
 /// </para>
 /// <para>
 /// <b>Thread Safety:</b> This class is thread-safe. Serilog.Sinks.File handles synchronization internally,
@@ -40,18 +42,19 @@ namespace Serilog.Sinks.File.Encrypt;
 /// </example>
 public class EncryptHooks : FileLifecycleHooks
 {
-    private readonly RSA _rsaPublicKey;
+    private static readonly ConcurrentDictionary<string, RSA> _rsaCache = new();
+    private readonly EncryptionOptions _encryptionOptions;
 
     /// <summary>
     /// Creates a new instance of <see cref="EncryptHooks"/> with the provided RSA public key.
     /// </summary>
-    /// <param name="rsaPublicKey">The RSA public key in XML or PEM format. Use <see cref="EncryptionUtils.GenerateRsaKeyPair"/> to generate keys.</param>
-    /// <exception cref="ArgumentNullException">Thrown when <paramref name="rsaPublicKey"/> is null or whitespace.</exception>
-    /// <exception cref="FormatException">Thrown when <paramref name="rsaPublicKey"/> is in an invalid format.</exception>
-    /// <exception cref="CryptographicException">Thrown when the format is invalid or cannot be parsed as an RSA public key.</exception>
+    /// <param name="publicKey">The RSA public key in XML or PEM format. Use <see cref="CryptographicUtils.GenerateRsaKeyPair"/> to generate keys.</param>
+    /// <param name="keyId">Optional key ID to include in the header for key rotation. Default is an empty string.</param>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="publicKey"/> is null or whitespace.</exception>
+    /// <exception cref="FormatException">Thrown when <paramref name="publicKey"/> is in an invalid format.</exception>
+    /// <exception cref="CryptographicException">Thrown when the key format is invalid, cannot be parsed. or is too small.</exception>
     /// <remarks>
-    /// The public key is loaded and validated during construction. Keep the corresponding private key secure
-    /// for decryption purposes - it should never be deployed with application code.
+    /// The public key is loaded and validated during construction.
     /// </remarks>
     /// <example>
     /// <code>
@@ -64,10 +67,20 @@ public class EncryptHooks : FileLifecycleHooks
     /// var hooks = new EncryptHooks(publicKey);
     /// </code>
     /// </example>
-    public EncryptHooks(string rsaPublicKey)
+    public EncryptHooks(string publicKey, string keyId = "")
     {
-        _rsaPublicKey = RSA.Create();
-        _rsaPublicKey.FromString(rsaPublicKey);
+        ArgumentNullException.ThrowIfNull(publicKey);
+        RSA rsa = _rsaCache.GetOrAdd(publicKey, CreateRsaFromString);
+        _encryptionOptions = new EncryptionOptions(rsa, keyId);
+    }
+
+    private static RSA CreateRsaFromString(string publicKey)
+    {
+        var r = RSA.Create();
+        r.FromString(publicKey);
+        return r.KeySize < EncryptionConstants.MinimumRsaKeySize
+            ? throw new CryptographicException("RSA key size is too small")
+            : r;
     }
 
     /// <summary>
@@ -76,13 +89,13 @@ public class EncryptHooks : FileLifecycleHooks
     /// <param name="path">The path to the log file being opened.</param>
     /// <param name="underlyingStream">The underlying file stream created by Serilog.</param>
     /// <param name="encoding">The text encoding used for log entries.</param>
-    /// <returns>An <see cref="EncryptedStream"/> that wraps the underlying stream for transparent encryption.</returns>
+    /// <returns>An <see cref="LogWriter"/> that wraps the underlying stream for transparent encryption.</returns>
     /// <remarks>
     /// This method is called internally by Serilog and should not be called directly by application code.
     /// The returned stream is managed by Serilog and will be disposed when the log file is closed.
     /// </remarks>
     public override Stream OnFileOpened(string path, Stream underlyingStream, Encoding encoding)
     {
-        return new EncryptedStream(underlyingStream, _rsaPublicKey);
+        return new LogWriter(underlyingStream, _encryptionOptions);
     }
 }

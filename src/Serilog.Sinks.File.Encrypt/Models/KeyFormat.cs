@@ -7,23 +7,26 @@ public enum KeyFormat
 {
     /// <summary>
     /// Base64 XML
-    ///
-    /// <RSAKeyValue>
-    ///     <Modulus>
+    /// <code>
+    /// &lt;RSAKeyValue&gt;
+    ///     &lt;Modulus&gt;
     ///        ...
-    ///    </Modulus>
-    ///    <Exponent>
+    ///    &lt;/Modulus&gt;
+    ///    &lt;Exponent&gt;
     ///        ...
-    ///    </Exponent>
-    /// </RSAKeyValue>
+    ///    &lt;/Exponent&gt;
+    /// &lt;/RSAKeyValue&gt;
+    /// </code>
     /// </summary>
     Xml,
+
     /// <summary>
     /// Base64 PEM (RFC 7468)
-    ///
+    /// <code>
     /// -----BEGIN RSA PUBLIC KEY-----
-    ///     ....
+    /// ....
     /// -----END RSA PUBLIC KEY-----
+    /// </code>
     /// </summary>
-    Pem
+    Pem,
 }

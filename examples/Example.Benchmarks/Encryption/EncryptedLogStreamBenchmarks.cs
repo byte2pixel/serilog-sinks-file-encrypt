@@ -5,15 +5,17 @@ using System.Text.Json;
 using BenchmarkDotNet.Attributes;
 using Example.Benchmarks.Keys;
 using Serilog.Sinks.File.Encrypt;
+using Serilog.Sinks.File.Encrypt.Models;
 
 namespace Example.Benchmarks.Encryption;
 
 [MemoryDiagnoser]
-public class EncryptedStreamBenchmarks
+public class EncryptedLogStreamBenchmarks
 {
     private byte[] _buffer = [];
     private readonly string _publicKey = new KeyService().PublicKey;
-    private readonly RSA _rsaPublicKey = RSA.Create();
+    private readonly string _keyId = Guid.NewGuid().ToString("N");
+    private readonly RSA _rsa = RSA.Create();
 
     [Params(512, 1024, 2048)]
     [SuppressMessage("ReSharper", "UnusedAutoPropertyAccessor.Global")]
@@ -22,8 +24,7 @@ public class EncryptedStreamBenchmarks
     [GlobalSetup]
     public void Setup()
     {
-        _rsaPublicKey.FromXmlString(_publicKey);
-
+        _rsa.FromXmlString(_publicKey);
         // Create realistic log entry data instead of random bytes
         var logEntry = new
         {
@@ -62,17 +63,12 @@ public class EncryptedStreamBenchmarks
     }
 
     [Benchmark]
-    public void EncryptedMemoryStreamWrite()
+    public void EncryptedLogStreamWriteV1()
     {
+        EncryptionOptions options = new(_rsa, _keyId);
         using MemoryStream ms = new();
-        using EncryptedStream es = new(ms, _rsaPublicKey);
-        es.Write(_buffer, 0, _buffer.Length);
-        es.Flush();
-    }
-
-    [GlobalCleanup]
-    public void Cleanup()
-    {
-        _rsaPublicKey.Dispose();
+        using LogWriter els = new(ms, options);
+        els.Write(_buffer, 0, _buffer.Length);
+        els.Flush();
     }
 }

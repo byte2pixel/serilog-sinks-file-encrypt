@@ -9,8 +9,9 @@ public abstract class CommandTestBase : IDisposable
     protected static readonly string[] Arguments = [];
     protected static readonly IRemainingArguments Remaining = Substitute.For<IRemainingArguments>();
 
-    protected TestConsole TestConsole { get; } = new();
-    protected MockFileSystem FileSystem { get; } = new();
+    protected readonly TestConsole TestConsole = new();
+    protected readonly MockFileSystem FileSystem = new();
+    protected readonly IFileSystem FileSystemSub = Substitute.For<IFileSystem>();
 
     public void Dispose()
     {

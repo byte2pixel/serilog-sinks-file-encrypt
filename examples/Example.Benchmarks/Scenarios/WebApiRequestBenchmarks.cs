@@ -14,6 +14,10 @@ public class WebApiRequestBenchmarks
     private string _logDirectory = string.Empty;
     private string _publicKey = string.Empty;
 
+    [Params(true, false)]
+    [SuppressMessage("ReSharper", "UnusedAutoPropertyAccessor.Global")]
+    public bool Buffered { get; set; }
+
     [Params(100, 1000)]
     [SuppressMessage("ReSharper", "UnusedAutoPropertyAccessor.Global")]
     public int RequestCount { get; set; }
@@ -41,7 +45,7 @@ public class WebApiRequestBenchmarks
             .WriteTo.File(
                 path: logPath,
                 rollingInterval: RollingInterval.Infinite,
-                buffered: true,
+                buffered: Buffered,
                 flushToDiskInterval: TimeSpan.FromSeconds(10)
             )
             .CreateLogger();
@@ -60,7 +64,7 @@ public class WebApiRequestBenchmarks
             .WriteTo.File(
                 path: logPath,
                 rollingInterval: RollingInterval.Infinite,
-                buffered: true,
+                buffered: Buffered,
                 flushToDiskInterval: TimeSpan.FromSeconds(10),
                 hooks: new EncryptHooks(_publicKey)
             )

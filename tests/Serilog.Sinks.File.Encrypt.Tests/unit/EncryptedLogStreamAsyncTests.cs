@@ -1,11 +1,11 @@
 using System.Diagnostics.CodeAnalysis;
 
-namespace Serilog.Sinks.File.Encrypt.Tests.unit;
+namespace Serilog.Sinks.File.Encrypt.Tests;
 
 /// <summary>
-/// Tests for EncryptedStream async operations, specifically FlushAsync
+/// Tests for EncryptedLogStream async operations, specifically FlushAsync
 /// </summary>
-public sealed class EncryptedStreamAsyncTests : EncryptionTestBase
+public sealed class EncryptedLogStreamAsyncTests : EncryptionTestBase
 {
     [Fact]
     public async Task FlushAsync_WithSingleMessage_EncryptsAndDecryptsCorrectly()
@@ -14,17 +14,9 @@ public sealed class EncryptedStreamAsyncTests : EncryptionTestBase
         const string TestMessage = "Test message with async flush";
 
         // Act - Use async stream creation which calls FlushAsync
-        MemoryStream encryptedStream = await CreateEncryptedStreamAsync(
-            TestMessage,
-            RsaKeyPair.publicKey,
-            TestContext.Current.CancellationToken
-        );
+        MemoryStream encryptedStream = await CreateEncryptedStreamAsync(TestMessage);
 
-        string decrypted = await DecryptStreamToStringAsync(
-            encryptedStream,
-            RsaKeyPair.privateKey,
-            TestContext.Current.CancellationToken
-        );
+        string decrypted = await DecryptStreamToStringAsync(encryptedStream);
 
         // Assert
         decrypted.ShouldBe(TestMessage);
@@ -39,11 +31,7 @@ public sealed class EncryptedStreamAsyncTests : EncryptionTestBase
         // Act - Use async stream creation which calls FlushAsync
         MemoryStream encryptedStream = await CreateEncryptedStreamAsync(messages);
 
-        string decrypted = await DecryptStreamToStringAsync(
-            encryptedStream,
-            RsaKeyPair.privateKey,
-            TestContext.Current.CancellationToken
-        );
+        string decrypted = await DecryptStreamToStringAsync(encryptedStream);
 
         // Assert
         string expected = string.Join("", messages);
@@ -54,24 +42,21 @@ public sealed class EncryptedStreamAsyncTests : EncryptionTestBase
     public async Task FlushAsync_With4096BitKey_EncryptsAndDecryptsSuccessfully()
     {
         // Arrange
-        (string publicKey, string privateKey) = EncryptionUtils.GenerateRsaKeyPair(keySize: 4096);
+        (string publicKey, string privateKey) = CryptographicUtils.GenerateRsaKeyPair(
+            keySize: 4096
+        );
         const string TestMessage = "Testing FlushAsync with 4096-bit RSA key!";
-
-        using RSA rsa = RSA.Create();
-        rsa.FromXmlString(publicKey);
-        rsa.KeySize.ShouldBe(4096); // Verify key size
 
         // Act - Use async stream creation which calls FlushAsync
         MemoryStream encryptedStream = await CreateEncryptedStreamAsync(
             TestMessage,
-            publicKey,
-            TestContext.Current.CancellationToken
+            CreateEncryptionOptions(publicKey, "4096")
         );
 
+        Dictionary<string, string> map = new() { { "4096", privateKey } };
         string decrypted = await DecryptStreamToStringAsync(
             encryptedStream,
-            privateKey,
-            TestContext.Current.CancellationToken
+            TestUtils.GetDecryptionOptions(map)
         );
 
         // Assert
@@ -101,11 +86,7 @@ public sealed class EncryptedStreamAsyncTests : EncryptionTestBase
         // Act - Each message gets its own flush in CreateEncryptedStreamAsync
         MemoryStream encryptedStream = await CreateEncryptedStreamAsync(messages);
 
-        string decrypted = await DecryptStreamToStringAsync(
-            encryptedStream,
-            RsaKeyPair.privateKey,
-            TestContext.Current.CancellationToken
-        );
+        string decrypted = await DecryptStreamToStringAsync(encryptedStream);
 
         // Assert
         string expected = string.Join("", messages);
@@ -139,7 +120,7 @@ public sealed class EncryptedStreamAsyncTests : EncryptionTestBase
 
         // Act - Create one with sync Flush
 # pragma warning disable S6966 // Suppress "Async method name should end with 'Async'" for test purpose
-        MemoryStream syncStream = CreateEncryptedStream(TestMessage, RsaKeyPair.publicKey);
+        MemoryStream syncStream = CreateEncryptedStream(TestMessage);
 # pragma warning restore S6966
         string syncDecrypted = await DecryptStreamToStringAsync(syncStream);
 
@@ -157,49 +138,52 @@ public sealed class EncryptedStreamAsyncTests : EncryptionTestBase
     public async Task WriteAsync_WritesDataAndFlushes()
     {
         // Arrange
-        (string publicKey, _) = EncryptionUtils.GenerateRsaKeyPair();
+        (string publicKey, _) = CryptographicUtils.GenerateRsaKeyPair();
         using MemoryStream fs = new();
         using RSA rsa = RSA.Create();
         rsa.FromXmlString(publicKey);
-        await using EncryptedStream encStream = new(fs, rsa);
+        EncryptionOptions options = new(rsa);
+        await using LogWriter logWriter = new(fs, options);
 
         byte[] data = "Hello Async"u8.ToArray();
 
         // Act
-        await encStream.WriteAsync(data, TestContext.Current.CancellationToken);
-        await encStream.FlushAsync(TestContext.Current.CancellationToken);
+        await logWriter.WriteAsync(data, TestContext.Current.CancellationToken);
+        await logWriter.FlushAsync(TestContext.Current.CancellationToken);
 
         // Assert
-        encStream.Position.ShouldBeGreaterThan(data.Length);
+        logWriter.Position.ShouldBeGreaterThan(data.Length);
     }
 
     [Fact]
     public async Task WriteAsync_ZeroBytes_DoesNot_WriteData()
     {
         // Arrange
-        (string publicKey, _) = EncryptionUtils.GenerateRsaKeyPair();
+        (string publicKey, _) = CryptographicUtils.GenerateRsaKeyPair();
         using MemoryStream fs = new();
         using RSA rsa = RSA.Create();
         rsa.FromXmlString(publicKey);
-        await using EncryptedStream encStream = new(fs, rsa);
+        EncryptionOptions options = new(rsa);
+        await using LogWriter logWriter = new(fs, options);
 
         // Act
-        await encStream.WriteAsync(Array.Empty<byte>(), TestContext.Current.CancellationToken);
-        await encStream.FlushAsync(TestContext.Current.CancellationToken);
+        await logWriter.WriteAsync(Array.Empty<byte>(), TestContext.Current.CancellationToken);
+        await logWriter.FlushAsync(TestContext.Current.CancellationToken);
 
         // Assert
-        encStream.Position.ShouldBeEquivalentTo(0L);
+        logWriter.Position.ShouldBeEquivalentTo(0L);
     }
 
     [Fact]
     public async Task WriteAsync_CancellationRequested_ThrowsOperationCanceledException()
     {
         // Arrange
-        (string publicKey, _) = EncryptionUtils.GenerateRsaKeyPair();
+        (string publicKey, _) = CryptographicUtils.GenerateRsaKeyPair();
         using MemoryStream fs = new();
         using RSA rsa = RSA.Create();
         rsa.FromXmlString(publicKey);
-        await using EncryptedStream encStream = new(fs, rsa);
+        EncryptionOptions options = new(rsa);
+        await using LogWriter logWriter = new(fs, options);
 
         byte[] data = "Hello Async"u8.ToArray();
         using var cts = new CancellationTokenSource();
@@ -207,7 +191,7 @@ public sealed class EncryptedStreamAsyncTests : EncryptionTestBase
 
         // Act & Assert
         await Should.ThrowAsync<OperationCanceledException>(async () =>
-            await encStream.WriteAsync(data, cts.Token)
+            await logWriter.WriteAsync(data, cts.Token)
         );
     }
 }

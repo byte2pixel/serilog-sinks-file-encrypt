@@ -14,10 +14,12 @@ public class SerilogFileSinkBenchmarks
     private string _logDirectory = string.Empty;
     private string _publicKey = string.Empty;
 
+    // [Params(10000)]
     [Params(100, 1000, 10000)]
     [SuppressMessage("ReSharper", "UnusedAutoPropertyAccessor.Global")]
     public int LogEntryCount { get; set; }
 
+    // [Params("Large")]
     [Params("Small", "Medium", "Large")]
     [SuppressMessage("ReSharper", "UnusedAutoPropertyAccessor.Global")]
     public string MessageSize { get; set; } = "Small";

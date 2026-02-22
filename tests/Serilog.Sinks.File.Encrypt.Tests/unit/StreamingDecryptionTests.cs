@@ -1,6 +1,4 @@
-using Serilog.Sinks.File.Encrypt.Models;
-
-namespace Serilog.Sinks.File.Encrypt.Tests.unit;
+namespace Serilog.Sinks.File.Encrypt.Tests;
 
 public sealed class StreamingDecryptionTests : EncryptionTestBase
 {
@@ -34,11 +32,10 @@ public sealed class StreamingDecryptionTests : EncryptionTestBase
     {
         // Arrange
         const string TestMessage = "Test message with custom options";
-        StreamingOptions customOptions = new()
+        DecryptionOptions customOptions = new()
         {
-            BufferSize = 8 * 1024, // 8KB
-            QueueDepth = 5,
-            ContinueOnError = false,
+            DecryptionKeys = DecryptOptions.DecryptionKeys,
+            ErrorHandlingMode = ErrorHandlingMode.ThrowException,
         };
 
         MemoryStream encryptedStream = await CreateEncryptedStreamAsync(TestMessage);
@@ -59,7 +56,7 @@ public sealed class StreamingDecryptionTests : EncryptionTestBase
 
         // Corrupt part of the stream
         byte[] fileBytes = encryptedStream.ToArray();
-        byte[] corrupted = CorruptData(fileBytes, fileBytes.Length / 2);
+        byte[] corrupted = TestUtils.CorruptData(fileBytes, fileBytes.Length / 2);
         MemoryStream corruptedStream = CreateMemoryStream(corrupted);
 
         // Act
@@ -74,42 +71,43 @@ public sealed class StreamingDecryptionTests : EncryptionTestBase
     /// and ensures decryption continues past it.
     /// </summary>
     [Theory]
-    [InlineData(299)] // Corrupt the length so it is a marker, but the data is still intact
-    [InlineData(300)] // Corrupt part of the length and data.
-    [InlineData(301)] // Corrupt part of the length and data.
-    [InlineData(302)] // Corrupt part of the length and data.
-    [InlineData(303)] // Corrupt the data
-    [InlineData(305)] // Corrupt the data more.
-    [InlineData(310)] // Corrupt the data and more.
-    [InlineData(320)] // Corrupt the data and more and more.
+    [InlineData(332)] // Corrupt the length so it is a marker and part of the data.
+    [InlineData(333)] // Corrupt part of the length and data.
+    [InlineData(334)] // Corrupt part of the length and data.
+    [InlineData(335)] // Corrupt part of the length and data.
+    [InlineData(336)] // Corrupt the data
+    [InlineData(337)] // Corrupt the data more.
+    [InlineData(338)] // Corrupt the data and more.
+    [InlineData(339)] // Corrupt the data and more and more.
     public async Task DecryptLogFileAsync_WithCorruptedMessageLength_ContinuesOnError(
         int corruptionOffset
     )
     {
         // Arrange - Do not change message sizes or the marker will not be in the correct offsets for each test.
         string[] messages = ["Good message 1\n", "Good message 2\n"];
-
+        var keyMap = new Dictionary<string, string> { { "", RsaKeyPair.privateKey } };
+        DecryptionOptions decryptionOptions = new()
+        {
+            DecryptionKeys = keyMap,
+            // ErrorLogPath = $"decryption_errors_{corruptionOffset}.log",
+        };
         // create a session with 2 messages.
         MemoryStream encryptedStream = await CreateEncryptedStreamAsync(messages);
 
         // Append a new session with a message.
-        encryptedStream = await CreateAppendedMemoryStream(
-            encryptedStream,
-            "Appended message",
-            TestContext.Current.CancellationToken
-        );
+        encryptedStream = await CreateAppendedMemoryStream(encryptedStream, "Appended message");
 
         // Corrupt part of the first session with a marker that corrupts the length of the 2nd message.
         byte[] fileBytes = encryptedStream.ToArray();
-        byte[] corrupted = CorruptDataAddingMarker(
+        byte[] corrupted = TestUtils.CorruptDataAddingMarker(
             fileBytes,
-            EncryptionConstants.Marker,
+            EncryptionConstants.MagicBytes,
             corruptionOffset
         );
         MemoryStream corruptedStream = CreateMemoryStream(corrupted);
 
         // Act
-        string result = await DecryptStreamToStringAsync(corruptedStream);
+        string result = await DecryptStreamToStringAsync(corruptedStream, decryptionOptions);
 
         // Assert we still got message 1 and message 2
         result.ShouldBe("Good message 1\nAppended message");
@@ -120,9 +118,9 @@ public sealed class StreamingDecryptionTests : EncryptionTestBase
     {
         // Arrange
         string[] messages = ["Good message 1", "Good message 2"];
-        StreamingOptions skipErrorOptions = new()
+        DecryptionOptions skipErrorOptions = new()
         {
-            ContinueOnError = true,
+            DecryptionKeys = DecryptOptions.DecryptionKeys,
             ErrorHandlingMode = ErrorHandlingMode.Skip,
         };
 
@@ -130,7 +128,7 @@ public sealed class StreamingDecryptionTests : EncryptionTestBase
 
         // Corrupt part of the stream
         byte[] fileBytes = encryptedStream.ToArray();
-        byte[] corrupted = CorruptData(fileBytes, fileBytes.Length / 2);
+        byte[] corrupted = TestUtils.CorruptData(fileBytes, fileBytes.Length / 2);
         MemoryStream corruptedStream = CreateMemoryStream(corrupted);
 
         // Act
@@ -141,70 +139,33 @@ public sealed class StreamingDecryptionTests : EncryptionTestBase
     }
 
     [Fact]
-    public async Task DecryptLogFileAsync_WithWriteInlineErrorMode_WritesErrorInline()
-    {
-        // Arrange
-        string[] messages = ["Good message 1", "Good message 2"];
-        StreamingOptions writeInlineOptions = new()
-        {
-            ContinueOnError = true,
-            ErrorHandlingMode = ErrorHandlingMode.WriteInline,
-        };
-
-        MemoryStream encryptedStream = await CreateEncryptedStreamAsync(messages);
-
-        // Corrupt part of the stream
-        byte[] fileBytes = encryptedStream.ToArray();
-        byte[] corrupted = CorruptData(fileBytes, fileBytes.Length / 2);
-        MemoryStream corruptedStream = CreateMemoryStream(corrupted);
-
-        // Act
-        string result = await DecryptStreamToStringAsync(corruptedStream, writeInlineOptions);
-
-        // Assert
-        result.ShouldContain("[DECRYPTION ERROR");
-    }
-
-    [Fact]
     public async Task DecryptLogFileAsync_WithWriteToErrorLogMode_WritesErrorsToSeparateLog()
     {
         // Arrange
         string[] messages = ["Good message 1", "Good message 2"];
-        string errorLogPath = Path.GetTempFileName();
-        StreamingOptions errorLogOptions = new()
+        DecryptionOptions errorLogOptions = new()
         {
-            ContinueOnError = true,
-            ErrorHandlingMode = ErrorHandlingMode.WriteToErrorLog,
-            ErrorLogPath = errorLogPath,
+            DecryptionKeys = DecryptOptions.DecryptionKeys,
         };
 
         MemoryStream encryptedStream = await CreateEncryptedStreamAsync(messages);
 
         // Corrupt part of the stream
         byte[] fileBytes = encryptedStream.ToArray();
-        byte[] corrupted = CorruptData(fileBytes, fileBytes.Length / 2);
+        byte[] corrupted = TestUtils.CorruptData(fileBytes, fileBytes.Length / 2);
         MemoryStream corruptedStream = CreateMemoryStream(corrupted);
 
         // Act
-        string result = await DecryptStreamToStringAsync(corruptedStream, errorLogOptions);
+        string result = await DecryptStreamToStringAsync(
+            corruptedStream,
+            errorLogOptions,
+            logger: Log
+        );
 
         // Assert
         result.ShouldBeEmpty();
 
-        // Error log file should exist (in real file system for this test)
-        string fileContents = await System.IO.File.ReadAllTextAsync(
-            errorLogPath,
-            TestContext.Current.CancellationToken
-        );
-        fileContents.ShouldContain("DECRYPTION ERROR");
-        try
-        {
-            System.IO.File.Delete(errorLogPath);
-        }
-        catch
-        {
-            // Ignore cleanup errors
-        }
+        Log.Received(1).Information(Arg.Is<string>(x => x.Contains("error at position")));
     }
 
     [Fact]
@@ -212,9 +173,9 @@ public sealed class StreamingDecryptionTests : EncryptionTestBase
     {
         // Arrange
         string[] messages = ["Good message 1", "Good message 2"];
-        StreamingOptions throwExceptionOptions = new()
+        DecryptionOptions throwExceptionOptions = new()
         {
-            ContinueOnError = false,
+            DecryptionKeys = DecryptOptions.DecryptionKeys,
             ErrorHandlingMode = ErrorHandlingMode.ThrowException,
         };
 
@@ -222,12 +183,12 @@ public sealed class StreamingDecryptionTests : EncryptionTestBase
 
         // Corrupt part of the stream
         byte[] fileBytes = encryptedStream.ToArray();
-        byte[] corrupted = CorruptData(fileBytes, fileBytes.Length / 2);
+        byte[] corrupted = TestUtils.CorruptData(fileBytes, fileBytes.Length / 2);
         MemoryStream corruptedStream = CreateMemoryStream(corrupted);
 
         // Act & Assert
-        await Assert.ThrowsAsync<CryptographicException>(async () =>
-            await DecryptStreamToStringAsync(corruptedStream, throwExceptionOptions)
+        await Should.ThrowAsync<CryptographicException>(() =>
+            DecryptStreamToStringAsync(corruptedStream, throwExceptionOptions)
         );
     }
 
@@ -236,9 +197,9 @@ public sealed class StreamingDecryptionTests : EncryptionTestBase
     {
         // Arrange
         string[] messages = ["Message 1", "Message 2", "Message 3"];
-        StreamingOptions throwExceptionOptions = new()
+        DecryptionOptions throwExceptionOptions = new()
         {
-            ContinueOnError = false,
+            DecryptionKeys = DecryptOptions.DecryptionKeys,
             ErrorHandlingMode = ErrorHandlingMode.ThrowException,
         };
 
