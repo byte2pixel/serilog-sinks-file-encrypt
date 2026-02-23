@@ -20,8 +20,9 @@ public class OutputResolver(IFileSystem fileSystem) : IOutputResolver
     ///     <description>
     ///       <b>Single-file input (<paramref name="inputPath"/> is an existing file):</b>
     ///       the output path may be either a file path or a directory.
-    ///       If the path already exists as a directory, or ends with a directory separator,
-    ///       the computed filename is appended to it; otherwise it is used as-is.
+    ///       If the path already exists as a directory, ends with a directory separator,
+    ///       or has no file extension (e.g. <c>./Decrypted</c>), it is treated as a directory
+    ///       and the computed filename is appended; otherwise it is used as-is as a file path.
     ///     </description>
     ///   </item>
     ///   <item>
@@ -41,25 +42,32 @@ public class OutputResolver(IFileSystem fileSystem) : IOutputResolver
         {
             // Default: place next to the source file with .decrypted inserted before the extension
             string sourceDir = fileSystem.Path.GetDirectoryName(inputFile) ?? string.Empty;
-            string decryptedName = GenerateDecryptedFileName(fileSystem.Path.GetFileName(inputFile));
+            string decryptedName = GenerateDecryptedFileName(
+                fileSystem.Path.GetFileName(inputFile)
+            );
             return fileSystem.Path.Join(sourceDir, decryptedName);
         }
 
         if (isSingleFile)
         {
-            // Single-file mode: output path may be a specific file path or an existing directory
+            // Single-file mode: output path may be a specific file path or a directory.
+            // Treat as a directory if it already exists as one, ends with a separator,
+            // or has no file extension (e.g. "./Decrypted" is almost certainly directory intent).
             bool outputIsDirectory =
                 fileSystem.Directory.Exists(outputPath)
                 || outputPath.EndsWith(fileSystem.Path.DirectorySeparatorChar)
-                || outputPath.EndsWith(fileSystem.Path.AltDirectorySeparatorChar);
+                || outputPath.EndsWith(fileSystem.Path.AltDirectorySeparatorChar)
+                || string.IsNullOrEmpty(fileSystem.Path.GetExtension(outputPath));
 
             if (outputIsDirectory)
             {
-                string decryptedName = GenerateDecryptedFileName(fileSystem.Path.GetFileName(inputFile));
+                string decryptedName = GenerateDecryptedFileName(
+                    fileSystem.Path.GetFileName(inputFile)
+                );
                 return fileSystem.Path.Join(outputPath, decryptedName);
             }
 
-            // Treat as an explicit file path
+            // Has a file extension — treat as an explicit file path
             return outputPath;
         }
 

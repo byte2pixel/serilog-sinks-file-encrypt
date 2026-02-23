@@ -263,7 +263,11 @@ public sealed class DecryptCommand(
         int failureCount = 0;
         foreach (string inputFile in filesToDecrypt)
         {
-            string outputFile = outputResolver.ResolveOutputPath(inputFile, settings.InputPath, settings.OutputPath);
+            string outputFile = outputResolver.ResolveOutputPath(
+                inputFile,
+                settings.InputPath,
+                settings.OutputPath
+            );
 
             if (fileSystem.File.Exists(outputFile))
             {
@@ -283,7 +287,7 @@ public sealed class DecryptCommand(
                 // Perform the decryption using streaming API
                 await using FileSystemStream inputStream = fileSystem.File.OpenRead(inputFile);
                 await using FileSystemStream outputStream = fileSystem.File.Create(outputFile);
-                await CryptographicUtils.DecryptLogFileAsync(
+                DecryptionResult result = await CryptographicUtils.DecryptLogFileAsync(
                     inputStream,
                     outputStream,
                     decryptionOptions,
@@ -291,7 +295,17 @@ public sealed class DecryptCommand(
                     cancellationToken: cancellationToken
                 );
 
-                console.MarkupLineInterpolated($"[green]✓ Decrypted:[/] {inputFile}");
+                if (result.FailedHeaders > 0 || result.FailedMessages > 0)
+                {
+                    console.MarkupLineInterpolated(
+                        $"[yellow]⚠ Decryption completed with {result.FailedHeaders} failed headers and {result.FailedMessages} failed messages.\nCheck audit log.[/]"
+                    );
+                }
+                else
+                {
+                    console.MarkupLineInterpolated($"[green]✓ Decrypted:[/] {inputFile}");
+                }
+
                 console.MarkupLineInterpolated($"  [dim]→ {outputFile}[/]");
                 successCount++;
             }
