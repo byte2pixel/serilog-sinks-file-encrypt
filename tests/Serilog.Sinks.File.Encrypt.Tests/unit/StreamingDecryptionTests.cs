@@ -165,7 +165,13 @@ public sealed class StreamingDecryptionTests : EncryptionTestBase
         // Assert
         result.ShouldBeEmpty();
 
-        Log.Received(1).Information(Arg.Is<string>(x => x.Contains("error at position")));
+        Log.Received(1)
+            .Error(
+                Arg.Any<CryptographicException>(),
+                Arg.Is<string>(x =>
+                    x.Contains("Cryptographic error encountered while processing header")
+                )
+            );
     }
 
     [Fact]
