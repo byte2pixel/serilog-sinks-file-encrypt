@@ -1,9 +1,9 @@
 namespace Serilog.Sinks.File.Encrypt.Cli.Tests.unit;
 
-public class FileResolverTests
+public class InputResolverTests
 {
     private readonly MockFileSystem _fileSystem = new();
-    private FileResolver GetSut() => new(_fileSystem);
+    private InputResolver GetSut() => new(_fileSystem);
 
     #region Single File Input
 

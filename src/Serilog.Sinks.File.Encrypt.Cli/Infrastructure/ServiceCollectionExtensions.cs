@@ -23,7 +23,8 @@ public static class ServiceCollectionExtensions
     {
         fileSystem ??= new FileSystem();
         services.TryAddSingleton(fileSystem);
-        services.TryAddTransient<IFileResolver, FileResolver>();
+        services.TryAddTransient<IInputResolver, InputResolver>();
+        services.TryAddTransient<IOutputResolver, OutputResolver>();
         services.TryAddSingleton(AnsiConsole.Console);
         return services;
     }

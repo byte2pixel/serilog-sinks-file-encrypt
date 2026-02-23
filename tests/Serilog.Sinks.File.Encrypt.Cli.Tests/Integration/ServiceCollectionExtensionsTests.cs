@@ -49,7 +49,7 @@ public class ServiceCollectionExtensionsTests
         services.AddCliServices();
 
         // Assert - Verify no services are accidentally added or removed
-        services.Count.ShouldBe(3);
+        services.Count.ShouldBe(4);
 
         // Verify IFileSystem is registered
         services
@@ -64,7 +64,12 @@ public class ServiceCollectionExtensionsTests
             .And(x => x.Lifetime.ShouldBe(ServiceLifetime.Singleton));
 
         services
-            .FirstOrDefault(s => s.ServiceType == typeof(IFileResolver))
+            .FirstOrDefault(s => s.ServiceType == typeof(IInputResolver))
+            .ShouldNotBeNull()
+            .And(x => x.Lifetime.ShouldBe(ServiceLifetime.Transient));
+
+        services
+            .FirstOrDefault(s => s.ServiceType == typeof(IOutputResolver))
             .ShouldNotBeNull()
             .And(x => x.Lifetime.ShouldBe(ServiceLifetime.Transient));
     }
@@ -80,7 +85,7 @@ public class ServiceCollectionExtensionsTests
         services.AddCliServices();
 
         // Assert
-        services.Count.ShouldBe(3); // Should still only have 3 services, no duplicates
+        services.Count.ShouldBe(4); // Should still only have 4 services, no duplicates
     }
 
     [Fact]

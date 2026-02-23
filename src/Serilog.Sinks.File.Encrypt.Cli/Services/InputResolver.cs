@@ -3,7 +3,7 @@ using System.IO.Abstractions;
 namespace Serilog.Sinks.File.Encrypt.Cli;
 
 /// <inheritdoc />
-public class FileResolver(IFileSystem fileSystem) : IFileResolver
+public class InputResolver(IFileSystem fileSystem) : IInputResolver
 {
     /// <inheritdoc />
     public IReadOnlyList<string> ResolveFiles(string inputPath, bool recursive)

@@ -6,7 +6,8 @@ namespace Serilog.Sinks.File.Encrypt.Cli.Tests.unit;
 
 public class DecryptCommandTests : CommandTestBase
 {
-    private readonly IFileResolver _fileResolver = Substitute.For<IFileResolver>();
+    private readonly IInputResolver _inputResolver = Substitute.For<IInputResolver>();
+    private readonly IOutputResolver _outputResolver = Substitute.For<IOutputResolver>();
     private readonly string _publicKey;
     private readonly string _privateKey;
     private readonly string _privateKeyPath = Path.Join("keys", "private_key.xml");
@@ -25,6 +26,23 @@ public class DecryptCommandTests : CommandTestBase
             new MockFileData(CreateEncryptedLogFile(LogContent1, _publicKey))
         );
         ConfigureFileResolver(EncryptedFile);
+
+        // Default: derive a .decrypted.log path next to the input file, honouring any explicit output path
+        _outputResolver
+            .ResolveOutputPath(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string?>())
+            .Returns(callInfo =>
+            {
+                string inputFile = callInfo.ArgAt<string>(0);
+                string? outputPath = callInfo.ArgAt<string?>(2);
+                if (!string.IsNullOrWhiteSpace(outputPath))
+                {
+                    return outputPath;
+                }
+                string dir = Path.GetDirectoryName(inputFile) ?? string.Empty;
+                string name = Path.GetFileNameWithoutExtension(inputFile);
+                string ext = Path.GetExtension(inputFile);
+                return Path.Join(dir, $"{name}.decrypted{ext}");
+            });
     }
 
     # region Happy Path Tests
@@ -73,7 +91,7 @@ public class DecryptCommandTests : CommandTestBase
         // Arrange
         string emptyDir = Path.Join("empty");
         FileSystem.AddDirectory(emptyDir);
-        _fileResolver
+        _inputResolver
             .ResolveFiles(Arg.Any<string>(), Arg.Any<bool>())
             .Returns(Enumerable.Empty<string>());
 
@@ -185,18 +203,6 @@ public class DecryptCommandTests : CommandTestBase
             .Directory.GetFiles(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<SearchOption>())
             .Returns([EncryptedFile, lockedFile]);
 
-        mockFs.Path.GetFileName(EncryptedFile).Returns(Path.GetFileName(EncryptedFile));
-        mockFs.Path.GetFileName(lockedFile).Returns(Path.GetFileName(lockedFile));
-        mockFs
-            .Path.GetFileNameWithoutExtension(Arg.Any<string>())
-            .Returns(x => Path.GetFileNameWithoutExtension((string)x[0]));
-        mockFs.Path.GetExtension(Arg.Any<string>()).Returns(x => Path.GetExtension((string)x[0]));
-        mockFs
-            .Path.GetDirectoryName(Arg.Any<string>())
-            .Returns(x => Path.GetDirectoryName((string)x[0]));
-        mockFs
-            .Path.Join(Arg.Any<string>(), Arg.Any<string>())
-            .Returns(x => Path.Join((string)x[0], (string)x[1]));
 
         mockFs.File.OpenRead(EncryptedFile).Returns(_ => FileSystem.File.OpenRead(EncryptedFile));
         mockFs
@@ -402,7 +408,7 @@ public class DecryptCommandTests : CommandTestBase
 
     private DecryptCommand GetSut(IFileSystem? fileSystem = null)
     {
-        return new(TestConsole, fileSystem ?? FileSystem, _fileResolver);
+        return new DecryptCommand(TestConsole, fileSystem ?? FileSystem, _inputResolver, _outputResolver);
     }
 
     /// <summary>
@@ -426,5 +432,5 @@ public class DecryptCommandTests : CommandTestBase
     }
 
     private void ConfigureFileResolver(params string[] encryptedFiles) =>
-        _fileResolver.ResolveFiles(Arg.Any<string>(), Arg.Any<bool>()).Returns(encryptedFiles);
+        _inputResolver.ResolveFiles(Arg.Any<string>(), Arg.Any<bool>()).Returns(encryptedFiles);
 }

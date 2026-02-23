@@ -13,12 +13,14 @@ namespace Serilog.Sinks.File.Encrypt.Cli.Commands;
 /// </summary>
 /// <param name="console">The ANSI console</param>
 /// <param name="fileSystem">The file system</param>
-/// <param name="fileResolver">The service that resolves file paths from input (supports files, directories, and glob patterns)</param>
+/// <param name="inputResolver">The service that resolves file paths from input (supports files, directories, and glob patterns)</param>
+/// <param name="outputResolver">The service that resolves the output path where the decrypted file will be saved.</param>
 [SuppressMessage("ReSharper", "ClassNeverInstantiated.Global")]
 public sealed class DecryptCommand(
     IAnsiConsole console,
     IFileSystem fileSystem,
-    IFileResolver fileResolver
+    IInputResolver inputResolver,
+    IOutputResolver outputResolver
 ) : AsyncCommand<DecryptCommand.Settings>
 {
     /// <summary>
@@ -141,7 +143,7 @@ public sealed class DecryptCommand(
             );
 
             // Determine if input is a file, directory, or pattern
-            IReadOnlyList<string> filesToDecrypt = fileResolver.ResolveFiles(
+            IReadOnlyList<string> filesToDecrypt = inputResolver.ResolveFiles(
                 settings.InputPath,
                 settings.Recursive
             );
@@ -261,7 +263,7 @@ public sealed class DecryptCommand(
         int failureCount = 0;
         foreach (string inputFile in filesToDecrypt)
         {
-            string outputFile = DetermineOutputPath(inputFile, settings);
+            string outputFile = outputResolver.ResolveOutputPath(inputFile, settings.InputPath, settings.OutputPath);
 
             if (fileSystem.File.Exists(outputFile))
             {
@@ -308,47 +310,5 @@ public sealed class DecryptCommand(
         }
 
         return (successCount, failureCount);
-    }
-
-    /// <summary>
-    /// Determines the output file path based on the input file and settings.
-    /// </summary>
-    /// <param name="inputFile">The log file that is being decrypted.</param>
-    /// <param name="settings">The command settings.</param>
-    private string DetermineOutputPath(string inputFile, Settings settings)
-    {
-        // If output path is explicitly specified
-        if (!string.IsNullOrWhiteSpace(settings.OutputPath))
-        {
-            if (!fileSystem.Directory.Exists(settings.OutputPath))
-            {
-                return settings.OutputPath;
-            }
-
-            string inputFileName = fileSystem.Path.GetFileName(inputFile);
-            string outputFileName = GenerateDecryptedFileName(inputFileName);
-            return fileSystem.Path.Join(settings.OutputPath, outputFileName);
-        }
-
-        // Default: add .decrypted extension in the same directory
-        string directory = fileSystem.Path.GetDirectoryName(inputFile) ?? string.Empty;
-        string inputFileName2 = fileSystem.Path.GetFileName(inputFile);
-        string decryptedFileName = GenerateDecryptedFileName(inputFileName2);
-
-        return fileSystem.Path.Join(directory, decryptedFileName);
-    }
-
-    /// <summary>
-    /// Generates a decrypted filename by adding .decrypted before the extension.
-    /// Example: app.log -> app.decrypted.log
-    /// </summary>
-    /// <param name="fileName">The name of the encrypted log file.</param>
-    /// <returns>The name to use for the decrypted log file.</returns>
-    private string GenerateDecryptedFileName(string fileName)
-    {
-        string nameWithoutExtension = fileSystem.Path.GetFileNameWithoutExtension(fileName);
-        string extension = fileSystem.Path.GetExtension(fileName);
-
-        return $"{nameWithoutExtension}.decrypted{extension}";
     }
 }
