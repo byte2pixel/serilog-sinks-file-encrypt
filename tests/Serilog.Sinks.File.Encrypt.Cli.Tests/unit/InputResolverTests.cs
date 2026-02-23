@@ -3,6 +3,7 @@ namespace Serilog.Sinks.File.Encrypt.Cli.Tests.unit;
 public class InputResolverTests
 {
     private readonly MockFileSystem _fileSystem = new();
+
     private InputResolver GetSut() => new(_fileSystem);
 
     #region Single File Input
@@ -15,7 +16,7 @@ public class InputResolverTests
         _fileSystem.AddFile(filePath, new MockFileData("content"));
 
         // Act
-        IReadOnlyList<string> result = GetSut().ResolveFiles(filePath, recursive: false);
+        IReadOnlyList<string> result = GetSut().ResolveFiles(filePath);
 
         // Assert
         result.ShouldHaveSingleItem();
@@ -29,7 +30,7 @@ public class InputResolverTests
         string filePath = Path.Join("logs", "app.decrypted.log");
         _fileSystem.AddFile(filePath, new MockFileData("content"));
 
-        IReadOnlyList<string> result = GetSut().ResolveFiles(filePath, recursive: false);
+        IReadOnlyList<string> result = GetSut().ResolveFiles(filePath);
 
         result.ShouldHaveSingleItem();
     }
@@ -43,11 +44,12 @@ public class InputResolverTests
     {
         // Arrange
         string dir = Path.Join("logs");
+        string pattern = Path.Join(dir, "*.log");
         _fileSystem.AddFile(Path.Join(dir, "app1.log"), new MockFileData("content"));
         _fileSystem.AddFile(Path.Join(dir, "app2.log"), new MockFileData("content"));
 
         // Act
-        IReadOnlyList<string> result = GetSut().ResolveFiles(dir, recursive: false);
+        IReadOnlyList<string> result = GetSut().ResolveFiles(pattern);
 
         // Assert
         result.Count.ShouldBe(2);
@@ -58,45 +60,16 @@ public class InputResolverTests
     {
         // Arrange
         string dir = Path.Join("logs");
+        string pattern = Path.Join(dir, "*.log");
         _fileSystem.AddFile(Path.Join(dir, "app.log"), new MockFileData("content"));
         _fileSystem.AddFile(Path.Join(dir, "app.decrypted.log"), new MockFileData("content"));
 
         // Act
-        IReadOnlyList<string> result = GetSut().ResolveFiles(dir, recursive: false);
+        IReadOnlyList<string> result = GetSut().ResolveFiles(pattern);
 
         // Assert
         result.ShouldHaveSingleItem();
         result[0].ShouldContain("app.log");
-    }
-
-    [Fact]
-    public void GivenDirectory_WithRecursiveFalse_DoesNotIncludeSubdirectoryFiles()
-    {
-        // Arrange
-        string dir = Path.Join("logs");
-        _fileSystem.AddFile(Path.Join(dir, "app.log"), new MockFileData("content"));
-        _fileSystem.AddFile(Path.Join(dir, "sub", "nested.log"), new MockFileData("content"));
-
-        // Act
-        IReadOnlyList<string> result = GetSut().ResolveFiles(dir, recursive: false);
-
-        // Assert
-        result.ShouldHaveSingleItem();
-    }
-
-    [Fact]
-    public void GivenDirectory_WithRecursiveTrue_IncludesSubdirectoryFiles()
-    {
-        // Arrange
-        string dir = Path.Join("logs");
-        _fileSystem.AddFile(Path.Join(dir, "app.log"), new MockFileData("content"));
-        _fileSystem.AddFile(Path.Join(dir, "sub", "nested.log"), new MockFileData("content"));
-
-        // Act
-        IReadOnlyList<string> result = GetSut().ResolveFiles(dir, recursive: true);
-
-        // Assert
-        result.Count.ShouldBe(2);
     }
 
     [Fact]
@@ -107,7 +80,7 @@ public class InputResolverTests
         _fileSystem.AddDirectory(dir);
 
         // Act
-        IReadOnlyList<string> result = GetSut().ResolveFiles(dir, recursive: false);
+        IReadOnlyList<string> result = GetSut().ResolveFiles(dir);
 
         // Assert
         result.ShouldBeEmpty();
@@ -128,7 +101,7 @@ public class InputResolverTests
         string pattern = Path.Join(dir, "*.log");
 
         // Act
-        IReadOnlyList<string> result = GetSut().ResolveFiles(pattern, recursive: false);
+        IReadOnlyList<string> result = GetSut().ResolveFiles(pattern);
 
         // Assert
         result.Count.ShouldBe(2);
@@ -145,7 +118,7 @@ public class InputResolverTests
         string pattern = Path.Join(dir, "*.log");
 
         // Act
-        IReadOnlyList<string> result = GetSut().ResolveFiles(pattern, recursive: false);
+        IReadOnlyList<string> result = GetSut().ResolveFiles(pattern);
 
         // Assert
         result.ShouldHaveSingleItem();
@@ -158,7 +131,7 @@ public class InputResolverTests
         string pattern = Path.Join("nonexistent", "*.log");
 
         // Act
-        IReadOnlyList<string> result = GetSut().ResolveFiles(pattern, recursive: false);
+        IReadOnlyList<string> result = GetSut().ResolveFiles(pattern);
 
         // Assert
         result.ShouldBeEmpty();
@@ -175,7 +148,7 @@ public class InputResolverTests
         string pattern = "*.log";
 
         // Act
-        IReadOnlyList<string> result = GetSut().ResolveFiles(pattern, recursive: false);
+        IReadOnlyList<string> result = GetSut().ResolveFiles(pattern);
 
         // Assert
         result.Count.ShouldBe(2);
@@ -193,7 +166,7 @@ public class InputResolverTests
         string path = Path.Join("logs", "doesnotexist.log");
 
         // Act
-        IReadOnlyList<string> result = GetSut().ResolveFiles(path, recursive: false);
+        IReadOnlyList<string> result = GetSut().ResolveFiles(path);
 
         // Assert
         result.ShouldBeEmpty();
