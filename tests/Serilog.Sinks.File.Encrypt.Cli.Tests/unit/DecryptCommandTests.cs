@@ -91,9 +91,7 @@ public class DecryptCommandTests : CommandTestBase
         // Arrange
         string emptyDir = Path.Join("empty");
         FileSystem.AddDirectory(emptyDir);
-        _inputResolver
-            .ResolveFiles(Arg.Any<string>(), Arg.Any<bool>())
-            .Returns(Enumerable.Empty<string>());
+        _inputResolver.ResolveFiles(Arg.Any<string>()).Returns(Enumerable.Empty<string>());
 
         DecryptCommand command = GetSut();
         DecryptCommand.Settings settings = new()
@@ -202,7 +200,6 @@ public class DecryptCommandTests : CommandTestBase
         mockFs
             .Directory.GetFiles(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<SearchOption>())
             .Returns([EncryptedFile, lockedFile]);
-
 
         mockFs.File.OpenRead(EncryptedFile).Returns(_ => FileSystem.File.OpenRead(EncryptedFile));
         mockFs
@@ -340,7 +337,7 @@ public class DecryptCommandTests : CommandTestBase
     }
 
     [Fact]
-    public void GivenInputPath_WhenValidDirectory_ThenValidationSucceeds()
+    public void GivenInputPath_WhenValidDirectoryNoPattern_ThenValidationFails()
     {
         // Arrange
         DecryptCommand command = GetSut();
@@ -357,7 +354,12 @@ public class DecryptCommandTests : CommandTestBase
         );
 
         // Assert
-        result.Successful.ShouldBeTrue();
+        result.Successful.ShouldBeFalse();
+        result
+            .Message.ShouldNotBeNull()
+            .ShouldContain(
+                "Input path cannot be a directory. Please specify a file or add a pattern"
+            );
     }
 
     [Fact]
@@ -380,7 +382,7 @@ public class DecryptCommandTests : CommandTestBase
         // Assert
         result.Successful.ShouldBeFalse();
         result.Message.ShouldNotBeNull().ShouldContain("Input path");
-        result.Message.ShouldContain("is not a valid file, directory, or glob pattern.");
+        result.Message.ShouldContain("is not a valid file or directory with pattern.");
     }
 
     [Fact]
@@ -408,7 +410,12 @@ public class DecryptCommandTests : CommandTestBase
 
     private DecryptCommand GetSut(IFileSystem? fileSystem = null)
     {
-        return new DecryptCommand(TestConsole, fileSystem ?? FileSystem, _inputResolver, _outputResolver);
+        return new DecryptCommand(
+            TestConsole,
+            fileSystem ?? FileSystem,
+            _inputResolver,
+            _outputResolver
+        );
     }
 
     /// <summary>
@@ -432,5 +439,5 @@ public class DecryptCommandTests : CommandTestBase
     }
 
     private void ConfigureFileResolver(params string[] encryptedFiles) =>
-        _inputResolver.ResolveFiles(Arg.Any<string>(), Arg.Any<bool>()).Returns(encryptedFiles);
+        _inputResolver.ResolveFiles(Arg.Any<string>()).Returns(encryptedFiles);
 }

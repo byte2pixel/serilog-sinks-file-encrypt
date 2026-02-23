@@ -30,11 +30,10 @@ public sealed class DecryptCommand(
     {
         /// <summary>
         /// The path to an encrypted log file or directory containing encrypted log files.
-        /// Supports glob patterns like *.log
         /// </summary>
         [CommandArgument(0, "<PATH>")]
         [Description(
-            "Path to encrypted log file, directory (uses *.log pattern), or glob pattern (e.g., *.log)"
+            @"Path to encrypted log file, for a directory append <PATH>\*.log or <PATH>\*.txt (Not recursive)"
         )]
         public string InputPath { get; init; } = string.Empty;
 
@@ -53,14 +52,6 @@ public sealed class DecryptCommand(
             "Output directory or file path (default: adds .decrypted to original filename)"
         )]
         public string? OutputPath { get; init; }
-
-        /// <summary>
-        /// Process directories recursively.
-        /// </summary>
-        [CommandOption("-r|--recursive")]
-        [Description("Process directories recursively")]
-        [DefaultValue(false)]
-        public bool Recursive { get; init; }
 
         /// <summary>
         /// Fail immediately on first decryption error instead of continuing with remaining files.
@@ -83,9 +74,8 @@ public sealed class DecryptCommand(
     }
 
     private bool IsFile { get; set; }
-    private bool IsDirectory { get; set; }
     private bool IsGlobPattern { get; set; }
-    private bool IsValidInput => IsFile || IsDirectory || IsGlobPattern;
+    private bool IsValidInput => IsFile || IsGlobPattern;
 
     private ILogger? _logger;
 
@@ -105,14 +95,20 @@ public sealed class DecryptCommand(
             );
         }
 
-        // Check if settings.InputPath is a valid file, directory, or glob pattern
+        if (fileSystem.Directory.Exists(settings.InputPath))
+        {
+            return ValidationResult.Error(
+                "✗ Error: Input path cannot be a directory. Please specify a file or add a pattern (<PATH>\\*.log) to select files within the directory."
+            );
+        }
+
+        // Check if settings.InputPath is a valid file or directory with pattern
         IsFile = fileSystem.File.Exists(settings.InputPath);
-        IsDirectory = fileSystem.Directory.Exists(settings.InputPath);
         IsGlobPattern = settings.InputPath.Contains('*') || settings.InputPath.Contains('?');
         if (!IsValidInput)
         {
             return ValidationResult.Error(
-                $"✗ Error: Input path '{settings.InputPath}' is not a valid file, directory, or glob pattern."
+                $"✗ Error: Input path '{settings.InputPath}' is not a valid file or directory with pattern."
             );
         }
 
@@ -142,11 +138,7 @@ public sealed class DecryptCommand(
                 cancellationToken
             );
 
-            // Determine if input is a file, directory, or pattern
-            IReadOnlyList<string> filesToDecrypt = inputResolver.ResolveFiles(
-                settings.InputPath,
-                settings.Recursive
-            );
+            IReadOnlyList<string> filesToDecrypt = inputResolver.ResolveFiles(settings.InputPath);
 
             if (filesToDecrypt.Count == 0)
             {
