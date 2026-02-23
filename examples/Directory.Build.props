@@ -5,5 +5,9 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <WarnOnPackingNonPackableProject>false</WarnOnPackingNonPackableProject>
+    <!-- Exclude all example projects from code coverage (Rider, dotnet-coverage, Coverlet) -->
+    <ExcludeFromCodeCoverage>true</ExcludeFromCodeCoverage>
+    <CollectCoverage>false</CollectCoverage>
+    <IsTestProject>false</IsTestProject>
   </PropertyGroup>
 </Project>

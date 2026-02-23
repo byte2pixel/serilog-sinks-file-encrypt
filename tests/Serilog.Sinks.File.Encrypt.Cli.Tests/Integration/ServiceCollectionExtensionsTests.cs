@@ -18,8 +18,8 @@ public class ServiceCollectionExtensionsTests
 
         // Assert
         IFileSystem fileSystem = provider.GetRequiredService<IFileSystem>();
-        Assert.NotNull(fileSystem);
-        Assert.IsType<FileSystem>(fileSystem);
+        fileSystem.ShouldBeAssignableTo<FileSystem>();
+        fileSystem.ShouldNotBeAssignableTo<MockFileSystem>();
     }
 
     [Fact]
@@ -35,25 +35,8 @@ public class ServiceCollectionExtensionsTests
 
         // Assert
         IFileSystem fileSystem = provider.GetRequiredService<IFileSystem>();
-        Assert.NotNull(fileSystem);
-        Assert.IsType<MockFileSystem>(fileSystem);
-        Assert.Same(mockFileSystem, fileSystem);
-    }
-
-    [Fact]
-    public void AddCliServices_ShouldRegisterAnsiConsole()
-    {
-        // Arrange
-        ServiceCollection services = new();
-
-        // Act
-        services.AddCliServices();
-        ServiceProvider provider = services.BuildServiceProvider();
-
-        // Assert
-        IAnsiConsole console = provider.GetRequiredService<IAnsiConsole>();
-        Assert.NotNull(console);
-        Assert.Same(AnsiConsole.Console, console);
+        fileSystem.ShouldBeAssignableTo<MockFileSystem>();
+        fileSystem.ShouldBe(mockFileSystem);
     }
 
     [Fact]
@@ -66,21 +49,29 @@ public class ServiceCollectionExtensionsTests
         services.AddCliServices();
 
         // Assert - Verify no services are accidentally added or removed
-        Assert.Equal(2, services.Count);
+        services.Count.ShouldBe(4);
 
         // Verify IFileSystem is registered
-        ServiceDescriptor? fileSystemDescriptor = services.FirstOrDefault(s =>
-            s.ServiceType == typeof(IFileSystem)
-        );
-        Assert.NotNull(fileSystemDescriptor);
-        Assert.Equal(ServiceLifetime.Transient, fileSystemDescriptor.Lifetime);
+        services
+            .FirstOrDefault(s => s.ServiceType == typeof(IFileSystem))
+            .ShouldNotBeNull()
+            .And(x => x.Lifetime.ShouldBe(ServiceLifetime.Singleton));
 
         // Verify IAnsiConsole is registered
-        ServiceDescriptor? consoleDescriptor = services.FirstOrDefault(s =>
-            s.ServiceType == typeof(IAnsiConsole)
-        );
-        Assert.NotNull(consoleDescriptor);
-        Assert.Equal(ServiceLifetime.Singleton, consoleDescriptor.Lifetime);
+        services
+            .FirstOrDefault(s => s.ServiceType == typeof(IAnsiConsole))
+            .ShouldNotBeNull()
+            .And(x => x.Lifetime.ShouldBe(ServiceLifetime.Singleton));
+
+        services
+            .FirstOrDefault(s => s.ServiceType == typeof(IInputResolver))
+            .ShouldNotBeNull()
+            .And(x => x.Lifetime.ShouldBe(ServiceLifetime.Transient));
+
+        services
+            .FirstOrDefault(s => s.ServiceType == typeof(IOutputResolver))
+            .ShouldNotBeNull()
+            .And(x => x.Lifetime.ShouldBe(ServiceLifetime.Transient));
     }
 
     [Fact]
@@ -94,22 +85,19 @@ public class ServiceCollectionExtensionsTests
         services.AddCliServices();
 
         // Assert
-        Assert.Equal(2, services.Count);
+        services.Count.ShouldBe(4); // Should still only have 4 services, no duplicates
     }
 
     [Fact]
-    public void AddCliServices_WithMockFileSystem_ShouldUseMockInstance()
+    public void AddCliServices_Returns_ShouldReturnSameServiceCollection()
     {
         // Arrange
         ServiceCollection services = new();
-        MockFileSystem mockFileSystem = new();
-        services.AddCliServices(mockFileSystem);
-        ServiceProvider provider = services.BuildServiceProvider();
 
         // Act
-        IFileSystem fileSystem = provider.GetRequiredService<IFileSystem>();
+        IServiceCollection result = services.AddCliServices();
 
-        // Assert - Should return the exact mock instance provided
-        Assert.Same(mockFileSystem, fileSystem);
+        // Assert
+        result.ShouldBe(services); // Should return the same instance for chaining
     }
 }
