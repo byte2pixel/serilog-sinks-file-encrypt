@@ -6,26 +6,14 @@ namespace Serilog.Sinks.File.Encrypt.Cli;
 public class InputResolver(IFileSystem fileSystem) : IInputResolver
 {
     /// <inheritdoc />
-    public IReadOnlyList<string> ResolveFiles(string inputPath, bool recursive)
+    public IReadOnlyList<string> ResolveFiles(string inputPath)
     {
         List<string> files = [];
-        string[] foundFiles;
-        SearchOption searchOption;
 
         // Check if it's a direct file path
         if (fileSystem.File.Exists(inputPath))
         {
             files.Add(inputPath);
-            return files;
-        }
-
-        // Check if it's a directory (always uses *.log pattern)
-        if (fileSystem.Directory.Exists(inputPath))
-        {
-            searchOption = recursive ? SearchOption.AllDirectories : SearchOption.TopDirectoryOnly;
-
-            foundFiles = fileSystem.Directory.GetFiles(inputPath, "*.log", searchOption);
-            files.AddRange(FilterDecryptedFiles(foundFiles));
             return files;
         }
 
@@ -48,9 +36,11 @@ public class InputResolver(IFileSystem fileSystem) : IInputResolver
             return files;
         }
 
-        searchOption = recursive ? SearchOption.AllDirectories : SearchOption.TopDirectoryOnly;
-
-        foundFiles = fileSystem.Directory.GetFiles(directory, pattern, searchOption);
+        string[] foundFiles = fileSystem.Directory.GetFiles(
+            directory,
+            pattern,
+            SearchOption.TopDirectoryOnly
+        );
         files.AddRange(FilterDecryptedFiles(foundFiles));
 
         return files;

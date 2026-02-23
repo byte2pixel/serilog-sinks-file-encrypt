@@ -30,24 +30,25 @@ public static class CommandAppConfiguration
     {
         const string PrivateKey = "private_key.xml";
         const string Decrypt = "decrypt";
+        const string Generate = "generate";
 
         return c =>
         {
             c.SetApplicationName("serilog-encrypt");
-            c.AddCommand<GenerateCommand>("generate")
+            c.AddCommand<GenerateCommand>(Generate)
                 .WithDescription("Generate a new RSA key pair for log encryption")
-                .WithExample("generate", "--output", "./keys");
+                .WithExample(Generate, "--output", "./keys")
+                .WithExample(Generate, "-o", "./keys", "-k", "4096")
+                .WithExample(Generate, "-o", "./keys", "-f", "Pem");
 
             c.AddCommand<DecryptCommand>(Decrypt)
                 .WithDescription("Decrypt encrypted log files using an RSA private key")
                 .WithExample(Decrypt, "app.log", "-k", PrivateKey)
-                .WithExample(Decrypt, "./logs", "-k", PrivateKey)
                 .WithExample(Decrypt, "*.log", "-k", PrivateKey)
                 .WithExample(Decrypt, "logs/*.txt", "-k", PrivateKey)
-                .WithExample(Decrypt, "./logs", "-k", PrivateKey, "-r")
                 .WithExample(Decrypt, "app.log", "-k", PrivateKey, "-o", "decrypted.log")
                 .WithExample(Decrypt, "app.log", "-k", PrivateKey, "--strict")
-                .WithExample(Decrypt, "./logs", "-k", PrivateKey, "--audit-log", "audit.log");
+                .WithExample(Decrypt, "./logs/*.log", "-k", PrivateKey, "--audit-log", "audit.log");
             c.ValidateExamples();
         };
     }
