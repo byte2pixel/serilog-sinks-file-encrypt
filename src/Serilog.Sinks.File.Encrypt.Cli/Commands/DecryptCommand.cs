@@ -169,7 +169,7 @@ public sealed class DecryptCommand(
 
             string auditLog =
                 settings.AuditLogPath
-                ?? Path.Combine(Path.GetTempPath(), Path.GetRandomFileName() + ".log");
+                ?? Path.Join(Path.GetTempPath(), Path.GetRandomFileName() + ".log");
             console.MarkupLineInterpolated($"[dim]Audit log:[/] {auditLog}");
             _logger = new LoggerConfiguration()
                 .MinimumLevel.Verbose()
