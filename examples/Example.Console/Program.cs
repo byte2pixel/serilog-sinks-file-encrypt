@@ -20,7 +20,7 @@ Logger logger = new LoggerConfiguration()
         path: Path.Join(logDirectory, "log.txt"),
         rollingInterval: RollingInterval.Day,
         retainedFileCountLimit: 31, // Keep logs for 31 days
-        hooks: new EncryptHooks(keyService.PublicKey, "Example.Console.Key_001") // Use public key for encryption
+        hooks: new EncryptHooks(keyService.PublicKey, "console-key-2026") // Use public key for encryption
     )
     .CreateLogger();
 

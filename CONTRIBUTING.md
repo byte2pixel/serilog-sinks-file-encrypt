@@ -275,25 +275,26 @@ Most analyzer warnings are suggestions. Address any warnings that appear during 
 /// </summary>
 /// <param name="inputStream">Stream containing the encrypted log data. Must be readable and seekable.</param>
 /// <param name="outputStream">Stream where the decrypted content will be written. Must be writable.</param>
-/// <param name="rsaPrivateKey">The XML representation of the RSA private key used for decryption.</param>
+/// <param name="options">Decryption options including the key dictionary and error handling mode.</param>
+/// <param name="logger">Optional audit logger. When provided, decryption errors are logged with position details.</param>
 /// <param name="cancellationToken">Cancellation token to cancel the decryption operation.</param>
-/// <returns>A task representing the asynchronous decryption operation.</returns>
-/// <exception cref="ArgumentNullException">Thrown when any parameter is null.</exception>
-/// <exception cref="CryptographicException">Thrown when decryption fails.</exception>
+/// <returns>A <see cref="DecryptionResult"/> with counts of decrypted sessions, messages, failures, and resync attempts.</returns>
+/// <exception cref="ArgumentNullException">Thrown when any required parameter is null.</exception>
+/// <exception cref="CryptographicException">Thrown when decryption fails and <see cref="ErrorHandlingMode.ThrowException"/> is set.</exception>
 /// <remarks>
-/// Memory usage is controlled by <see cref="StreamingOptions.BufferSize"/> and 
-/// <see cref="StreamingOptions.QueueDepth"/>. Typical memory usage: 160KB (default).
+/// Memory usage is determined by the producer-consumer queue. Typical usage: ~160KB (default queue depth).
 /// </remarks>
-public static async Task DecryptLogFileAsync(
+public static async Task<DecryptionResult> DecryptLogFileAsync(
     Stream inputStream,
     Stream outputStream,
-    string rsaPrivateKey,
+    DecryptionOptions options,
+    ILogger? logger = null,
     CancellationToken cancellationToken = default
 )
 {
     ArgumentNullException.ThrowIfNull(inputStream);
     ArgumentNullException.ThrowIfNull(outputStream);
-    ArgumentNullException.ThrowIfNull(rsaPrivateKey);
+    ArgumentNullException.ThrowIfNull(options);
     
     // Implementation...
 }
@@ -317,7 +318,7 @@ Write clear commit messages:
 ```
 Add support for 4096-bit RSA keys
 
-- Update EncryptionUtils to accept key size parameter
+- Update CryptographicUtils to accept key size parameter
 - Add tests for different key sizes
 - Update CLI tool to support --key-size option
 
@@ -353,17 +354,19 @@ Closes #123
 ```
 serilog-sinks-file-encrypt/
 ├── src/
-│   ├── Serilog.Sinks.File.Encrypt/          # Main library
-│   └── Serilog.Sinks.File.Encrypt.Cli/      # CLI tool
-├── test/
-│   └── Serilog.Sinks.File.Encrypt.Tests/    # Unit tests
+│   ├── Serilog.Sinks.File.Encrypt/                   # Main library
+│   └── Serilog.Sinks.File.Encrypt.Cli/               # CLI tool
+├── tests/
+│   ├── Serilog.Sinks.File.Encrypt.Tests/             # Library unit & integration tests
+│   └── Serilog.Sinks.File.Encrypt.Cli.Tests/         # CLI unit & integration tests
 ├── examples/
-│   ├── Example.Console/                      # Console example
-│   └── Example.Benchmarks/                   # Performance benchmarks
+│   ├── Example.Console/                              # Console example
+│   ├── Example.WebApi/                               # ASP.NET Core Web API example
+│   └── Example.Benchmarks/                           # Performance benchmarks
 ├── resources/
-│   └── nuget/                                # NuGet package documentation
-├── build.cs                                  # Cake build script
-└── global.json                               # .NET SDK version
+│   └── nuget/                                        # NuGet package documentation
+├── build.cs                                          # Cake build script
+└── global.json                                       # .NET SDK version
 ```
 
 ## Testing Guidelines
@@ -391,7 +394,7 @@ public async Task DecryptLogFileAsync_WithValidKey_ReturnsDecryptedContent()
 {
     // Arrange
     const string testMessage = "Test log message";
-    (string publicKey, string privateKey) = EncryptionUtils.GenerateRsaKeyPair();
+    (string publicKey, string privateKey) = CryptographicUtils.GenerateRsaKeyPair();
     
     // Act
     // ... encryption and decryption logic
