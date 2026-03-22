@@ -45,7 +45,7 @@ public static class CommandAppConfiguration
                 .WithDescription("Decrypt encrypted log files using an RSA private key")
                 .WithExample(Decrypt, "app.log", "-k", PrivateKey)
                 .WithExample(Decrypt, "*.log", "-k", PrivateKey)
-                .WithExample(Decrypt, "logs/*.txt", "-k", PrivateKey)
+                .WithExample(Decrypt, "logs/*.txt", "-k", PrivateKey, "--id", "")
                 .WithExample(Decrypt, "app.log", "-k", PrivateKey, "-o", "decrypted.log")
                 .WithExample(Decrypt, "app.log", "-k", PrivateKey, "--strict")
                 .WithExample(Decrypt, "./logs/*.log", "-k", PrivateKey, "--audit-log", "audit.log");

@@ -45,6 +45,16 @@ public sealed class DecryptCommand(
         public string KeyFile { get; init; } = "private_key.xml";
 
         /// <summary>
+        /// The id of the key to use for decryption. This should match exactly the key id used during encryption.
+        /// If not specified, the default key id of "" (empty string) will be used.
+        /// The CLI currently only supports decrypting with a single key. If you need multiple keys
+        /// use the underlying library directly in your own application.
+        /// </summary>
+        [CommandOption("--id")]
+        [Description("The id of the key to use for decryption.(default: \"\")")]
+        public string KeyId { get; init; } = string.Empty;
+
+        /// <summary>
         /// The output directory or file path. If not specified, files are decrypted in place with .decrypted extension.
         /// </summary>
         [CommandOption("-o|--output <OUTPUT>")]
@@ -64,7 +74,7 @@ public sealed class DecryptCommand(
         public bool Strict { get; init; }
 
         /// <summary>
-        /// Path to write detailed audit information. If specified, audit info is logged to this file instead of being skipped silently.
+        /// Path to write detailed audit information. If not specified, a temporary file will be used.
         /// </summary>
         [CommandOption("--audit-log <PATH>")]
         [Description(
@@ -157,27 +167,25 @@ public sealed class DecryptCommand(
                 ? ErrorHandlingMode.ThrowException
                 : ErrorHandlingMode.Skip;
 
-            if (!string.IsNullOrWhiteSpace(settings.AuditLogPath))
-            {
-                console.MarkupLineInterpolated($"[dim]Audit log:[/] {settings.AuditLogPath}");
-                _logger = new LoggerConfiguration()
-                    .MinimumLevel.Verbose()
-                    .WriteTo.File(
-                        settings.AuditLogPath,
-                        outputTemplate: "[{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} {Level:u3}] {Message:lj}{NewLine}{Exception}",
-                        fileSizeLimitBytes: 10 * 1024 * 1024, // 10 MB
-                        shared: true,
-                        rollOnFileSizeLimit: true,
-                        retainedFileCountLimit: 7
-                    )
-                    .CreateLogger();
-            }
+            string auditLog =
+                settings.AuditLogPath
+                ?? Path.Combine(Path.GetTempPath(), Path.GetRandomFileName() + ".log");
+            console.MarkupLineInterpolated($"[dim]Audit log:[/] {auditLog}");
+            _logger = new LoggerConfiguration()
+                .MinimumLevel.Verbose()
+                .WriteTo.File(
+                    auditLog,
+                    outputTemplate: "[{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} {Level:u3}] {Message:lj}{NewLine}{Exception}",
+                    fileSizeLimitBytes: 10 * 1024 * 1024, // 10 MB
+                    shared: true,
+                    rollOnFileSizeLimit: true,
+                    retainedFileCountLimit: 7
+                )
+                .CreateLogger();
 
-            // TODO: need a way to support multiple keys with key IDs for rotation scenarios.
-            // For now, we will just use a single default key with an empty key ID since the CLI only accepts one key file.
             var decryptionKeys = new Dictionary<string, string>
             {
-                { "", rsaPrivateKey }, // Default key with empty key ID
+                { settings.KeyId, rsaPrivateKey },
             };
 
             DecryptionOptions decryptionOptions = new()

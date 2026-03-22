@@ -13,7 +13,6 @@ public class DecryptCommandTests : CommandTestBase
     private readonly string _privateKeyPath = Path.Join("keys", "private_key.xml");
     private readonly string _logsDir = Path.Join("logs");
     private string EncryptedFile => Path.Join(_logsDir, "app1.log");
-
     private const string LogContent1 = "2024-11-26 14:00:00 [INF] Log file 1\n";
 
     public DecryptCommandTests()
@@ -48,6 +47,48 @@ public class DecryptCommandTests : CommandTestBase
     # region Happy Path Tests
     [Fact]
     public async Task ExecuteAsync_WithValidEncryptedFile_DecryptsSuccessfully()
+    {
+        // Arrange
+        string decryptedFilePath = Path.Join("logs", "decrypted.log");
+        string auditLogPath = Path.Join(Path.GetTempPath(), $"audit_{Guid.NewGuid()}.log");
+        AddMockEncryptedFile("appLogWithKeyId.log", LogContent1, "key-id-123");
+        ConfigureFileResolver("appLogWithKeyId.log");
+        DecryptCommand command = GetSut();
+        DecryptCommand.Settings settings = new()
+        {
+            InputPath = "appLogWithKeyId.log",
+            KeyFile = _privateKeyPath,
+            OutputPath = decryptedFilePath,
+            AuditLogPath = auditLogPath,
+            KeyId = "key-id-123",
+        };
+
+        // Act
+        int result = await command.ExecuteAsync(
+            new CommandContext(Arguments, Remaining, "decrypt", null),
+            settings,
+            CancellationToken.None
+        );
+
+        // Assert
+        result.ShouldBe(0); // Success
+
+        FileSystem.File.Exists(decryptedFilePath).ShouldBeTrue();
+
+        string decryptedContent = await FileSystem.File.ReadAllTextAsync(
+            decryptedFilePath,
+            TestContext.Current.CancellationToken
+        );
+        decryptedContent.ShouldBe(LogContent1);
+        bool auditLogExists = System.IO.File.Exists(auditLogPath);
+        auditLogExists.ShouldBeTrue();
+
+        TestConsole.Output.ShouldContain("✓ Decrypted:");
+        TestConsole.Output.ShouldContain("Reading private key from:");
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WithValidEncryptedFileWithKeyId_DecryptsSuccessfully()
     {
         // Arrange
         string decryptedFilePath = Path.Join("logs", "decrypted.log");
@@ -418,15 +459,27 @@ public class DecryptCommandTests : CommandTestBase
         );
     }
 
+    private void AddMockEncryptedFile(string fileName, string logMessage, string keyId = "")
+    {
+        FileSystem.AddFile(
+            fileName,
+            new MockFileData(CreateEncryptedLogFile(logMessage, _publicKey, keyId))
+        );
+    }
+
     /// <summary>
     /// Helper method to create an encrypted log file using EncryptedStream
     /// </summary>
-    private static byte[] CreateEncryptedLogFile(string logContent, string rsaPublicKey)
+    private static byte[] CreateEncryptedLogFile(
+        string logContent,
+        string rsaPublicKey,
+        string keyId = ""
+    )
     {
         using MemoryStream memoryStream = new();
         using var rsa = RSA.Create();
         rsa.FromString(rsaPublicKey);
-        EncryptionOptions options = new(rsa);
+        EncryptionOptions options = new(rsa, keyId);
 
         using (LogWriter logWriter = new(memoryStream, options))
         {
