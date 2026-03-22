@@ -14,9 +14,11 @@ A [Serilog.File.Sink](https://github.com/serilog/serilog-sinks-file) hook that e
 - **[Serilog.Sinks.File.Encrypt.Cli](https://www.nuget.org/packages/Serilog.Sinks.File.Encrypt.Cli)** - Command-line tool for key management and log decryption.
 
 ## ✨ Features
-- Transparent encryption of log files using public/private key cryptography 
-- CLI utilities for decrypting and inspecting encrypted logs
-- Support for various encryption algorithms and configuration options
+
+- Transparent encryption of log files using hybrid RSA + AES-GCM cryptography
+- **Key rotation** — assign a key ID to each `EncryptHooks` instance; the decryption layer selects the correct key automatically
+- CLI utilities for key generation, decryption, and batch processing of encrypted logs
+- Memory-optimised streaming for large log files
 
 ## 📖 Documentation
 
@@ -25,6 +27,7 @@ Detailed installation, configuration, and usage instructions are provided in the
 - 📄 [Serilog.Sinks.File.Encrypt](resources/nuget/Serilog.Sinks.File.Encrypt.md)
 - 📄 [Serilog.Sinks.File.Encrypt.Cli](resources/nuget/Serilog.Sinks.File.Encrypt.Cli.md)
 - 📊 [Performance Benchmarks & Analysis](examples/Example.Benchmarks/README.md)
+- 📋 [Changelog & Migration Guide](CHANGELOG.md)
 
 Please refer to these files for up-to-date and comprehensive documentation for each package.
 

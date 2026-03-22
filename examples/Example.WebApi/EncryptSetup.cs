@@ -21,7 +21,7 @@ public static class EncryptSetup
 
             return string.IsNullOrWhiteSpace(rsaPublicKey)
                 ? throw new InvalidOperationException("LogPublicKey not found in configuration")
-                : new EncryptHooks(rsaPublicKey);
+                : new EncryptHooks(rsaPublicKey, keyId: "webapp-key-2026");
         }
     }
 }

@@ -59,7 +59,7 @@ Each run will append to the daily log file with encrypted content.
 
 ### 5. Examine the Encrypted Log Files
 
-Navigate to the logs directory and examine the files:
+Navigate to the logs directory and examine the files and take note of the file names (e.g., `log20251123.txt`):
 
 ```bash
 # Go to the logs directory
@@ -69,6 +69,7 @@ cd bin/Debug/<framework>/Logs
 ls
 
 # Try to view the encrypted content (you'll see binary data)
+# replace log20251123.txt with the actual log file name generated
 cat log20251123.txt
 ```
 
@@ -79,11 +80,15 @@ The log files contain encrypted binary data that cannot be read without decrypti
 Use the CLI tool to decrypt and view the log contents:
 
 ```bash
-# Decrypt a specific log file (creates log20251123.decrypted.txt)
-serilog-encrypt decrypt log20251123.txt -k ../../../private_key.xml
+# Decrypt a specific log file (replace the date portion with your actual filename)
+# --id must match the keyId used in EncryptHooks — see Program.cs
+serilog-encrypt decrypt log20251123.txt -k ../../../private_key.xml --id console-key-2026
 
-# Or decrypt with custom output name
-serilog-encrypt decrypt log20251123.txt -k ../../../private_key.xml -o decrypted-log.txt
+# Or decrypt all log files in the Logs directory using a glob pattern
+serilog-encrypt decrypt *.txt -k ../../../private_key.xml --id console-key-2026
+
+# Decrypt to a custom output name
+serilog-encrypt decrypt log20251123.txt -k ../../../private_key.xml --id console-key-2026 -o decrypted-log.txt
 
 # View the decrypted content
 cat log20251123.decrypted.txt
@@ -114,9 +119,10 @@ Logger logger = new LoggerConfiguration()
     .WriteTo.File(
         path: Path.Join(logDirectory, "log.txt"),
         rollingInterval: RollingInterval.Day,
-        hooks: new EncryptHooks(keyService.PublicKey)
+        hooks: new EncryptHooks(keyService.PublicKey, keyId: "console-key-2026")
     )
     .CreateLogger();
 ```
 
 This setup ensures all log messages are encrypted before being written to disk.
+The `keyId` is embedded in the session header and must be passed to the CLI `--id` option when decrypting.

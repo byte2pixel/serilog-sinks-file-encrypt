@@ -126,7 +126,7 @@ public static class EncryptSetup
 
             return string.IsNullOrWhiteSpace(rsaPublicKey)
                 ? throw new InvalidOperationException("LogPublicKey not found in configuration")
-                : new EncryptHooks(rsaPublicKey);
+                : new EncryptHooks(rsaPublicKey, keyId: "webapp-key-2026");
         }
     }
 }
@@ -259,7 +259,8 @@ To verify everything is working correctly:
    notepad logs/prod{date}.txt
    
    # Decrypt to verify content (creates logs/prod{date}.decrypted.txt)
-   serilog-encrypt decrypt logs/prod{date}.txt -k private_key.xml
+   # --id must match the keyId in EncryptSetup.cs
+   serilog-encrypt decrypt logs/prod{date}.txt -k private_key.xml --id webapp-key-2026
    notepad logs/prod{date}.decrypted.txt
    ```
 
@@ -300,11 +301,11 @@ Check the appropriate log files to see the logged messages.
 
 To decrypt the production logs, you can use the CLI tool:
 ```bash
-# The log file name will include the date (e.g., prod20251129.txt)
-serilog-encrypt decrypt logs/prod20251129.txt -k private_key.xml
+# Decrypt a single file (--id must match the keyId configured in EncryptSetup.cs)
+serilog-encrypt decrypt logs/prod20251129.txt -k private_key.xml --id webapp-key-2026
 
 # Or decrypt all production logs using a glob pattern
-serilog-encrypt decrypt "logs/prod*.txt" -k private_key.xml
+serilog-encrypt decrypt "logs/prod*.txt" -k private_key.xml --id webapp-key-2026
 ```
 
 **Note**: You will need the private key file (`private_key.xml`) that was generated earlier with the `serilog-encrypt generate` command.
