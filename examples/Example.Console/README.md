@@ -82,13 +82,13 @@ Use the CLI tool to decrypt and view the log contents:
 ```bash
 # Decrypt a specific log file (replace the date portion with your actual filename)
 # --id must match the keyId used in EncryptHooks — see Program.cs
-serilog-encrypt decrypt log20251123.txt -k ../../../private_key.xml --id Example.Console.Key_001
+serilog-encrypt decrypt log20251123.txt -k ../../../private_key.xml --id console-key-2026
 
 # Or decrypt all log files in the Logs directory using a glob pattern
-serilog-encrypt decrypt "bin/Debug/<framework>/Logs/*.txt" -k private_key.xml --id Example.Console.Key_001
+serilog-encrypt decrypt *.txt -k ../../../private_key.xml --id console-key-2026
 
 # Decrypt to a custom output name
-serilog-encrypt decrypt log20251123.txt -k ../../../private_key.xml --id Example.Console.Key_001 -o decrypted-log.txt
+serilog-encrypt decrypt log20251123.txt -k ../../../private_key.xml --id console-key-2026 -o decrypted-log.txt
 
 # View the decrypted content
 cat log20251123.decrypted.txt

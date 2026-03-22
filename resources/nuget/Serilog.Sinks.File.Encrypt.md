@@ -32,7 +32,7 @@ Production-ready performance with minimal overhead:
 
 - ✅ **8-12% time overhead** in real-world unbuffered scenarios (well under typical targets)
 - ✅ **300K+ logs/second** throughput with buffered writes (vs. ~174K baseline)
-- ✅ **AES-GCM: ~1.03–1.07x memory overhead** — near-baseline; AES: ~2.02–2.15x
+- ✅ **AES-GCM: ~1.03–1.07x memory overhead** — near-baseline
 - ✅ **~5-16% throughput reduction** with unbuffered encryption (148K–153K logs/sec)
 - 🚀 **Buffered mode outperforms non-encrypted unbuffered by ~66%** — encrypted buffered I/O is faster than plain unbuffered
 - ✅ **Zero lock contentions** — safe for multithreaded applications handled by Serilog.File.Sink

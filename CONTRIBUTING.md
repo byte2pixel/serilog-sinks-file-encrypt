@@ -269,35 +269,35 @@ Most analyzer warnings are suggestions. Address any warnings that appear during 
 
 ### Example
 
+Example of a well-documented method with XML comments:
+
 ```csharp
-/// <summary>
-/// Decrypts an encrypted log file asynchronously using streaming for efficient memory usage.
-/// </summary>
-/// <param name="inputStream">Stream containing the encrypted log data. Must be readable and seekable.</param>
-/// <param name="outputStream">Stream where the decrypted content will be written. Must be writable.</param>
-/// <param name="options">Decryption options including the key dictionary and error handling mode.</param>
-/// <param name="logger">Optional audit logger. When provided, decryption errors are logged with position details.</param>
-/// <param name="cancellationToken">Cancellation token to cancel the decryption operation.</param>
-/// <returns>A <see cref="DecryptionResult"/> with counts of decrypted sessions, messages, failures, and resync attempts.</returns>
-/// <exception cref="ArgumentNullException">Thrown when any required parameter is null.</exception>
-/// <exception cref="CryptographicException">Thrown when decryption fails and <see cref="ErrorHandlingMode.ThrowException"/> is set.</exception>
-/// <remarks>
-/// Memory usage is determined by the producer-consumer queue. Typical usage: ~160KB (default queue depth).
-/// </remarks>
-public static async Task<DecryptionResult> DecryptLogFileAsync(
-    Stream inputStream,
-    Stream outputStream,
-    DecryptionOptions options,
-    ILogger? logger = null,
-    CancellationToken cancellationToken = default
-)
-{
-    ArgumentNullException.ThrowIfNull(inputStream);
-    ArgumentNullException.ThrowIfNull(outputStream);
-    ArgumentNullException.ThrowIfNull(options);
-    
-    // Implementation...
-}
+    /// <summary>
+    /// Decrypts an encrypted log file from an input stream and writes the decrypted content to an output stream.
+    /// </summary>
+    /// <param name="inputStream">The input stream to decrypt.</param>
+    /// <param name="outputStream">The output stream for plaintext.</param>
+    /// <param name="options">Decryption options.</param>
+    /// <param name="logger">Optional audit logger for decryption errors. If provided, decryption errors will be logged with details about the error and the position in the stream where it occurred.</param>
+    /// <param name="cancellationToken">Cancellation token to cancel the decryption operation.</param>
+    /// <returns>
+    /// A <see cref="DecryptionResult"/> containing counts of decrypted sessions, messages, failures, and resync attempts.
+    /// </returns>
+    /// <example>
+    /// <code>
+    /// // Example of usage...
+    /// </code>
+    /// </example>
+    public static async Task<DecryptionResult> DecryptLogFileAsync(
+        Stream inputStream,
+        Stream outputStream,
+        DecryptionOptions options,
+        ILogger? logger = null,
+        CancellationToken cancellationToken = default
+    )
+    {
+        // Implementation...
+    }
 ```
 
 ## Submitting Changes

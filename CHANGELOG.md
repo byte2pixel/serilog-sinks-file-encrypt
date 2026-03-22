@@ -23,11 +23,11 @@ these fields and cannot be parsed by the v3 reader.
 
 #### Decryption API
 
-| v2                                                                                               | v3                                                                                      |
-|--------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------|
-| `CryptographicUtils.DecryptLogFileAsync(stream, output, string privateKey, StreamingOptions?)`   | `CryptographicUtils.DecryptLogFileAsync(stream, output, DecryptionOptions, ILogger?)`   |
-| `CryptographicUtils.DecryptLogFileAsync(path, outputPath, string privateKey, StreamingOptions?)` | `CryptographicUtils.DecryptLogFileAsync(path, outputPath, DecryptionOptions, ILogger?)` |
-| `StreamingOptions`                                                                               | `DecryptionOptions`                                                                     |
+| v2                                                                                            | v3                                                                                      |
+|-----------------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------|
+| `EncryptionUtils.DecryptLogFileAsync(stream, output, string privateKey, StreamingOptions?)`   | `CryptographicUtils.DecryptLogFileAsync(stream, output, DecryptionOptions, ILogger?)`   |
+| `EncryptionUtils.DecryptLogFileAsync(path, outputPath, string privateKey, StreamingOptions?)` | `CryptographicUtils.DecryptLogFileAsync(path, outputPath, DecryptionOptions, ILogger?)` |
+| `StreamingOptions`                                                                            | `DecryptionOptions`                                                                     |
 
 `StreamingOptions` has been replaced by `DecryptionOptions`. The new type carries a
 `Dictionary<string, string> DecryptionKeys` (key ID → private key XML/PEM) instead of a single

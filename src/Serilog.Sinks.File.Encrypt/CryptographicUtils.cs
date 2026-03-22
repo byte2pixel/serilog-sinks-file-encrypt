@@ -13,13 +13,13 @@ namespace Serilog.Sinks.File.Encrypt;
 /// <example>
 /// <code>
 /// // Generate a key pair
-/// var (publicKey, privateKey) = EncryptionUtils.GenerateRsaKeyPair(4096);
+/// var (publicKey, privateKey) = CryptographicUtils.GenerateRsaKeyPair(4096);
 ///
 /// // Decrypt a log file
 /// using var inputStream = File.OpenRead("encrypted.log");
 /// using var outputStream = File.Create("decrypted.log");
 ///
-/// await EncryptionUtils.DecryptLogFileAsync(
+/// await CryptographicUtils.DecryptLogFileAsync(
 ///     inputStream,
 ///     outputStream,
 ///     privateKey,
@@ -121,10 +121,10 @@ public static class CryptographicUtils
     /// <example>
     /// <code>
     /// // Generate 2048-bit key pair (default)
-    /// var (publicKey, privateKey) = EncryptionUtils.GenerateRsaKeyPair();
+    /// var (publicKey, privateKey) = CryptographicUtils.GenerateRsaKeyPair();
     ///
     /// // Generate 4096-bit key pair for enhanced security
-    /// var (publicKey4k, privateKey4k) = EncryptionUtils.GenerateRsaKeyPair(4096);
+    /// var (publicKey4k, privateKey4k) = CryptographicUtils.GenerateRsaKeyPair(4096);
     ///
     /// // Store keys securely
     /// File.WriteAllText("public_key.xml", publicKey);
@@ -172,7 +172,7 @@ public static class CryptographicUtils
     ///     DecryptionKeys = new Dictionary&lt;string, string&gt; { { "keyId", privateKey } },
     /// };
     /// var logger = new LoggerConfiguration().WriteTo.File("decryption_errors.log").CreateLogger();
-    /// var result = await EncryptionUtils.DecryptLogFileAsync(
+    /// var result = await CryptographicUtils.DecryptLogFileAsync(
     ///     inputStream,
     ///     outputStream,
     ///     options,
@@ -216,7 +216,7 @@ public static class CryptographicUtils
     /// <example>
     /// <code>
     /// // Decrypt a file with default options
-    /// await EncryptionUtils.DecryptLogFileAsync(
+    /// await CryptographicUtils.DecryptLogFileAsync(
     ///     "logs/encrypted.log",
     ///     "logs/decrypted.log",
     ///     privateKey
@@ -229,7 +229,7 @@ public static class CryptographicUtils
     ///     ErrorLogPath = "logs/errors.log"
     /// };
     ///
-    /// await EncryptionUtils.DecryptLogFileAsync(
+    /// await CryptographicUtils.DecryptLogFileAsync(
     ///     "logs/encrypted.log",
     ///     "logs/decrypted.log",
     ///     privateKey,
