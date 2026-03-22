@@ -11,8 +11,8 @@ internal interface IFrameWriter
     /// Responsible for writing the session header to the output stream according to the specified format:
     /// 1. Magic bytes (8 bytes)
     /// 2. Version (1 byte)
-    /// 3. Key ID (32 bytes, UTF-8, null-padded)
-    /// 4. Header (variable length, RSA encrypted)
+    /// 3. Key ID (bytes determined by version, 32 bytes for v1)
+    /// 4. Header (RSA encrypted bytes, length determined by RSA key size)
     /// Messages following the header are self-framing with length prefixes.
     /// </summary>
     /// <param name="output">The output stream to which the session header will be written.</param>
