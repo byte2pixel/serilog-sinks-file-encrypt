@@ -25,7 +25,7 @@ namespace Serilog.Sinks.File.Encrypt;
 /// <example>
 /// <code>
 /// // Generate or load RSA keys
-/// var (publicKey, privateKey) = EncryptionUtils.GenerateRsaKeyPair();
+/// var (publicKey, privateKey) = CryptographicUtils.GenerateRsaKeyPair();
 ///
 /// // Configure Serilog with encryption
 /// Log.Logger = new LoggerConfiguration()

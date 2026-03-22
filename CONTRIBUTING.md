@@ -269,34 +269,35 @@ Most analyzer warnings are suggestions. Address any warnings that appear during 
 
 ### Example
 
+Example of a well-documented method with XML comments:
+
 ```csharp
-/// <summary>
-/// Decrypts an encrypted log file asynchronously using streaming for efficient memory usage.
-/// </summary>
-/// <param name="inputStream">Stream containing the encrypted log data. Must be readable and seekable.</param>
-/// <param name="outputStream">Stream where the decrypted content will be written. Must be writable.</param>
-/// <param name="rsaPrivateKey">The XML representation of the RSA private key used for decryption.</param>
-/// <param name="cancellationToken">Cancellation token to cancel the decryption operation.</param>
-/// <returns>A task representing the asynchronous decryption operation.</returns>
-/// <exception cref="ArgumentNullException">Thrown when any parameter is null.</exception>
-/// <exception cref="CryptographicException">Thrown when decryption fails.</exception>
-/// <remarks>
-/// Memory usage is controlled by <see cref="StreamingOptions.BufferSize"/> and 
-/// <see cref="StreamingOptions.QueueDepth"/>. Typical memory usage: 160KB (default).
-/// </remarks>
-public static async Task DecryptLogFileAsync(
-    Stream inputStream,
-    Stream outputStream,
-    string rsaPrivateKey,
-    CancellationToken cancellationToken = default
-)
-{
-    ArgumentNullException.ThrowIfNull(inputStream);
-    ArgumentNullException.ThrowIfNull(outputStream);
-    ArgumentNullException.ThrowIfNull(rsaPrivateKey);
-    
-    // Implementation...
-}
+    /// <summary>
+    /// Decrypts an encrypted log file from an input stream and writes the decrypted content to an output stream.
+    /// </summary>
+    /// <param name="inputStream">The input stream to decrypt.</param>
+    /// <param name="outputStream">The output stream for plaintext.</param>
+    /// <param name="options">Decryption options.</param>
+    /// <param name="logger">Optional audit logger for decryption errors. If provided, decryption errors will be logged with details about the error and the position in the stream where it occurred.</param>
+    /// <param name="cancellationToken">Cancellation token to cancel the decryption operation.</param>
+    /// <returns>
+    /// A <see cref="DecryptionResult"/> containing counts of decrypted sessions, messages, failures, and resync attempts.
+    /// </returns>
+    /// <example>
+    /// <code>
+    /// // Example of usage...
+    /// </code>
+    /// </example>
+    public static async Task<DecryptionResult> DecryptLogFileAsync(
+        Stream inputStream,
+        Stream outputStream,
+        DecryptionOptions options,
+        ILogger? logger = null,
+        CancellationToken cancellationToken = default
+    )
+    {
+        // Implementation...
+    }
 ```
 
 ## Submitting Changes
@@ -317,7 +318,7 @@ Write clear commit messages:
 ```
 Add support for 4096-bit RSA keys
 
-- Update EncryptionUtils to accept key size parameter
+- Update CryptographicUtils to accept key size parameter
 - Add tests for different key sizes
 - Update CLI tool to support --key-size option
 
@@ -353,17 +354,19 @@ Closes #123
 ```
 serilog-sinks-file-encrypt/
 ├── src/
-│   ├── Serilog.Sinks.File.Encrypt/          # Main library
-│   └── Serilog.Sinks.File.Encrypt.Cli/      # CLI tool
-├── test/
-│   └── Serilog.Sinks.File.Encrypt.Tests/    # Unit tests
+│   ├── Serilog.Sinks.File.Encrypt/                   # Main library
+│   └── Serilog.Sinks.File.Encrypt.Cli/               # CLI tool
+├── tests/
+│   ├── Serilog.Sinks.File.Encrypt.Tests/             # Library unit & integration tests
+│   └── Serilog.Sinks.File.Encrypt.Cli.Tests/         # CLI unit & integration tests
 ├── examples/
-│   ├── Example.Console/                      # Console example
-│   └── Example.Benchmarks/                   # Performance benchmarks
+│   ├── Example.Console/                              # Console example
+│   ├── Example.WebApi/                               # ASP.NET Core Web API example
+│   └── Example.Benchmarks/                           # Performance benchmarks
 ├── resources/
-│   └── nuget/                                # NuGet package documentation
-├── build.cs                                  # Cake build script
-└── global.json                               # .NET SDK version
+│   └── nuget/                                        # NuGet package documentation
+├── build.cs                                          # Cake build script
+└── global.json                                       # .NET SDK version
 ```
 
 ## Testing Guidelines
@@ -391,7 +394,7 @@ public async Task DecryptLogFileAsync_WithValidKey_ReturnsDecryptedContent()
 {
     // Arrange
     const string testMessage = "Test log message";
-    (string publicKey, string privateKey) = EncryptionUtils.GenerateRsaKeyPair();
+    (string publicKey, string privateKey) = CryptographicUtils.GenerateRsaKeyPair();
     
     // Act
     // ... encryption and decryption logic
