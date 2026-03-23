@@ -76,8 +76,6 @@ serilog-encrypt decrypt "logs/*.log" -k private_key.xml -o ./decrypted
 **Features:**
 - Memory-optimized for large log files
 - Simple error handling: continues on errors by default, or use `--strict` to fail fast
-- Fixed memory usage regardless of log file size
-- Support for structured logging formats (JSON, etc.)
 - Batch processing with glob patterns
 - Automatically skips files with `.decrypted.` in the name to prevent re-decryption
 
@@ -180,7 +178,8 @@ The tool automatically skips files with `.decrypted.` in the filename to prevent
 serilog-encrypt decrypt "logs/*.log" -k key.xml --id my-app-key-2026
 
 # Later, after new logs are added
-# Second run: only processes new encrypted files, skips app.decrypted.log
+# Second run: only processes app.log and overwrites app.decrypted.log
+# skips trying to decrypt app.decrypted.log
 serilog-encrypt decrypt "logs/*.log" -k key.xml --id my-app-key-2026
 ```
 
