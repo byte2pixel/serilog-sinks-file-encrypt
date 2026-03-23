@@ -32,10 +32,10 @@ The fuller the bar the more time overhead compared to baseline.
 ┌─────────────────────────────────────────────────────────────────┐
 │ GOAL: Time Overhead < 50%  (Serilog File Sink, 100 entries)     │
 | Baseline (no encryption): ~680 μs for 100 entries               │
-│ AES:                                                            │
+│ v2.x (AES):                                                     │
 │ █░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░  1-8% (unbuffered)     │
 │ FASTER ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░  -23 to -35% (buff.)   │
-│ AES-GCM:                                                        │
+│ v3.x (AES-GCM):                                                 │
 │ █░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░  0-13% (unbuffered)    │
 │ FASTER ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░  -25 to -45% (buff.)   │
 │ At 10K entries: AES → ~18%, AES-GCM → ~9-12%                    │
@@ -51,10 +51,10 @@ The fuller the bar the more memory used compared to baseline.
 ┌─────────────────────────────────────────────────────────────────┐
 │ GOAL: Memory Overhead < 2x (Serilog File Sink, Medium msgs)     │
 │ Baseline (no encryption): ~652.49 KB for 1000 entries           │
-│ AES:                                                            │
+│ v2.x (AES):                                                     │
 │ ████████████████████████░░░░░░░░░░░░░░░░░ 2.15x (unbuffered)    │ 
 │ ███████████████████████░░░░░░░░░░░░░░░░░░ 2.02x (buffered)      │
-│ AES-GCM:                                                        │
+│ v3.x (AES-GCM):                                                 │
 │ ██░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░  1.07x (unbuffered)    │
 │ █░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░  1.03x (buffered)      │
 │ STATUS: AES can exceed 2x on smaller msgs                       │
@@ -70,10 +70,10 @@ The fuller the bar the closer to matching baseline.
 │ GOAL: Throughput > 100,000 logs/sec (File Sink, Small, 100)     │
 │ Full logging pipeline: Serilog formatting + file I/O + encrypt  │
 | Baseline (no encryption): ~174,000 logs/sec                     |
-│ AES:                                                            │
+│ v2.x (AES):                                                     │
 │ ███████████████████████████████████░░░░░  153,200 (unbuffered)  │
 │ FASTER ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░  311,400 (buffered)    │
-│ AES-GCM:                                                        │
+│ v3.0.0                                                          │
 │ ██████████████████████████████████░░░░░░  148,200 (unbuffered)  │
 │ FASTER ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░  311,900 (buffered)    │
 │ STATUS: PASS - Exceeds 100,000/sec target by ~1.5x              │
@@ -171,63 +171,6 @@ Simulates high-volume background processing:
 
 ---
 
-## Recommended Configuration
-
-### ⚠️ Important: Buffering & Data Loss Risk
-
-When using `buffered: true` with encryption, **data written since the last flush may be lost** if your application crashes or terminates unexpectedly. The risk window depends on your `flushToDiskInterval` setting (default is determined by the runtime/OS). This is because:
-
-1. Buffered writes hold data in memory between flush intervals
-2. Encryption requires finalizing blocks to write valid encrypted data
-3. Sudden termination prevents proper block finalization of unflushed data
-
-**Risk Window:**
-- `flushToDiskInterval: TimeSpan.FromSeconds(1)` → At most 1 second of logs at risk
-- `flushToDiskInterval: TimeSpan.FromMilliseconds(500)` → At most 500ms of logs at risk
-- Default (no explicit interval) → Runtime/OS decides, typically several seconds
-
-**Mitigation strategies:**
-
-```csharp
-// 1. Configure flush interval to balance performance vs data loss window
-.WriteTo.File(
-    buffered: true,
-    flushToDiskInterval: TimeSpan.FromMilliseconds(500),  // Max 500ms of logs at risk
-    // ...
-)
-
-// 2. Explicitly flush on critical operations
-Log.Information("Critical operation completed");
-Log.CloseAndFlush();  // Ensure data is written before exit
-
-// 3. Use unbuffered for ultra-critical logs (no data loss window)
-.WriteTo.File(
-    buffered: false,  // Immediate writes (default Serilog behavior)
-    // ...
-)
-```
-
-**Choosing your flush interval:**
-- High-volume, low-criticality: `TimeSpan.FromSeconds(5)` - Better performance
-- Balanced approach: `TimeSpan.FromSeconds(1)` - Good compromise
-- Critical data: `TimeSpan.FromMilliseconds(500)` - Minimal risk window
-- Ultra-critical: `buffered: false` - Zero risk, accepts performance cost
-
-**Recommendation:** Use unbuffered writes for most scenarios.
-For best performance in production, use buffered writes:
-
-```csharp
-Log.Logger = new LoggerConfiguration()
-    .WriteTo.File(
-        path: "logs/app.log",
-        buffered: true,              // Critical for performance!
-        flushToDiskInterval: TimeSpan.FromSeconds(1),
-        hooks: new EncryptHooks(publicKey))
-    .CreateLogger();
-```
-
----
-
 ## Best Practices
 
 ### Before Running Benchmarks
@@ -243,30 +186,6 @@ Log.Logger = new LoggerConfiguration()
 - Compare against baseline measurements
 - Watch for memory allocation increases
 - Monitor GC collection frequency
-
-### Production Deployment
-
-✅ **DO Use Encryption When:**
-- Logging sensitive data (PII, credentials, tokens)
-- Compliance requires encryption at rest
-- High-volume logging (overhead is minimal even unbuffered)
-
-✅ **Use Buffered Mode When:**
-- Performance is critical (high-volume background workers)
-- Application has reliable shutdown handling (`Log.CloseAndFlush()`)
-- You can tolerate potential loss of recent logs
-
-⚠️ **Consider Alternatives When:**
-- Every microsecond counts (real-time trading systems)
-- Memory is severely constrained (embedded systems)
-- Log files already encrypted by infrastructure
-
-⚠️ **Important - Default Configuration:**
-- **Start with unbuffered** (default) for data safety
-- **Opt-in to buffered** only when performance is critical AND risk is acceptable
-- Buffered + Encrypted = Risk of data loss on crashes/exceptions
-- Encryption needs to finalize blocks before data is valid
-- **Always call `Log.CloseAndFlush()` on application shutdown**
 
 ---
 

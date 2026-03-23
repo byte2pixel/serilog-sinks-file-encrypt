@@ -93,7 +93,7 @@ Log.Information("This message will be encrypted!");
 Log.CloseAndFlush();
 ```
 
-> **💡 Performance Tip:** For high-volume scenarios where you can tolerate potential data loss on crashes, use `buffered: true` to reduce overhead from 15-17% to 6-8%. See the [Advanced Usage](#advanced-usage) section below.
+> **💡 Performance Tip:** For high-volume scenarios where you can tolerate potential data loss on crashes, use `buffered: true`. See the [Advanced Usage](#advanced-usage) section below.
 
 ### 3. Decrypt Logs
 
@@ -122,8 +122,8 @@ string publicKeyXml = File.ReadAllText("./keys/public_key.xml");
 Log.Logger = new LoggerConfiguration()
     .WriteTo.File(
         path: "logs/app.log",
-        buffered: true,              // Enables high-performance mode
-        flushToDiskInterval: TimeSpan.FromSeconds(1),
+        buffered: true, // buffered writes
+        flushToDiskInterval: TimeSpan.FromSeconds(5), // flush every X seconds (adjust as needed)
         hooks: new EncryptHooks(publicKeyXml, keyId: "my-app-key-2026"))
     .CreateLogger();
 
@@ -310,6 +310,7 @@ app.Run();
 
 ### Key Management
 ```csharp
+// Generates a new RSA key pair with the specified key size and format (XML or PEM).
 (string publicKey, string privateKey) CryptographicUtils.GenerateRsaKeyPair(int keySize = 2048, KeyFormat format = KeyFormat.Xml)
 ```
 
@@ -332,7 +333,7 @@ Task<DecryptionResult> CryptographicUtils.DecryptLogFileAsync(
     CancellationToken cancellationToken = default)
 
 // File-to-file async decryption
-Task CryptographicUtils.DecryptLogFileAsync(
+Task<DecryptionResult> CryptographicUtils.DecryptLogFileAsync(
     string encryptedFilePath,
     string outputFilePath,
     DecryptionOptions options,
@@ -384,7 +385,8 @@ public class DecryptionResult
 
 ## CLI Tool
 
-The companion CLI tool provides key management and decryption with full error handling:
+The companion CLI tool provides a simple interface for key generation and log decryption.
+If your logs contain multiple key IDs, you will not be able to use the CLI tool for decryption since it only supports one key at a time. In that case, use the programmatic API to supply multiple keys.
 
 ```bash
 # Generate keys
@@ -408,7 +410,7 @@ For detailed CLI documentation, see the [CLI tool documentation](https://www.nug
 ## Migration from v2.x to v3.0.0
 
 > [!IMPORTANT]
-> **Log files written by v2 cannot be read by v3.** Archive or decrypt your existing log files with the v2 CLI before deploying v3.
+> **Log files written by v2.x cannot be read by v3.x.** Archive or decrypt your existing log files with the v2 CLI before deploying v3.
 
 See the full [Migration Guide in CHANGELOG.md](https://github.com/byte2pixel/serilog-sinks-file-encrypt/blob/main/CHANGELOG.md#migration-guide-v2--v3) for step-by-step instructions.
 

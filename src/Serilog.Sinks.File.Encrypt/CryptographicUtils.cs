@@ -211,7 +211,7 @@ public static class CryptographicUtils
     /// <exception cref="OperationCanceledException">Thrown when the operation is canceled via <paramref name="cancellationToken"/>.</exception>
     /// <remarks>
     /// This is a convenience overload that automatically manages file streams. For more control over stream handling,
-    /// use the <see cref="DecryptLogFileAsync(string, string, DecryptionOptions, ILogger?, CancellationToken)"/> overload.
+    /// use the <see cref="DecryptLogFileAsync(Stream, Stream, DecryptionOptions, ILogger?, CancellationToken)"/> overload.
     /// </remarks>
     /// <example>
     /// <code>
@@ -238,7 +238,7 @@ public static class CryptographicUtils
     /// );
     /// </code>
     /// </example>
-    public static async Task DecryptLogFileAsync(
+    public static async Task<DecryptionResult> DecryptLogFileAsync(
         string encryptedFilePath,
         string outputFilePath,
         DecryptionOptions options,
@@ -249,6 +249,12 @@ public static class CryptographicUtils
         await using FileStream inputStream = System.IO.File.OpenRead(encryptedFilePath);
         await using FileStream outputStream = System.IO.File.Create(outputFilePath);
 
-        await DecryptLogFileAsync(inputStream, outputStream, options, logger, cancellationToken);
+        return await DecryptLogFileAsync(
+            inputStream,
+            outputStream,
+            options,
+            logger,
+            cancellationToken
+        );
     }
 }

@@ -157,13 +157,18 @@ public sealed class FileSinkIntegrationTests : IDisposable
         logger.Information("This is a second log message");
         await logger.DisposeAsync();
         // Act - Decrypt the log file to a specified file
-        await CryptographicUtils.DecryptLogFileAsync(
+        DecryptionResult result = await CryptographicUtils.DecryptLogFileAsync(
             _logFilePath,
             decryptedFilePath,
             _decryptionOptions,
             cancellationToken: TestContext.Current.CancellationToken
         );
         // Assert
+        result.DecryptedMessages.ShouldBe(2);
+        result.DecryptedSessions.ShouldBe(2);
+        result.FailedHeaders.ShouldBe(0);
+        result.FailedMessages.ShouldBe(0);
+        result.ResyncAttempts.ShouldBe(0);
         string decryptedContent = await System.IO.File.ReadAllTextAsync(
             decryptedFilePath,
             TestContext.Current.CancellationToken
