@@ -46,7 +46,7 @@ new EncryptHooks(publicKey)              // keyId defaults to "" — still valid
 new EncryptHooks(publicKey, "key-2026") // recommended: supply a key ID
 ```
 
-### ✨ New Features
+### New Features
 
 #### Key rotation support
 
@@ -146,5 +146,6 @@ serilog-encrypt decrypt "logs/*.log" -k private_key.xml --id my-app-key-2026
 
 # Key ID defaults to "" when omitted, so the --id flag is optional
 # if you did not assign a key ID (i.e. used the default).
+serilog-encrypt decrypt app.log -k private_key.xml
 ```
 
