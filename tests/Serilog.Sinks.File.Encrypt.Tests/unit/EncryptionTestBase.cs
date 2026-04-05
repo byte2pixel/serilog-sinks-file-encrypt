@@ -17,7 +17,8 @@ public abstract class EncryptionTestBase : IDisposable, IAsyncDisposable
     protected EncryptionTestBase()
     {
         EncryptOptions = CreateEncryptionOptions();
-        DecryptOptions = TestUtils.GetDecryptionOptions(RsaKeyPair.privateKey);
+        LocalKeyProvider keyProvider = new(new Dictionary<string, string> { { "", RsaKeyPair.privateKey } });
+        DecryptOptions = new DecryptionOptions { KeyProvider = keyProvider };
     }
 
     public async ValueTask DisposeAsync()
@@ -244,6 +245,9 @@ public abstract class EncryptionTestBase : IDisposable, IAsyncDisposable
             }
             _streamsToDispose.Clear();
         }
+
+        var keyProvider = DecryptOptions.KeyProvider as LocalKeyProvider;
+        keyProvider?.Dispose();
 
         _disposed = true;
     }

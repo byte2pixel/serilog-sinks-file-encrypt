@@ -34,7 +34,7 @@ public sealed class StreamingDecryptionTests : EncryptionTestBase
         const string TestMessage = "Test message with custom options";
         DecryptionOptions customOptions = new()
         {
-            DecryptionKeys = DecryptOptions.DecryptionKeys,
+            KeyProvider = DecryptOptions.KeyProvider,
             ErrorHandlingMode = ErrorHandlingMode.ThrowException,
         };
 
@@ -85,10 +85,10 @@ public sealed class StreamingDecryptionTests : EncryptionTestBase
     {
         // Arrange - Do not change message sizes or the marker will not be in the correct offsets for each test.
         string[] messages = ["Good message 1\n", "Good message 2\n"];
-        var keyMap = new Dictionary<string, string> { { "", RsaKeyPair.privateKey } };
+        using LocalKeyProvider keyProvider = new("", RsaKeyPair.privateKey);
         DecryptionOptions decryptionOptions = new()
         {
-            DecryptionKeys = keyMap,
+            KeyProvider = keyProvider,
             // ErrorLogPath = $"decryption_errors_{corruptionOffset}.log",
         };
         // create a session with 2 messages.
@@ -120,7 +120,7 @@ public sealed class StreamingDecryptionTests : EncryptionTestBase
         string[] messages = ["Good message 1", "Good message 2"];
         DecryptionOptions skipErrorOptions = new()
         {
-            DecryptionKeys = DecryptOptions.DecryptionKeys,
+            KeyProvider = DecryptOptions.KeyProvider,
             ErrorHandlingMode = ErrorHandlingMode.Skip,
         };
 
@@ -143,10 +143,7 @@ public sealed class StreamingDecryptionTests : EncryptionTestBase
     {
         // Arrange
         string[] messages = ["Good message 1", "Good message 2"];
-        DecryptionOptions errorLogOptions = new()
-        {
-            DecryptionKeys = DecryptOptions.DecryptionKeys,
-        };
+        DecryptionOptions errorLogOptions = new() { KeyProvider = DecryptOptions.KeyProvider };
 
         MemoryStream encryptedStream = await CreateEncryptedStreamAsync(messages);
 
@@ -181,7 +178,7 @@ public sealed class StreamingDecryptionTests : EncryptionTestBase
         string[] messages = ["Good message 1", "Good message 2"];
         DecryptionOptions throwExceptionOptions = new()
         {
-            DecryptionKeys = DecryptOptions.DecryptionKeys,
+            KeyProvider = DecryptOptions.KeyProvider,
             ErrorHandlingMode = ErrorHandlingMode.ThrowException,
         };
 
@@ -205,7 +202,7 @@ public sealed class StreamingDecryptionTests : EncryptionTestBase
         string[] messages = ["Message 1", "Message 2", "Message 3"];
         DecryptionOptions throwExceptionOptions = new()
         {
-            DecryptionKeys = DecryptOptions.DecryptionKeys,
+            KeyProvider = DecryptOptions.KeyProvider,
             ErrorHandlingMode = ErrorHandlingMode.ThrowException,
         };
 

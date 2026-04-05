@@ -183,14 +183,11 @@ public sealed class DecryptCommand(
                 )
                 .CreateLogger();
 
-            var decryptionKeys = new Dictionary<string, string>
-            {
-                { settings.KeyId, rsaPrivateKey },
-            };
+            LocalKeyProvider keyProvider = new(settings.KeyId, rsaPrivateKey);
 
             DecryptionOptions decryptionOptions = new()
             {
-                DecryptionKeys = decryptionKeys,
+                KeyProvider = keyProvider,
                 ErrorHandlingMode = errorMode,
             };
 

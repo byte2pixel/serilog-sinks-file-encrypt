@@ -5,7 +5,7 @@ public sealed class FileSinkIntegrationTests : IDisposable
     private readonly string _testDirectory;
     private readonly string _logFilePath;
     private readonly (string publicKey, string privateKey) _rsaKeyPair;
-    private readonly Dictionary<string, string> _rsaKeyMap = [];
+    private readonly LocalKeyProvider _keyProvider;
     private readonly DecryptionOptions _decryptionOptions;
     private bool _disposed;
 
@@ -22,8 +22,8 @@ public sealed class FileSinkIntegrationTests : IDisposable
 
         // Generate a key pair for testing
         _rsaKeyPair = CryptographicUtils.GenerateRsaKeyPair();
-        _rsaKeyMap.Add("", _rsaKeyPair.privateKey);
-        _decryptionOptions = new DecryptionOptions { DecryptionKeys = _rsaKeyMap };
+        _keyProvider = new LocalKeyProvider("", _rsaKeyPair.privateKey);
+        _decryptionOptions = new DecryptionOptions { KeyProvider = _keyProvider };
     }
 
     private void Dispose(bool disposing)
@@ -32,7 +32,7 @@ public sealed class FileSinkIntegrationTests : IDisposable
         {
             return;
         }
-
+        _keyProvider.Dispose();
         if (disposing)
         {
             // Dispose managed resources here
@@ -190,20 +190,14 @@ public sealed class FileSinkIntegrationTests : IDisposable
         // Generate a different key pair
         (string publicKey, string privateKey) differentKeyPair =
             CryptographicUtils.GenerateRsaKeyPair();
-
+        using LocalKeyProvider differentKeyProvider = new("", differentKeyPair.privateKey);
         // Act & Assert
         await using FileStream inputStream = System.IO.File.OpenRead(_logFilePath);
         using MemoryStream outputStream = new();
         await CryptographicUtils.DecryptLogFileAsync(
             inputStream,
             outputStream,
-            new DecryptionOptions()
-            {
-                DecryptionKeys = new Dictionary<string, string>()
-                {
-                    { "", differentKeyPair.privateKey },
-                },
-            },
+            new DecryptionOptions() { KeyProvider = differentKeyProvider },
             cancellationToken: TestContext.Current.CancellationToken
         );
 
@@ -391,8 +385,13 @@ public sealed class FileSinkIntegrationTests : IDisposable
         // Generate a second key pair
         (string publicKey, string privateKey) secondKeyPair =
             CryptographicUtils.GenerateRsaKeyPair();
-        _decryptionOptions.DecryptionKeys.Add("Key1", _rsaKeyPair.privateKey);
-        _decryptionOptions.DecryptionKeys.Add("Key2", secondKeyPair.privateKey);
+        var keyMap = new Dictionary<string, string>
+        {
+            { "Key1", _rsaKeyPair.privateKey },
+            { "Key2", secondKeyPair.privateKey },
+        };
+        using LocalKeyProvider keyProvider = new(keyMap);
+        DecryptionOptions decryptionOptions = new() { KeyProvider = keyProvider };
 
         // Act - Create two loggers with different encryption keys
         Logger logger1 = new LoggerConfiguration()
@@ -417,7 +416,7 @@ public sealed class FileSinkIntegrationTests : IDisposable
         await CryptographicUtils.DecryptLogFileAsync(
             inputStream1,
             outputStream1,
-            _decryptionOptions,
+            decryptionOptions,
             cancellationToken: TestContext.Current.CancellationToken
         );
 
@@ -426,7 +425,7 @@ public sealed class FileSinkIntegrationTests : IDisposable
         await CryptographicUtils.DecryptLogFileAsync(
             inputStream2,
             outputStream2,
-            _decryptionOptions,
+            decryptionOptions,
             cancellationToken: TestContext.Current.CancellationToken
         );
 
@@ -449,10 +448,7 @@ public sealed class FileSinkIntegrationTests : IDisposable
             crossOutputStream1,
             new DecryptionOptions
             {
-                DecryptionKeys = new Dictionary<string, string>
-                {
-                    { "Key1", secondKeyPair.privateKey }, // add the wrong key with correct key id for cross decryption
-                },
+                KeyProvider = new LocalKeyProvider("Key1", secondKeyPair.privateKey), // add the wrong key with correct key id for cross decryption
             },
             cancellationToken: TestContext.Current.CancellationToken
         );
@@ -464,10 +460,7 @@ public sealed class FileSinkIntegrationTests : IDisposable
             crossOutputStream2,
             new DecryptionOptions
             {
-                DecryptionKeys = new Dictionary<string, string>
-                {
-                    { "Key2", _rsaKeyPair.privateKey }, // add the wrong key with correct key id for cross decryption
-                },
+                KeyProvider = new LocalKeyProvider("Key2", _rsaKeyPair.privateKey), // add the wrong key with correct key id for cross decryption
             },
             cancellationToken: TestContext.Current.CancellationToken
         );
