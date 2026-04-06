@@ -9,6 +9,11 @@
 A [Serilog.File.Sink](https://github.com/serilog/serilog-sinks-file) hook that encrypts log files using RSA and AES-GCM hybrid encryption. This package provides secure logging by encrypting log data before writing to disk, ensuring sensitive information remains protected.
 
 > [!WARNING]
+> **v4.0.0 DecryptionOptions API Change**
+> The decryption options no longer takes a dictionary of key id → private key pairs. Instead, you must provide
+> a IKeyProvider implementation that can decrypt the AES-GCM session data itself. There is a provided LocalKeyProvider
+> that works similarly to the old API. Use this interface if you use Azure Key Vault, AWS KMS, or any other external key management system where you don't want to load private keys into memory. v4.x can still decrypt v3.x files so there is no concern about rolling log files before upgrading. See the [Migration Guide](#migration-from-v3x-to-v400)
+> 
 > **v3.0.0 is a breaking change from v2.x.**
 > Log files written by v2 cannot be appended to or read by v3. See the [Migration Guide](#migration-from-v2x-to-v300) below and the full [CHANGELOG](https://github.com/byte2pixel/serilog-sinks-file-encrypt/blob/main/CHANGELOG.md) before upgrading.
 
@@ -156,7 +161,7 @@ hooks: new EncryptHooks(oldPublicKey, keyId: "my-app-key-2025")
 hooks: new EncryptHooks(newPublicKey, keyId: "my-app-key-2026")
 ```
 
-**Decryption side** — supply all relevant private keys in `DecryptionOptions.DecryptionKeys`:
+**Decryption side** — Implement a key provider that can decrypt the AES-GCM session data for each key ID. The simplest way is to use the provided `LocalKeyProvider` which takes a dictionary of key ID → private key pairs or implement your own if you use an external key management system like Azure Key Vault or AWS KMS.
 
 ```csharp
 using Serilog.Sinks.File.Encrypt;
@@ -165,13 +170,16 @@ using Serilog.Sinks.File.Encrypt.Models;
 string oldPrivateKey = File.ReadAllText("./keys/private_key_2025.xml");
 string newPrivateKey = File.ReadAllText("./keys/private_key_2026.xml");
 
+var keyMap = new Dictionary<string, string>
+{
+    { "my-app-key-2025", oldPrivateKey },
+    { "my-app-key-2026", newPrivateKey },
+};
+
+using LocalKeyProvider keyProvider = new LocalKeyProvider(keyMap);
 var options = new DecryptionOptions
 {
-    DecryptionKeys = new Dictionary<string, string>
-    {
-        { "my-app-key-2025", oldPrivateKey },
-        { "my-app-key-2026", newPrivateKey },
-    }
+    KeyProvider = keyProvider,
 };
 
 using var input  = File.OpenRead("logs/app.log");
@@ -200,23 +208,25 @@ For large files, use the memory-optimized streaming API:
 using Serilog.Sinks.File.Encrypt;
 using Serilog.Sinks.File.Encrypt.Models;
 
+var keyMap = new Dictionary<string, string>
+{
+    { "my-app-key-2026", File.ReadAllText("private_key.xml") },
+};
+using LocalKeyProvider keyProvider = new LocalKeyProvider(keyMap); // or implement your own IKeyProvider.
+
 // Build decryption options with one or more keys
 var options = new DecryptionOptions
 {
-    DecryptionKeys = new Dictionary<string, string>
-    {
-        { "my-app-key-2026", File.ReadAllText("private_key.xml") },
-    },
-    ErrorHandlingMode = ErrorHandlingMode.Skip  // default
+    KeyProvider = keyProvider,
 };
 
-// File-to-file decryption
+// File-to-file decryption example
 await CryptographicUtils.DecryptLogFileAsync(
     "logs/app.log",
     "logs/decrypted.log",
     options);
 
-// Stream-to-stream decryption
+// Or Stream-to-stream decryption example
 using var input  = File.OpenRead("large-log.encrypted");
 using var output = File.Create("large-log.decrypted");
 await CryptographicUtils.DecryptLogFileAsync(input, output, options);
@@ -232,14 +242,14 @@ using Serilog.Sinks.File.Encrypt.Models;
 // Skip corrupted sections silently (DEFAULT — ideal for JSON/structured logs)
 var skipOptions = new DecryptionOptions
 {
-    DecryptionKeys = ...,
+    KeyProvider = ...,
     ErrorHandlingMode = ErrorHandlingMode.Skip  // This is the default
 };
 
 // Throw exception on first error (strict validation)
 var strictOptions = new DecryptionOptions
 {
-    DecryptionKeys = ...,
+    KeyProvider = ...,
     ErrorHandlingMode = ErrorHandlingMode.ThrowException
 };
 
@@ -253,7 +263,7 @@ await CryptographicUtils.DecryptLogFileAsync(input, output, skipOptions);
 // Continues past corrupted sections; output is clean and safe for structured log parsers.
 var options = new DecryptionOptions
 {
-    DecryptionKeys = new Dictionary<string, string> { { "key-id", privateKey } },
+    KeyProvider = ...,
     ErrorHandlingMode = ErrorHandlingMode.Skip
 };
 
@@ -271,7 +281,7 @@ await CryptographicUtils.DecryptLogFileAsync(input, output, options, auditLogger
 ```csharp
 var options = new DecryptionOptions
 {
-    DecryptionKeys = new Dictionary<string, string> { { "key-id", privateKey } },
+    KeyProvider = ...,
     ErrorHandlingMode = ErrorHandlingMode.ThrowException
 };
 
@@ -341,17 +351,32 @@ Task<DecryptionResult> CryptographicUtils.DecryptLogFileAsync(
     CancellationToken cancellationToken = default)
 ```
 
+### Key Provider Interface
+```csharp
+public interface IKeyProvider
+{
+    // Decrypts the AES-GCM session key using the RSA private key corresponding to the given keyId.
+    Task<byte[]> DecryptAsync(
+        string keyId,
+        ReadOnlyMemory<byte> cipherText,
+        CancellationToken cancellationToken = default
+    );
+    
+    // The header does not contain the key size, this method is needed to determine how many bytes to read to
+    // get the full encrypted session data for decryption.
+    Task<int> GetKeySizeAsync(string keyId, CancellationToken cancellationToken = default);
+}
+```
+
 ### DecryptionOptions
 ```csharp
 public sealed record DecryptionOptions
 {
-    // Dictionary of key ID → RSA private key (XML or PEM).
-    // Use "" as the key when no keyId was assigned during encryption.
-    public required Dictionary<string, string> DecryptionKeys { get; init; }
-
-    // How decryption errors are handled. Default: Skip.
+    // The key provider is responsible for decrypting the AES-GCM session key using the RSA private key.
+    public required IKeyProvider KeyProvider { get; init; }
+    
     public ErrorHandlingMode ErrorHandlingMode { get; init; } = ErrorHandlingMode.Skip;
-}
+};
 ```
 
 ### ErrorHandlingMode
@@ -406,6 +431,10 @@ serilog-encrypt decrypt "logs/*.log" -k private_key.xml --id my-app-key-2026 --a
 ```
 
 For detailed CLI documentation, see the [CLI tool documentation](https://www.nuget.org/packages/Serilog.Sinks.File.Encrypt.Cli).
+
+## Migration from v3.x to v4.0.0
+
+The only breaking change is the DecryptionOptions API change. The new IKeyProvider interface is more flexible and allows you to implement your own key management strategy if you use an external system like Azure Key Vault or AWS KMS. If you were previously using the old dictionary-based API, you can switch to the new LocalKeyProvider which provides similar functionality.
 
 ## Migration from v2.x to v3.0.0
 

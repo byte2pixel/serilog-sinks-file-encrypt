@@ -134,8 +134,10 @@ serilog-encrypt decrypt "logs/2026/*.log" -k ./keys/private_key_2026.xml --id my
 ```
 
 > **Note:** The CLI supports one key per invocation. To decrypt a mixed directory containing files
-> from multiple key rotations, use the programmatic `DecryptionOptions.DecryptionKeys` dictionary
-> in your own application. See the [main package documentation](https://www.nuget.org/packages/Serilog.Sinks.File.Encrypt#readme-body-tab).
+> from multiple key rotations, use the `IKeyProvider` API from the main package to implement custom logic for
+> selecting the correct key and decrypting the AES session. There is a `LocalKeyProvider` implementation included 
+> or write your own that uses Azure Key Vault, AWS KMS, HashiCorp Vault, or any other secure key management system.
+> See the [main package documentation](https://www.nuget.org/packages/Serilog.Sinks.File.Encrypt#readme-body-tab) for details on how to implement and integrate a custom `IKeyProvider`.
 
 ### Error Handling
 
