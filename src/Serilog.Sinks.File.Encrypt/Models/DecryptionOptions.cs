@@ -1,3 +1,5 @@
+using Serilog.Sinks.File.Encrypt.Interfaces;
+
 namespace Serilog.Sinks.File.Encrypt.Models;
 
 /// <summary>
@@ -6,9 +8,10 @@ namespace Serilog.Sinks.File.Encrypt.Models;
 public sealed record DecryptionOptions
 {
     /// <summary>
-    /// A dictionary of RSA private keys indexed by their corresponding key IDs. This allows for key rotation and supports multiple keys for decryption.
+    /// The <see cref="IKeyProvider"/> implementation responsible for providing the decryption of the AES Session
+    /// key and nonce used to encrypt the log entry(ies). This is a required property and must be set for decryption to work.
     /// </summary>
-    public required Dictionary<string, string> DecryptionKeys { get; init; } = [];
+    public required IKeyProvider KeyProvider { get; init; }
 
     /// <summary>
     /// Defines how decryption errors should be handled.

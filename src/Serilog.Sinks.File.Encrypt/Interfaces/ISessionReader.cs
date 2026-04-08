@@ -10,10 +10,11 @@ namespace Serilog.Sinks.File.Encrypt.Interfaces;
 internal interface ISessionReader
 {
     /// <summary>
-    /// Reads the session header from the input stream, decrypts it using the appropriate RSA key from the key map
+    /// Reads the session header from the input stream and decrypts it to obtain the AES session key and nonce.
+    /// The session header is expected to be encrypted using RSA, and will be decrypted using the provided <see cref="IKeyProvider"/>
     /// </summary>
     /// <param name="input">The input to decrypt.</param>
-    /// <param name="keyMap">The key map to look up the proper RSA key.</param>
+    /// <param name="keyProvider">The key provider used to decrypt the AES session key and nonce.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>A <see cref="DecryptionContext"/> containing the AES key, nonce for decrypting subsequent messages.</returns>
     /// <exception cref="EndOfStreamException">The end of the stream is reached before the full session info is read.</exception>
@@ -22,7 +23,7 @@ internal interface ISessionReader
     /// <exception cref="InvalidDataException">Thrown when then header is not valid.</exception>
     internal Task<DecryptionContext> ReadSessionAsync(
         Stream input,
-        Dictionary<string, RSA> keyMap,
+        IKeyProvider keyProvider,
         CancellationToken cancellationToken
     );
 }

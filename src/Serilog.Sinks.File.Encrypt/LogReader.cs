@@ -26,7 +26,6 @@ public sealed class LogReader : IDisposable
     private readonly DecryptionOptions _options;
     private DecryptionContext _context = DecryptionContext.Empty;
     private readonly ILogger? _logger;
-    private readonly Dictionary<string, RSA> _rsaKeyCache = new();
     private int _decryptedSessions;
     private int _decryptedMessages;
     private int _failedHeaders;
@@ -41,19 +40,19 @@ public sealed class LogReader : IDisposable
     /// <param name="options">The decryption options</param>
     /// <param name="logger">Optional logger for auditing decryption operations and errors. If not provided, no audit logging will occur.</param>
     /// <exception cref="ArgumentNullException">Thrown if input or options is null</exception>
-    /// <exception cref="InvalidOperationException">Thrown if the decryption keys are null or empty.</exception>
-    /// <exception cref="CryptographicException">Thrown if there is an issue creating an RSA with any of the decryption keys.</exception>
+    /// <exception cref="InvalidOperationException">Thrown if KeyProvider is null</exception>
     /// <remarks>
     /// This class is not thread-safe and should be used for a single decryption operation on a given input stream.
+    /// The caller retains ownership of the input stream and <see cref="DecryptionOptions.KeyProvider"/>
     /// </remarks>
     public LogReader(Stream input, DecryptionOptions options, ILogger? logger = null)
     {
         ArgumentNullException.ThrowIfNull(input);
         ArgumentNullException.ThrowIfNull(options);
 
-        if (options.DecryptionKeys is null || options.DecryptionKeys.Count == 0)
+        if (options.KeyProvider is null)
         {
-            throw new InvalidOperationException("At least one decryption key must be provided.");
+            throw new InvalidOperationException("A KeyProvider must be supplied in DecryptionOptions.");
         }
 
         _input = input;
@@ -67,23 +66,6 @@ public sealed class LogReader : IDisposable
             );
         }
 
-        foreach (KeyValuePair<string, string> key in options.DecryptionKeys)
-        {
-            try
-            {
-                var rsa = RSA.Create();
-                rsa.FromString(key.Value);
-                _rsaKeyCache.Add(key.Key, rsa);
-            }
-            catch (Exception ex)
-                when (ex is CryptographicException or ArgumentNullException or ArgumentException)
-            {
-                throw new CryptographicException(
-                    $"Invalid RSA key for key ID '{key.Key}': {ex.Message}",
-                    ex
-                );
-            }
-        }
         _logger?.Information("LogReader initialized, ready to process input stream.");
     }
 
@@ -376,7 +358,7 @@ public sealed class LogReader : IDisposable
             ISessionReader sessionReader = SessionReaderFactory.GetSessionReader(version[0]);
             _context = await sessionReader.ReadSessionAsync(
                 _input,
-                _rsaKeyCache,
+                _options.KeyProvider,
                 cancellationToken
             );
             _decryptedSessions++;
@@ -411,18 +393,7 @@ public sealed class LogReader : IDisposable
         _input.Length - _input.Position >= EncryptionConstants.MagicBytes.Length;
 
     /// <inheritdoc />
-    public void Dispose()
-    {
-        DisposeRsaKeys();
-    }
-
-    private void DisposeRsaKeys()
-    {
-        foreach (RSA value in _rsaKeyCache.Values)
-        {
-            value.Dispose();
-        }
-    }
+    public void Dispose() { }
 
     private int BoyerMooreSearch()
     {

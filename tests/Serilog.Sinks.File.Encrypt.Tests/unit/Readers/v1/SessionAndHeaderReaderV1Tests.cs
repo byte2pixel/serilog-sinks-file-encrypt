@@ -8,18 +8,16 @@ public sealed class SessionAndHeaderReaderV1Tests : IDisposable
     private readonly byte[] _nonce;
     private readonly RSA _encryptionRsa = RSA.Create();
     private const string KeyId = "test-key-id";
-    private readonly Dictionary<string, RSA> _keyMap = [];
-    private readonly DecryptionOptions _decOptions;
+    private readonly LocalKeyProvider _keyProvider;
 
     public SessionAndHeaderReaderV1Tests()
     {
         (string publicKey, string privateKey) = CryptographicUtils.GenerateRsaKeyPair();
         _encryptionRsa.FromString(publicKey);
-        _decOptions = TestUtils.GetDecryptionOptions(privateKey, KeyId);
         _input = new MemoryStream();
         _sut = new SessionReaderV1(new HeaderReaderV1());
+        _keyProvider = new LocalKeyProvider(KeyId, privateKey);
         (_aesKey, _nonce) = TestUtils.CreateSessionData();
-        BuildKeyMap();
     }
 
     [Fact]
@@ -36,7 +34,7 @@ public sealed class SessionAndHeaderReaderV1Tests : IDisposable
         // Act
         DecryptionContext context = await _sut.ReadSessionAsync(
             _input,
-            _keyMap,
+            _keyProvider,
             TestContext.Current.CancellationToken
         );
 
@@ -46,7 +44,7 @@ public sealed class SessionAndHeaderReaderV1Tests : IDisposable
     }
 
     [Fact]
-    public async Task GivenNoMatchingKey_WhenReadSessionAsync_ThenThrows()
+    public async Task GivenNullKeyProvider_WhenReadSessionAsync_ThenThrows()
     {
         // Arrange
         byte[] sessionData = new byte[_aesKey.Length + _nonce.Length];
@@ -57,12 +55,8 @@ public sealed class SessionAndHeaderReaderV1Tests : IDisposable
         _input.Seek(0, SeekOrigin.Begin);
 
         // Act & Assert
-        await Should.ThrowAsync<InvalidOperationException>(async () =>
-            await _sut.ReadSessionAsync(
-                _input,
-                new Dictionary<string, RSA>(), // empty key map to force failure
-                TestContext.Current.CancellationToken
-            )
+        await Should.ThrowAsync<ArgumentNullException>(async () =>
+            await _sut.ReadSessionAsync(_input, null!, TestContext.Current.CancellationToken)
         );
     }
 
@@ -78,7 +72,7 @@ public sealed class SessionAndHeaderReaderV1Tests : IDisposable
 
         // Act & Assert
         var exception = await Should.ThrowAsync<InvalidDataException>(async () =>
-            await _sut.ReadSessionAsync(_input, _keyMap, TestContext.Current.CancellationToken)
+            await _sut.ReadSessionAsync(_input, _keyProvider, TestContext.Current.CancellationToken)
         );
         exception.Message.ShouldContain("Decrypted payload is too short to read AES key");
     }
@@ -100,7 +94,7 @@ public sealed class SessionAndHeaderReaderV1Tests : IDisposable
 
         // Act & Assert
         var exception = await Should.ThrowAsync<InvalidDataException>(async () =>
-            await _sut.ReadSessionAsync(_input, _keyMap, TestContext.Current.CancellationToken)
+            await _sut.ReadSessionAsync(_input, _keyProvider, TestContext.Current.CancellationToken)
         );
         exception.Message.ShouldContain("Decrypted payload is too short to read the nonce");
     }
@@ -123,7 +117,7 @@ public sealed class SessionAndHeaderReaderV1Tests : IDisposable
 
         // Act & Assert
         var exception = await Should.ThrowAsync<CryptographicException>(async () =>
-            await _sut.ReadSessionAsync(_input, _keyMap, TestContext.Current.CancellationToken)
+            await _sut.ReadSessionAsync(_input, _keyProvider, TestContext.Current.CancellationToken)
         );
         exception.Message.ShouldContain("RSA decryption of header failed");
     }
@@ -146,23 +140,10 @@ public sealed class SessionAndHeaderReaderV1Tests : IDisposable
         return header;
     }
 
-    private void BuildKeyMap()
-    {
-        foreach (KeyValuePair<string, string> kvp in _decOptions.DecryptionKeys)
-        {
-            var rsa = RSA.Create();
-            rsa.FromString(kvp.Value);
-            _keyMap[kvp.Key] = rsa;
-        }
-    }
-
     public void Dispose()
     {
         _input.Dispose();
-        foreach (RSA rsa in _keyMap.Values)
-        {
-            rsa.Dispose();
-        }
         _encryptionRsa.Dispose();
+        _keyProvider.Dispose();
     }
 }

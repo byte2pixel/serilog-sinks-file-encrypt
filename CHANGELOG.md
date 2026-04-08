@@ -7,6 +7,50 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [4.0.0] - 2026-04-05
+
+### ⚠️ Breaking Changes
+
+#### `DecryptionOptions.DecryptionKeys` replaced by `DecryptionOptions.KeyProvider`
+
+`DecryptionOptions` no longer holds a `Dictionary<string, string>` of key ID → private key pairs.
+Instead, you must supply an `IKeyProvider` implementation that performs the actual RSA decryption of
+the AES-GCM session key. The built-in `LocalKeyProvider` provides the same dictionary-based
+behaviour as before; implement `IKeyProvider` directly when integrating with an external key
+management system such as Azure Key Vault or AWS KMS.
+
+| v3                                                                                          | v4                                                              |
+|---------------------------------------------------------------------------------------------|-----------------------------------------------------------------|
+| `DecryptionOptions { DecryptionKeys = new Dictionary<string, string> { { "id", key } } }`  | `DecryptionOptions { KeyProvider = new LocalKeyProvider(map) }` |
+
+```csharp
+// v3
+var options = new DecryptionOptions
+{
+    DecryptionKeys = new Dictionary<string, string>
+    {
+        { "logs-key-2025", oldPrivateKey },
+        { "logs-key-2026", newPrivateKey },
+    }
+};
+
+// v4
+var keyMap = new Dictionary<string, string>
+{
+    { "logs-key-2025", oldPrivateKey },
+    { "logs-key-2026", newPrivateKey },
+};
+using LocalKeyProvider keyProvider = new LocalKeyProvider(keyMap);
+var options = new DecryptionOptions
+{
+    KeyProvider = keyProvider,
+};
+```
+
+> **v4.x can still decrypt v3.x log files.** No need to archive or re-encrypt existing files before upgrading.
+
+---
+
 ## [3.0.0] - 2026-03-22
 
 ### ⚠️ Breaking Changes
@@ -148,4 +192,3 @@ serilog-encrypt decrypt "logs/*.log" -k private_key.xml --id my-app-key-2026
 # if you did not assign a key ID (i.e. used the default).
 serilog-encrypt decrypt app.log -k private_key.xml
 ```
-

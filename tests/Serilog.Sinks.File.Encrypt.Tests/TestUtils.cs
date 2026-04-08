@@ -22,34 +22,6 @@ internal static class TestUtils
         return GetEncryptionOptions(rsa, keyId, version);
     }
 
-    internal static DecryptionOptions GetDecryptionOptions(
-        Dictionary<string, string> decryptionKeys,
-        ErrorHandlingMode? mode = null
-    )
-    {
-        if (decryptionKeys is null || decryptionKeys.Count == 0)
-        {
-            throw new ArgumentException(
-                "Decryption keys dictionary cannot be empty",
-                nameof(decryptionKeys)
-            );
-        }
-        return new DecryptionOptions
-        {
-            DecryptionKeys = decryptionKeys,
-            ErrorHandlingMode = mode ?? ErrorHandlingMode.Skip,
-        };
-    }
-
-    internal static DecryptionOptions GetDecryptionOptions(
-        string privateKey,
-        string keyId = "",
-        ErrorHandlingMode? mode = null
-    )
-    {
-        return GetDecryptionOptions(new Dictionary<string, string> { { keyId, privateKey } }, mode);
-    }
-
     /// <summary>
     /// Creates a corrupted version of encrypted data by flipping bits at the specified position
     /// </summary>

@@ -162,25 +162,6 @@ public static class CryptographicUtils
     /// <returns>
     /// A <see cref="DecryptionResult"/> containing counts of decrypted sessions, messages, failures, and resync attempts.
     /// </returns>
-    /// <example>
-    /// <code>
-    /// // Decrypt a log file with error logging
-    /// using var inputStream = File.OpenRead("encrypted.log");
-    /// using var outputStream = File.Create("decrypted.log");
-    /// var options = new DecryptionOptions
-    /// {
-    ///     DecryptionKeys = new Dictionary&lt;string, string&gt; { { "keyId", privateKey } },
-    /// };
-    /// var logger = new LoggerConfiguration().WriteTo.File("decryption_errors.log").CreateLogger();
-    /// var result = await CryptographicUtils.DecryptLogFileAsync(
-    ///     inputStream,
-    ///     outputStream,
-    ///     options,
-    ///     logger,
-    ///     cancellationToken
-    /// );
-    /// </code>
-    /// </example>
     public static async Task<DecryptionResult> DecryptLogFileAsync(
         Stream inputStream,
         Stream outputStream,
@@ -213,31 +194,6 @@ public static class CryptographicUtils
     /// This is a convenience overload that automatically manages file streams. For more control over stream handling,
     /// use the <see cref="DecryptLogFileAsync(Stream, Stream, DecryptionOptions, ILogger?, CancellationToken)"/> overload.
     /// </remarks>
-    /// <example>
-    /// <code>
-    /// // Decrypt a file with default options
-    /// await CryptographicUtils.DecryptLogFileAsync(
-    ///     "logs/encrypted.log",
-    ///     "logs/decrypted.log",
-    ///     privateKey
-    /// );
-    ///
-    /// // Decrypt with error logging
-    /// var options = new StreamingOptions
-    /// {
-    ///     ErrorHandlingMode = ErrorHandlingMode.WriteToErrorLog,
-    ///     ErrorLogPath = "logs/errors.log"
-    /// };
-    ///
-    /// await CryptographicUtils.DecryptLogFileAsync(
-    ///     "logs/encrypted.log",
-    ///     "logs/decrypted.log",
-    ///     privateKey,
-    ///     options,
-    ///     cancellationToken
-    /// );
-    /// </code>
-    /// </example>
     public static async Task<DecryptionResult> DecryptLogFileAsync(
         string encryptedFilePath,
         string outputFilePath,

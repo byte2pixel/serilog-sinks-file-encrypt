@@ -231,14 +231,17 @@ public class CryptographicUtilsTests : EncryptionTestBase
     public async Task EncryptedStream_With4096BitKey_EncryptsAndDecryptsSuccessfully()
     {
         // Arrange
-        (string publicKey, string _) = CryptographicUtils.GenerateRsaKeyPair(keySize: 4096);
+        (string publicKey, string privateKey) = CryptographicUtils.GenerateRsaKeyPair(keySize: 4096);
         const string OriginalText = "Testing 4096-bit RSA key with encrypted stream!";
 
         using var rsa = RSA.Create();
         rsa.FromXmlString(publicKey);
+        EncryptionOptions options = new(rsa, "4096");
+        LocalKeyProvider keyProvider = new("4096", privateKey);
+        DecryptionOptions decryptionOptions = new() { KeyProvider = keyProvider };
 
         // Act - Use helper that manages streams automatically
-        string decrypted = await EncryptAndDecryptAsync(OriginalText);
+        string decrypted = await EncryptAndDecryptAsync(OriginalText, options, decryptionOptions);
 
         // Assert
         decrypted.ShouldBe(OriginalText);
@@ -254,8 +257,8 @@ public class CryptographicUtilsTests : EncryptionTestBase
         using var rsa = RSA.Create();
         rsa.FromString(publicKey);
         EncryptionOptions options = new(rsa, "4096");
-        var map = new Dictionary<string, string> { { options.KeyId, privateKey } };
-        DecryptionOptions decryptionOptions = new() { DecryptionKeys = map };
+        LocalKeyProvider keyProvider = new("4096", privateKey);
+        DecryptionOptions decryptionOptions = new() { KeyProvider = keyProvider };
         const string LogMessage1 = "First log entry with 4096-bit key";
         const string LogMessage2 = "Second log entry with 4096-bit key";
         const string LogMessage3 = "Third log entry with 4096-bit key";

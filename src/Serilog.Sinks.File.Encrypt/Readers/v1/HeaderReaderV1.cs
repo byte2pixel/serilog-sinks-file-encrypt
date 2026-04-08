@@ -5,10 +5,24 @@ using Serilog.Sinks.File.Encrypt.Models;
 namespace Serilog.Sinks.File.Encrypt;
 
 /// <inheritdoc />
-public class HeaderReaderV1 : IHeaderReader
+internal class HeaderReaderV1 : IHeaderReader
 {
-    /// <inheritdoc />
-    public (byte[] AesKey, byte[] Nonce) Decrypt(RSA rsa, ReadOnlySpan<byte> headerData)
+    /// <summary>
+    /// Decrypts the session header information, which includes the RSA-encrypted session key and nonce.
+    /// </summary>
+    /// <param name="keyProvider">Provides a method for decrypting the AES-GCM session key and nonce.</param>
+    /// <param name="keyId">The key id that was used to encrypt the AES-GCM session key and nonce</param>
+    /// <param name="headerData">The encrypted header data read from the log file.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>>A tuple containing the decrypted AES session key and nonce.</returns>
+    /// <exception cref="CryptographicException">Thrown when RSA decryption of the header fails.</exception>
+    /// <exception cref="InvalidDataException">Thrown when the decrypted payload is too short to contain the expected AES key and nonce.</exception>
+    public async Task<(byte[] AesKey, byte[] Nonce)> Decrypt(
+        IKeyProvider keyProvider,
+        string keyId,
+        ReadOnlyMemory<byte> headerData,
+        CancellationToken cancellationToken = default
+    )
     {
         int offset = 0;
 
@@ -16,7 +30,7 @@ public class HeaderReaderV1 : IHeaderReader
         byte[] decryptedPayload;
         try
         {
-            decryptedPayload = rsa.Decrypt(headerData, RSAEncryptionPadding.OaepSHA256);
+            decryptedPayload = await keyProvider.DecryptAsync(keyId, headerData, cancellationToken);
         }
         // this catch is needed because of Interop+Crypto+OpenSslCryptographicException on GitHub Actions Ubuntu runners.
         // The OpenSSL implementation throws a different exception type that derives from CryptographicException, so we catch both.

@@ -1,5 +1,3 @@
-using System.Security.Cryptography;
-
 namespace Serilog.Sinks.File.Encrypt.Interfaces;
 
 /// <summary>
@@ -10,11 +8,15 @@ internal interface IHeaderReader
     /// <summary>
     /// Decrypts the session header information, which includes the RSA-encrypted session key and nonce.
     /// </summary>
-    /// <param name="rsa">The RSA instance containing the private key corresponding to the public key used for encryption.
-    /// This is used to decrypt the AES session key and nonce from the header data.</param>
+    /// <param name="keyProvider">Provides a method for decrypting the AES-GCM session key and nonce.</param>
+    /// <param name="keyId">The key id that was used to encrypt the AES-GCM session key and nonce</param>
     /// <param name="headerData">The encrypted header data read from the log file.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>A tuple containing the decrypted AES session key, nonce, and timestamp.</returns>
-    /// <exception cref="CryptographicException">Thrown when the decryption fails.</exception>
-    /// <exception cref="InvalidDataException">Thrown when the header data is invalid or does not contain the expected information.</exception>
-    internal (byte[] AesKey, byte[] Nonce) Decrypt(RSA rsa, ReadOnlySpan<byte> headerData);
+    internal Task<(byte[] AesKey, byte[] Nonce)> Decrypt(
+        IKeyProvider keyProvider,
+        string keyId,
+        ReadOnlyMemory<byte> headerData,
+        CancellationToken cancellationToken = default
+    );
 }
