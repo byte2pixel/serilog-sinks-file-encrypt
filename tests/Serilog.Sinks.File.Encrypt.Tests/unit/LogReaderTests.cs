@@ -1,3 +1,5 @@
+using Serilog.Sinks.File.Encrypt.Interfaces;
+
 namespace Serilog.Sinks.File.Encrypt.Tests;
 
 /// <summary>
@@ -11,7 +13,7 @@ public class LogReaderTests
     public void GivenStreamNull_WhenConstructing_ThenThrows()
     {
         // Arrange
-        DecryptionOptions options = new() { DecryptionKeys = [] };
+        DecryptionOptions options = new() { KeyProvider = Substitute.For<IKeyProvider>() };
 
         // Act & Assert
         Should
@@ -38,11 +40,11 @@ public class LogReaderTests
     }
 
     [Fact]
-    public void GivenNullDecryptionKeys_WhenConstructing_ThenThrows()
+    public void GivenNullKeyProvider_WhenConstructing_ThenThrows()
     {
         // Arrange
         using MemoryStream ms = new();
-        DecryptionOptions options = new() { DecryptionKeys = null! };
+        DecryptionOptions options = new() { KeyProvider = null! };
 
         // Act & Assert
         Should
@@ -50,23 +52,7 @@ public class LogReaderTests
             {
                 using LogReader reader = new(ms, options);
             })
-            .Message.ShouldContain("At least one decryption key must be provided");
-    }
-
-    [Fact]
-    public void GivenEmptyDecryptionKeys_WhenConstructing_ThenThrows()
-    {
-        // Arrange
-        using MemoryStream ms = new();
-        DecryptionOptions options = new() { DecryptionKeys = [] };
-
-        // Act & Assert
-        Should
-            .Throw<InvalidOperationException>(() =>
-            {
-                using LogReader reader = new(ms, options);
-            })
-            .Message.ShouldContain("At least one decryption key must be provided");
+            .Message.ShouldStartWith("A KeyProvider must be");
     }
 
     [Fact]
@@ -74,10 +60,10 @@ public class LogReaderTests
     {
         // Arrange
         using MemoryStream ms = new();
-        DecryptionOptions options = TestUtils.GetDecryptionOptions(
-            "dummy-public",
-            mode: (ErrorHandlingMode)999
-        );
+        (_, string privateKey) = CryptographicUtils.GenerateRsaKeyPair();
+        var keyMap = new Dictionary<string, string>() { { "", privateKey } };
+        using LocalKeyProvider keyProvider = new(keyMap);
+        DecryptionOptions options = new() { KeyProvider = keyProvider, ErrorHandlingMode = (ErrorHandlingMode)999 };
 
         // Act & Assert
         Should

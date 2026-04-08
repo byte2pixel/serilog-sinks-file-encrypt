@@ -54,9 +54,11 @@ public sealed class EncryptedLogStreamAsyncTests : EncryptionTestBase
         );
 
         Dictionary<string, string> map = new() { { "4096", privateKey } };
+        using LocalKeyProvider keyProvider = new(map);
+        DecryptionOptions decryptionOptions = new() { KeyProvider = keyProvider };
         string decrypted = await DecryptStreamToStringAsync(
             encryptedStream,
-            TestUtils.GetDecryptionOptions(map)
+            decryptionOptions
         );
 
         // Assert
