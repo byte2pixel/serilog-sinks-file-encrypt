@@ -101,7 +101,7 @@ public sealed class StreamingDecryptionTests : EncryptionTestBase
         byte[] fileBytes = encryptedStream.ToArray();
         byte[] corrupted = TestUtils.CorruptDataAddingMarker(
             fileBytes,
-            EncryptionConstants.MagicBytes,
+            CryptographicUtils.MagicBytes,
             corruptionOffset
         );
         MemoryStream corruptedStream = CreateMemoryStream(corrupted);

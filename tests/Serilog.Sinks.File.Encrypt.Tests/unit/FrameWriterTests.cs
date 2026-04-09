@@ -17,7 +17,7 @@ public class FrameWriterTests
         frameWriter.WriteHeader(ms, Version, keyIdBytes, header);
 
         // Assert
-        byte[] expectedOutput = EncryptionConstants
+        byte[] expectedOutput = CryptographicUtils
             .MagicBytes.Concat([Version])
             .Concat(keyIdBytes.ToArray())
             .Concat(header)
