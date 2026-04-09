@@ -53,9 +53,9 @@ public class SessionWriterV1Tests
         byte[] outputBytes = output.ToArray();
         int offset = 0;
         outputBytes
-            .Take(EncryptionConstants.MagicBytes.Length)
-            .ShouldBe(EncryptionConstants.MagicBytes);
-        offset += EncryptionConstants.MagicBytes.Length;
+            .Take(CryptographicUtils.MagicBytes.Length)
+            .ShouldBe(CryptographicUtils.MagicBytes);
+        offset += CryptographicUtils.MagicBytes.Length;
         outputBytes[offset].ShouldBe((byte)1); // Version byte
         offset += 1;
         outputBytes.Skip(offset).Take(HeaderMetadataV1.KeyIdLength).ShouldBe(expectedKeyId);
