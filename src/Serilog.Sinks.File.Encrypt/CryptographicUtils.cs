@@ -30,6 +30,15 @@ namespace Serilog.Sinks.File.Encrypt;
 public static class CryptographicUtils
 {
     /// <summary>
+    /// The fixed magic bytes that identify the file format.
+    /// 0xFF: Reserved byte (must be 0xFF) to easily detect when parsing messages, that a new session started.
+    /// 0x42, 0x32, 0x50: ASCII "B2P" (stands for "Byte2Pixel")
+    /// 0xFF, 0xDA, 0x7E: Random bytes for additional uniqueness
+    /// 0x00: Reserved byte (must be 0)
+    /// </summary>
+    public static readonly byte[] MagicBytes = [0xFF, 0x42, 0x32, 0x50, 0xFF, 0xDA, 0x7E, 0x00];
+
+    /// <summary>
     /// Imports an RSA key into an <see cref="RSA"/> instance from a string in either XML or PEM format.
     /// </summary>
     /// <param name="rsa">The <see cref="RSA"/> instance to import the key into.</param>

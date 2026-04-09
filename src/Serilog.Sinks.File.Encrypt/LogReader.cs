@@ -52,7 +52,9 @@ public sealed class LogReader : IDisposable
 
         if (options.KeyProvider is null)
         {
-            throw new InvalidOperationException("A KeyProvider must be supplied in DecryptionOptions.");
+            throw new InvalidOperationException(
+                "A KeyProvider must be supplied in DecryptionOptions."
+            );
         }
 
         _input = input;
@@ -331,7 +333,7 @@ public sealed class LogReader : IDisposable
 
     private async Task ReadMarkerAndHeaderAsync(CancellationToken cancellationToken)
     {
-        var markerBuffer = new Memory<byte>(new byte[EncryptionConstants.MagicBytes.Length]);
+        var markerBuffer = new Memory<byte>(new byte[CryptographicUtils.MagicBytes.Length]);
         await _input.ReadExactlyAsync(markerBuffer, cancellationToken);
         if (IsHeaderMarker(markerBuffer))
         {
@@ -341,7 +343,7 @@ public sealed class LogReader : IDisposable
         {
             _nextSyncPosition++;
             throw new InvalidDataException(
-                $"Invalid header marker at position {_input.Position - EncryptionConstants.MagicBytes.Length}"
+                $"Invalid header marker at position {_input.Position - CryptographicUtils.MagicBytes.Length}"
             );
         }
     }
@@ -385,12 +387,12 @@ public sealed class LogReader : IDisposable
     }
 
     private static bool IsHeaderMarker(Memory<byte> markerBuffer) =>
-        markerBuffer.Span.SequenceEqual(EncryptionConstants.MagicBytes);
+        markerBuffer.Span.SequenceEqual(CryptographicUtils.MagicBytes);
 
     private bool IsEndOfStream() => _input.Position >= _input.Length;
 
     private bool IsRoomForMagicBytes() =>
-        _input.Length - _input.Position >= EncryptionConstants.MagicBytes.Length;
+        _input.Length - _input.Position >= CryptographicUtils.MagicBytes.Length;
 
     /// <inheritdoc />
     public void Dispose() { }
@@ -400,7 +402,7 @@ public sealed class LogReader : IDisposable
         // Consider making this more efficient by reading directly from the stream in chunks and handling buffer overlaps,
         // rather than reading byte-by-byte, make it asynchronous, and consider edge cases like
         // the pattern being split across buffer boundaries
-        int patternLength = EncryptionConstants.MagicBytes.Length;
+        int patternLength = CryptographicUtils.MagicBytes.Length;
         int[] badCharShift = new int[256];
 
         // Preprocessing
@@ -411,7 +413,7 @@ public sealed class LogReader : IDisposable
 
         for (int i = 0; i < patternLength - 1; i++)
         {
-            badCharShift[EncryptionConstants.MagicBytes[i]] = patternLength - 1 - i;
+            badCharShift[CryptographicUtils.MagicBytes[i]] = patternLength - 1 - i;
         }
 
         // Search
@@ -426,7 +428,7 @@ public sealed class LogReader : IDisposable
             while (i < bytesRead)
             {
                 int j = patternLength - 1;
-                while (j >= 0 && buffer[i] == EncryptionConstants.MagicBytes[j])
+                while (j >= 0 && buffer[i] == CryptographicUtils.MagicBytes[j])
                 {
                     i--;
                     j--;

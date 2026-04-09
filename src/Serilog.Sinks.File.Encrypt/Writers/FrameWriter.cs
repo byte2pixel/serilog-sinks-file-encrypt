@@ -14,7 +14,7 @@ internal class FrameWriter : IFrameWriter
     )
     {
         // Write the magic bytes
-        output.Write(EncryptionConstants.MagicBytes, 0, EncryptionConstants.MagicBytes.Length);
+        output.Write(CryptographicUtils.MagicBytes, 0, CryptographicUtils.MagicBytes.Length);
 
         // Write the encrypted log format version
         output.WriteByte(version);
