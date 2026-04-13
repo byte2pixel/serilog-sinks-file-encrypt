@@ -54,7 +54,7 @@ Install the package via NuGet:
 dotnet add package Serilog.Sinks.File.Encrypt
 ```
 
-For key management and decryption capabilities, also install the CLI tool:
+For development key management and decryption capabilities, also install the CLI tool:
 
 ```bash
 dotnet tool install --global Serilog.Sinks.File.Encrypt.Cli
@@ -102,7 +102,7 @@ Log.CloseAndFlush();
 
 ### 3. Decrypt Logs
 
-Use the CLI tool to decrypt your log files:
+Use the CLI tool to decrypt your log files for development testing.
 
 ```bash
 # Pass the key ID that was used during encryption

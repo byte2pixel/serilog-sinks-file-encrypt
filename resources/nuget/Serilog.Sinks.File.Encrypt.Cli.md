@@ -9,8 +9,16 @@
 A command-line tool for managing RSA key pairs and decrypting log files created by the [Serilog.Sinks.File.Encrypt](https://www.nuget.org/packages/Serilog.Sinks.File.Encrypt#readme-body-tab) package.
 
 > [!WARNING]
+> **v4.x can decrypt log files written by v3.0.0, but not v2.x.**
 > **v3.0.0 is a breaking change from v2.x.**
-> The v3 CLI cannot decrypt log files written by v2. Decrypt existing v2 files with the v2 CLI **before** upgrading. See the [CHANGELOG](https://github.com/byte2pixel/serilog-sinks-file-encrypt/blob/main/CHANGELOG.md) for the full migration guide.
+> The v3.x CLI cannot decrypt log files written by v2.x. Decrypt existing v2.x files with the v2.x CLI **before** upgrading. See the [CHANGELOG](https://github.com/byte2pixel/serilog-sinks-file-encrypt/blob/main/CHANGELOG.md) for the full migration guide.
+
+> [!NOTE]
+> The CLI is designed for simplicity and ease of use, with a focus mainly on testing and development scenarios.
+
+For production use, especially with complex key management needs, the correct solution is to implement an `IKeyProvider` and integrate it with your secure key management system.
+
+The CLI can still be used for ad-hoc decryption tasks, but for ongoing operations, the main package's API provides more flexibility and security. See the [main package documentation](https://www.nuget.org/packages/Serilog.Sinks.File.Encrypt#readme-body-tab) for details on how to implement and integrate a custom `IKeyProvider` with your application.
 
 ## Installation
 
@@ -27,7 +35,7 @@ dotnet tool install --global Serilog.Sinks.File.Encrypt.Cli
 Generate a new RSA public/private key pair for encrypting log files:
 
 ```bash
-serilog-encrypt generate --output /path/to/keys
+serilog-encrypt generate --output ./keys
 ```
 
 **Options:**
@@ -133,11 +141,8 @@ serilog-encrypt decrypt "logs/2025/*.log" -k ./keys/private_key_2025.xml --id my
 serilog-encrypt decrypt "logs/2026/*.log" -k ./keys/private_key_2026.xml --id my-app-key-2026
 ```
 
-> **Note:** The CLI supports one key per invocation. To decrypt a mixed directory containing files
-> from multiple key rotations, use the `IKeyProvider` API from the main package to implement custom logic for
-> selecting the correct key and decrypting the AES session. There is a `LocalKeyProvider` implementation included 
-> or write your own that uses Azure Key Vault, AWS KMS, HashiCorp Vault, or any other secure key management system.
-> See the [main package documentation](https://www.nuget.org/packages/Serilog.Sinks.File.Encrypt#readme-body-tab) for details on how to implement and integrate a custom `IKeyProvider`.
+> [!NOTE]
+> The CLI supports one key per invocation. To decrypt a mixed directory containing files from multiple key rotations, use the `IKeyProvider` API from the main package to implement custom logic for selecting the correct key and decrypting the AES session. There is a `LocalKeyProvider` implementation included.
 
 ### Error Handling
 
@@ -154,7 +159,7 @@ serilog-encrypt decrypt app.log -k private_key.xml --strict
 ```
 
 **Audit Logging:**
-Write detailed diagnostic information to a separate rolling log file:
+Write detailed diagnostic information to a separate rolling log file. If `--audit-log` is not specified, one is always created in the temp directory:
 ```bash
 # If not specified, a randomly-named audit log will be created in the temporary directory
 serilog-encrypt decrypt "logs/*.log" -k private_key.xml --audit-log decryption-audit.log
