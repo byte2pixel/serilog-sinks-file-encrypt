@@ -18,7 +18,7 @@ A [Serilog.File.Sink](https://github.com/serilog/serilog-sinks-file) hook that e
 - Transparent encryption of log files using hybrid RSA + AES-GCM cryptography
 - **Key rotation** — assign a key ID to each `EncryptHooks` instance; the decryption layer selects the correct key automatically
 - CLI utilities for key generation, decryption, and batch processing of encrypted logs
-- Memory-optimised streaming for large log files
+- Memory-optimized streaming for large log files
 
 ## 📖 Documentation
 
