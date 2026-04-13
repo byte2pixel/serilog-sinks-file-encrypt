@@ -7,6 +7,8 @@ We release security updates for the following versions:
 | Version | Supported          |
 |---------|--------------------|
 | 4.x.x   | :white_check_mark: |
+| 3.x.x   | :white_check_mark: |
+| 2.x.x   | :x:                |
 
 We provide security updates for the latest pre-release version and the current major version and the previous major version for a minimum of 6 months after the next major release.
 
