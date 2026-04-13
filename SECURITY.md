@@ -6,9 +6,9 @@ We release security updates for the following versions:
 
 | Version | Supported          |
 |---------|--------------------|
-| 1.x.x   | :white_check_mark: |
+| 4.x.x   | :white_check_mark: |
 
-As this project is in pre-release (0.x.x versions), we provide security updates for the latest pre-release version. Once version 1.0.0 is released, we will provide security updates for the current major version and the previous major version for a minimum of 6 months after the next major release.
+We provide security updates for the latest pre-release version and the current major version and the previous major version for a minimum of 6 months after the next major release.
 
 ## Reporting a Vulnerability
 
@@ -54,30 +54,9 @@ When using Serilog.Sinks.File.Encrypt in production, follow these security best 
 
 **Never store private keys in your application code or configuration files that are committed to version control.**
 
-Recommended key storage solutions:
-
-- **Azure Key Vault**: Store keys in Azure Key Vault and retrieve them at runtime
-  ```csharp
-  var client = new SecretClient(new Uri(keyVaultUrl), new DefaultAzureCredential());
-  KeyVaultSecret secret = await client.GetSecretAsync("PublicEncryptionKey");
-  string publicKey = secret.Value;
-  ```
-
-- **AWS Secrets Manager**: Use AWS Secrets Manager for key storage
-  ```csharp
-  var client = new AmazonSecretsManagerClient();
-  var request = new GetSecretValueRequest { SecretId = "PublicEncryptionKey" };
-  var response = await client.GetSecretValueAsync(request);
-  string publicKey = response.SecretString;
-  ```
-
-- **HashiCorp Vault**: Enterprise-grade secret management
-- **Environment Variables**: For development/testing only (not recommended for production)
-- **Encrypted Configuration Files**: Use ASP.NET Core Data Protection or similar
-
 #### Key Generation
 
-- **Use 2048-bit RSA keys minimum**: Default is 2048-bit, but consider 4096-bit for enhanced security
+- **Use 2048-bit RSA keys minimum**: Default is 2048-bit, but consider 4096-bit for enhanced security at a performance cost:
   ```bash
   serilog-encrypt generate --output ./keys --key-size 4096
   ```
@@ -113,10 +92,10 @@ Key rotation is essential for long-term security:
 #### What This Library Does NOT Protect Against
 
 - ❌ **In-memory data**: Log data is unencrypted in application memory before encryption
-- ❌ **Transport encryption**: Logs are encrypted on disk, not during network transmission (use TLS for that)
+- ❌ **Transport encryption**: Logs are encrypted on disk, but should still use secure transport (e.g., TLS) if sent over the network
 - ❌ **Key compromise**: If an attacker obtains the private key, all logs can be decrypted
 - ❌ **Side-channel attacks**: Physical access to the machine may enable advanced attacks
-- ❌ **Malicious code**: Malware running with application privileges can capture logs before encryption
+- ❌ **Malicious code**: Malware running with application privileges can potentially access log data before encryption
 
 ### Threat Model
 

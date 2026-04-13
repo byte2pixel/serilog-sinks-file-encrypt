@@ -49,6 +49,8 @@ var options = new DecryptionOptions
 
 > **v4.x can still decrypt v3.x log files.** No need to archive or re-encrypt existing files before upgrading.
 
+The `CryptographicUtils.MagicBytes` has been made public to allow custom decryption implementations to identify compatible log files.
+
 ---
 
 ## [3.0.0] - 2026-03-22
