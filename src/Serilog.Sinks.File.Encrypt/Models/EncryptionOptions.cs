@@ -13,5 +13,5 @@ namespace Serilog.Sinks.File.Encrypt.Models;
 /// </summary>
 /// <param name="Rsa">The RSA public key used to encrypt the AES-GCM session information.</param>
 /// <param name="KeyId">The key id to include in the header for key rotation. Allows decryption tools to identify which key was used for encryption.</param>
-/// <param name="Version">The version of the header format. This allows for future-proofing the format of the header, enabling backward compatibility.</param>
+/// <param name="Version">Retained for backward compatibility. This value is ignored; the library always uses version 1 of the header format.</param>
 public record EncryptionOptions(RSA Rsa, string KeyId = "", int Version = 1);

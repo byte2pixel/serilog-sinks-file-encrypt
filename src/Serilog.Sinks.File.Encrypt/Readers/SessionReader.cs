@@ -4,17 +4,17 @@ using Serilog.Sinks.File.Encrypt.Models;
 namespace Serilog.Sinks.File.Encrypt;
 
 /// <inheritdoc />
-internal class SessionReaderV1 : ISessionReader
+internal class SessionReader : ISessionReader
 {
     private readonly IHeaderReader _headerReader;
 
     /// <summary>
-    /// Initializes a new instance of the <see cref="SessionReaderV1"/> class with the specified header decryptor.
+    /// Initializes a new instance of the <see cref="SessionReader"/> class with the specified header decryptor.
     /// </summary>
-    /// <param name="headerDecryptor"></param>
-    public SessionReaderV1(IHeaderReader? headerDecryptor = null)
+    /// <param name="headerDecryptor">The header decryptor to use. Defaults to <see cref="HeaderReader"/> if not provided.</param>
+    public SessionReader(IHeaderReader? headerDecryptor = null)
     {
-        _headerReader = headerDecryptor ?? new HeaderReaderV1();
+        _headerReader = headerDecryptor ?? new HeaderReader();
     }
 
     /// <inheritdoc />
@@ -27,7 +27,7 @@ internal class SessionReaderV1 : ISessionReader
         ArgumentNullException.ThrowIfNull(input);
         ArgumentNullException.ThrowIfNull(keyProvider);
         // Read the header from the input stream
-        Memory<byte> keyId = new byte[HeaderMetadataV1.KeyIdLength];
+        Memory<byte> keyId = new byte[HeaderMetadata.KeyIdLength];
         // lookup the RSA key based on the keyId in the header
         await input.ReadExactlyAsync(keyId, cancellationToken);
         string keyIdStr = System.Text.Encoding.UTF8.GetString(keyId.Span).TrimEnd('\0');

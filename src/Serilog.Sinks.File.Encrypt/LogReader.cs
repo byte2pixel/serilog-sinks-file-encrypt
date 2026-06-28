@@ -357,7 +357,11 @@ public sealed class LogReader : IDisposable
         await _input.ReadExactlyAsync(version, cancellationToken);
         try
         {
-            ISessionReader sessionReader = SessionReaderFactory.GetSessionReader(version[0]);
+            if (version[0] != 1)
+            {
+                throw new NotSupportedException($"Unsupported encryption version: {version[0]}");
+            }
+            ISessionReader sessionReader = new SessionReader();
             _context = await sessionReader.ReadSessionAsync(
                 _input,
                 _options.KeyProvider,
