@@ -128,7 +128,7 @@ Verdict:                ✅ Acceptable for web API logging to file, especially w
 ✅ **Safe by Default** - Unbuffered mode has no data loss risk (only unflushed data at risk)  
 🚀 **Performance Mode Available** - Buffered mode is 66% *faster* than no encryption unbuffered
 ⚠️ **Buffering Trade-off** - Better performance but data loss risk on crashes  
-✅ **Zero Lock Contentions** - Safe for multithreaded applications through Serilog.File.Sink
+✅ **Zero Lock Contentions** - Safe for multithreaded applications through `Serilog.File.Sink`
 
 ---
 
