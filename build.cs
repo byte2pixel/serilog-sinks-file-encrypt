@@ -1,11 +1,12 @@
-#:sdk Cake.Sdk@6.0.0
+#:sdk Cake.Sdk@6.2.0
 
-string solution = "./serilog-sinks-file-encrypt.sln";
-string[] testProjects = new[]
-{
+const string Solution = "./serilog-sinks-file-encrypt.sln";
+const string CoverageDir = "./.coverage";
+string[] testProjects =
+[
     "./tests/Serilog.Sinks.File.Encrypt.Tests/Serilog.Sinks.File.Encrypt.Tests.csproj",
     "./tests/Serilog.Sinks.File.Encrypt.Cli.Tests/Serilog.Sinks.File.Encrypt.Cli.Tests.csproj",
-};
+];
 
 ////////////////////////////////////////////////////////////////
 // Arguments
@@ -26,13 +27,13 @@ Task("Clean")
 Task("Restore")
     .Does(ctx =>
     {
-        ctx.DotNetRestore(solution);
+        ctx.DotNetRestore(Solution);
     });
 
 Task("Lint")
     .Does(ctx =>
     {
-        ctx.DotNetFormatStyle(solution, new DotNetFormatSettings { VerifyNoChanges = true });
+        ctx.DotNetFormatStyle(Solution, new DotNetFormatSettings { VerifyNoChanges = true });
     });
 
 Task("Build")
@@ -42,7 +43,7 @@ Task("Build")
     .Does(ctx =>
     {
         ctx.DotNetBuild(
-            solution,
+            Solution,
             new DotNetBuildSettings
             {
                 Configuration = configuration,
@@ -63,14 +64,13 @@ Task("Test")
     {
         bool collectCoverage =
             Argument("collect-coverage", false) || BuildSystem.IsRunningOnGitHubActions;
-        string coverageDir = "./.coverage";
 
         if (collectCoverage)
         {
-            ctx.CleanDirectory(coverageDir);
+            ctx.CleanDirectory(CoverageDir);
         }
 
-        foreach (string? testProject in testProjects)
+        foreach (string testProject in testProjects)
         {
             string projectName = System.IO.Path.GetFileNameWithoutExtension(testProject);
             var settings = new DotNetTestSettings
@@ -85,7 +85,7 @@ Task("Test")
             if (collectCoverage)
             {
                 // Create a unique directory for each test project's results
-                string projectResultsDir = System.IO.Path.Join(coverageDir, projectName);
+                string projectResultsDir = System.IO.Path.Join(CoverageDir, projectName);
                 settings.Collectors = ["XPlat Code Coverage"];
                 settings.ResultsDirectory = projectResultsDir;
                 settings.Loggers = ["trx;LogFilePrefix=testResults"];
@@ -101,7 +101,7 @@ Task("Package")
     .Does(ctx =>
     {
         ctx.DotNetPack(
-            solution,
+            Solution,
             new DotNetPackSettings
             {
                 Configuration = configuration,
@@ -118,7 +118,7 @@ Task("Package")
     });
 
 Task("Publish-NuGet")
-    .WithCriteria(ctx => BuildSystem.IsRunningOnGitHubActions, "Not running on GitHub Actions")
+    .WithCriteria(_ => BuildSystem.IsRunningOnGitHubActions, "Not running on GitHub Actions")
     .IsDependentOn("Package")
     .Does(ctx =>
     {
@@ -129,7 +129,7 @@ Task("Publish-NuGet")
         }
 
         // Publish to GitHub Packages
-        foreach (var file in ctx.GetFiles("./.artifacts/*.nupkg"))
+        foreach (FilePath? file in ctx.GetFiles("./.artifacts/*.nupkg"))
         {
             ctx.Information("Publishing {0}...", file.GetFilename().FullPath);
             DotNetNuGetPush(
@@ -150,7 +150,7 @@ Task("Publish").IsDependentOn("Publish-NuGet");
 
 Task("Default").IsDependentOn("Package");
 
-Teardown(ctx =>
+Teardown(_ =>
 {
     Information("Shutting down .NET core SDK tooling...");
     DotNetBuildServerShutdown();

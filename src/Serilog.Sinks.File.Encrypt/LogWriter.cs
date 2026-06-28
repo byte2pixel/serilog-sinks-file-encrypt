@@ -44,7 +44,7 @@ public sealed class LogWriter : Stream
         ArgumentNullException.ThrowIfNull(inner);
         ArgumentNullException.ThrowIfNull(options);
         _inner = inner;
-        _writer = SessionWriterFactory.Create(options);
+        _writer = new SessionWriter(new HeaderWriter(options), options.KeyId);
     }
 
     /// <summary>

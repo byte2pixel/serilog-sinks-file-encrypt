@@ -5,7 +5,7 @@ using Serilog.Sinks.File.Encrypt.Models;
 namespace Serilog.Sinks.File.Encrypt;
 
 /// <inheritdoc />
-internal class HeaderReaderV1 : IHeaderReader
+internal class HeaderReader : IHeaderReader
 {
     /// <summary>
     /// Decrypts the session header information, which includes the RSA-encrypted session key and nonce.
@@ -14,7 +14,7 @@ internal class HeaderReaderV1 : IHeaderReader
     /// <param name="keyId">The key id that was used to encrypt the AES-GCM session key and nonce</param>
     /// <param name="headerData">The encrypted header data read from the log file.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
-    /// <returns>>A tuple containing the decrypted AES session key and nonce.</returns>
+    /// <returns>A tuple containing the decrypted AES session key and nonce.</returns>
     /// <exception cref="CryptographicException">Thrown when RSA decryption of the header fails.</exception>
     /// <exception cref="InvalidDataException">Thrown when the decrypted payload is too short to contain the expected AES key and nonce.</exception>
     public async Task<(byte[] AesKey, byte[] Nonce)> Decrypt(
@@ -42,20 +42,20 @@ internal class HeaderReaderV1 : IHeaderReader
             throw new CryptographicException("RSA decryption of header failed.", ex);
         }
         // Read AES key
-        if (decryptedPayload.Length < HeaderMetadataV1.AesKeyLength)
+        if (decryptedPayload.Length < HeaderMetadata.AesKeyLength)
         {
             throw new InvalidDataException("Decrypted payload is too short to read AES key");
         }
 
-        byte[] aesKey = decryptedPayload[offset..(HeaderMetadataV1.AesKeyLength)];
-        offset += HeaderMetadataV1.AesKeyLength;
+        byte[] aesKey = decryptedPayload[offset..(HeaderMetadata.AesKeyLength)];
+        offset += HeaderMetadata.AesKeyLength;
 
-        if (decryptedPayload.Length < offset + HeaderMetadataV1.NonceLength)
+        if (decryptedPayload.Length < offset + HeaderMetadata.NonceLength)
         {
             throw new InvalidDataException("Decrypted payload is too short to read the nonce.");
         }
 
-        byte[] nonce = decryptedPayload[offset..(offset + HeaderMetadataV1.NonceLength)];
+        byte[] nonce = decryptedPayload[offset..(offset + HeaderMetadata.NonceLength)];
 
         return (aesKey, nonce);
     }

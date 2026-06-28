@@ -63,7 +63,7 @@ public class EncryptedLogStreamBenchmarks
     }
 
     [Benchmark]
-    public void EncryptedLogStreamWriteV1()
+    public void EncryptedLogStreamWrite()
     {
         EncryptionOptions options = new(_rsa, _keyId);
         using MemoryStream ms = new();

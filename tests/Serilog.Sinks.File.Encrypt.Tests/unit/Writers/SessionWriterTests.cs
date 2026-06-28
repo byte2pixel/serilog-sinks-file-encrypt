@@ -3,14 +3,14 @@ using Serilog.Sinks.File.Encrypt.Tests.Mocks;
 
 namespace Serilog.Sinks.File.Encrypt.Tests;
 
-public class SessionWriterV1Tests
+public class SessionWriterTests
 {
-    private readonly MockHeaderWriterV1 _headerWriter = new();
+    private readonly MockHeaderWriter _headerWriter = new();
     private readonly IFrameWriter _frameWriter = new FrameWriter();
     private readonly byte[] _aesKey;
     private readonly byte[] _nonce;
 
-    public SessionWriterV1Tests()
+    public SessionWriterTests()
     {
         (_aesKey, _nonce) = TestUtils.CreateSessionData();
     }
@@ -19,9 +19,9 @@ public class SessionWriterV1Tests
     public void GivenKeyIdTooLarge_WhenWriteHeader_ThenThrowsArgumentException()
     {
         // Arrange
-        string keyId = new('A', HeaderMetadataV1.KeyIdLength + 1); // 33 bytes when UTF-8 encoded
+        string keyId = new('A', HeaderMetadata.KeyIdLength + 1); // 33 bytes when UTF-8 encoded
 
-        SessionWriterV1 writer = new(_headerWriter, keyId, _frameWriter);
+        SessionWriter writer = new(_headerWriter, keyId, _frameWriter);
         using MemoryStream output = new();
 
         // Act & Assert
@@ -37,12 +37,12 @@ public class SessionWriterV1Tests
     {
         // Arrange
         const string KeyId = "TestKeyId";
-        byte[] expectedKeyId = new byte[HeaderMetadataV1.KeyIdLength];
+        byte[] expectedKeyId = new byte[HeaderMetadata.KeyIdLength];
         Encoding.UTF8.GetBytes(KeyId).CopyTo(expectedKeyId, 0);
 
         byte[] expectedHeader = [.. _aesKey, .. _nonce];
 
-        SessionWriterV1 writer = new(_headerWriter, KeyId, _frameWriter);
+        SessionWriter writer = new(_headerWriter, KeyId, _frameWriter);
         using MemoryStream output = new();
 
         // Act
@@ -58,10 +58,10 @@ public class SessionWriterV1Tests
         offset += CryptographicUtils.MagicBytes.Length;
         outputBytes[offset].ShouldBe((byte)1); // Version byte
         offset += 1;
-        outputBytes.Skip(offset).Take(HeaderMetadataV1.KeyIdLength).ShouldBe(expectedKeyId);
-        offset += HeaderMetadataV1.KeyIdLength;
-        outputBytes.Skip(offset).Take(HeaderMetadataV1.AesKeyLength).ShouldBe(_aesKey);
-        offset += HeaderMetadataV1.AesKeyLength;
-        outputBytes.Skip(offset).Take(HeaderMetadataV1.NonceLength).ShouldBe(_nonce);
+        outputBytes.Skip(offset).Take(HeaderMetadata.KeyIdLength).ShouldBe(expectedKeyId);
+        offset += HeaderMetadata.KeyIdLength;
+        outputBytes.Skip(offset).Take(HeaderMetadata.AesKeyLength).ShouldBe(_aesKey);
+        offset += HeaderMetadata.AesKeyLength;
+        outputBytes.Skip(offset).Take(HeaderMetadata.NonceLength).ShouldBe(_nonce);
     }
 }

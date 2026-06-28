@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [4.1.0] - 2026-06-29
+
+### ⚠️ Breaking Changes (likely not relevant for most users)
+
+- A class that was meant to be `internal` was actually public. `HeaderMetadataV1` has been made `internal` and renamed to `HeaderMetadata`.
+
+The only other changes here were renaming classes. Versioning of the header was removed to simplify the code base. I have decided I do not want the header to support storing additional data in the future.
+
+> [!NOTE]
+> The next major version v5.0.0 will split the Encryption and Decryption into separate NuGet packages.
+> This will allow the decryption package to be used in environments where the encryption package is not needed.
+
+---
+
 ## [4.0.0] - 2026-04-05
 
 ### ⚠️ Breaking Changes

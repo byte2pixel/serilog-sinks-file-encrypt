@@ -3,10 +3,9 @@ using System.Security.Cryptography;
 namespace Serilog.Sinks.File.Encrypt.Models;
 
 /// <summary>
-/// Represents the metadata for Version 1 of the header format, which includes specific lengths for various
-/// components.
+/// Metadata constants for the encrypted log file header format.
 /// </summary>
-public static class HeaderMetadataV1
+internal static class HeaderMetadata
 {
     /// <summary>
     /// Version 1 key ID length in bytes. This is the length of the key identifier string that will be stored in the header.
