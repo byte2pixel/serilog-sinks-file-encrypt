@@ -3,6 +3,7 @@ namespace Serilog.Sinks.File.Encrypt.Cli.Tests.unit;
 public class OutputResolverTests
 {
     private readonly MockFileSystem _fileSystem = new();
+
     private OutputResolver GetSut() => new(_fileSystem);
 
     #region No output path specified (default behaviour)

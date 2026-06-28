@@ -63,7 +63,11 @@ public class LogReaderTests
         (_, string privateKey) = CryptographicUtils.GenerateRsaKeyPair();
         var keyMap = new Dictionary<string, string>() { { "", privateKey } };
         using LocalKeyProvider keyProvider = new(keyMap);
-        DecryptionOptions options = new() { KeyProvider = keyProvider, ErrorHandlingMode = (ErrorHandlingMode)999 };
+        DecryptionOptions options = new()
+        {
+            KeyProvider = keyProvider,
+            ErrorHandlingMode = (ErrorHandlingMode)999,
+        };
 
         // Act & Assert
         Should
