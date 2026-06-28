@@ -1,21 +1,21 @@
 namespace Serilog.Sinks.File.Encrypt.Tests;
 
-public sealed class SessionAndHeaderReaderV1Tests : IDisposable
+public sealed class SessionAndHeaderReaderTests : IDisposable
 {
     private readonly MemoryStream _input;
-    private readonly SessionReaderV1 _sut;
+    private readonly SessionReader _sut;
     private readonly byte[] _aesKey;
     private readonly byte[] _nonce;
     private readonly RSA _encryptionRsa = RSA.Create();
     private const string KeyId = "test-key-id";
     private readonly LocalKeyProvider _keyProvider;
 
-    public SessionAndHeaderReaderV1Tests()
+    public SessionAndHeaderReaderTests()
     {
         (string publicKey, string privateKey) = CryptographicUtils.GenerateRsaKeyPair();
         _encryptionRsa.FromString(publicKey);
         _input = new MemoryStream();
-        _sut = new SessionReaderV1(new HeaderReaderV1());
+        _sut = new SessionReader(new HeaderReader());
         _keyProvider = new LocalKeyProvider(KeyId, privateKey);
         (_aesKey, _nonce) = TestUtils.CreateSessionData();
     }
@@ -64,7 +64,7 @@ public sealed class SessionAndHeaderReaderV1Tests : IDisposable
     public async Task GivenHeaderShorterThanAesKey_WhenReadSessionAsync_ThenThrows()
     {
         // Arrange
-        byte[] sessionData = new byte[HeaderMetadataV1.AesKeyLength - 1]; // intentionally too short
+        byte[] sessionData = new byte[HeaderMetadata.AesKeyLength - 1]; // intentionally too short
         _aesKey[..sessionData.Length].CopyTo(sessionData, 0);
         byte[] invalidHeader = CreateHeader(sessionData);
         await _input.WriteAsync(invalidHeader, TestContext.Current.CancellationToken);
@@ -82,12 +82,12 @@ public sealed class SessionAndHeaderReaderV1Tests : IDisposable
     {
         // Arrange
         byte[] sessionData = new byte[
-            HeaderMetadataV1.AesKeyLength + HeaderMetadataV1.NonceLength - 1
+            HeaderMetadata.AesKeyLength + HeaderMetadata.NonceLength - 1
         ]; // intentionally too short for nonce
         _aesKey.CopyTo(sessionData, 0);
         // copy only part of the nonce to make it too short
-        _nonce[..(sessionData.Length - HeaderMetadataV1.AesKeyLength)]
-            .CopyTo(sessionData, HeaderMetadataV1.AesKeyLength);
+        _nonce[..(sessionData.Length - HeaderMetadata.AesKeyLength)]
+            .CopyTo(sessionData, HeaderMetadata.AesKeyLength);
         byte[] invalidHeader = CreateHeader(sessionData);
         await _input.WriteAsync(invalidHeader, TestContext.Current.CancellationToken);
         _input.Seek(0, SeekOrigin.Begin);
@@ -108,7 +108,7 @@ public sealed class SessionAndHeaderReaderV1Tests : IDisposable
         _nonce.CopyTo(sessionData, _aesKey.Length);
         byte[] validHeader = CreateHeader(sessionData);
         // corrupt the RSA payload by changing some bytes in the header after the keyId
-        for (int i = HeaderMetadataV1.KeyIdLength; i < validHeader.Length; i++)
+        for (int i = HeaderMetadata.KeyIdLength; i < validHeader.Length; i++)
         {
             validHeader[i] ^= 0xFF; // flip bits to corrupt the data
         }
@@ -126,17 +126,17 @@ public sealed class SessionAndHeaderReaderV1Tests : IDisposable
     {
         // write the plaintext key ID 32 bytes padded with zeros
         // then add the encrypted session key and nonce (for simplicity, we just concatenate them here)
-        byte[] header = new byte[HeaderMetadataV1.KeyIdLength + _encryptionRsa.KeySize / 8];
+        byte[] header = new byte[HeaderMetadata.KeyIdLength + _encryptionRsa.KeySize / 8];
         // padded with 0s to ensure fixed length
-        byte[] keyIdBytes = new byte[HeaderMetadataV1.KeyIdLength];
+        byte[] keyIdBytes = new byte[HeaderMetadata.KeyIdLength];
         byte[] rawKeyIdBytes = Encoding.UTF8.GetBytes(KeyId);
         Array.Copy(rawKeyIdBytes, keyIdBytes, Math.Min(rawKeyIdBytes.Length, keyIdBytes.Length));
         ReadOnlySpan<byte> session = _encryptionRsa.Encrypt(
             sessionData,
             RSAEncryptionPadding.OaepSHA256
         );
-        Array.Copy(keyIdBytes, 0, header, 0, HeaderMetadataV1.KeyIdLength);
-        Array.Copy(session.ToArray(), 0, header, HeaderMetadataV1.KeyIdLength, session.Length);
+        Array.Copy(keyIdBytes, 0, header, 0, HeaderMetadata.KeyIdLength);
+        Array.Copy(session.ToArray(), 0, header, HeaderMetadata.KeyIdLength, session.Length);
         return header;
     }
 

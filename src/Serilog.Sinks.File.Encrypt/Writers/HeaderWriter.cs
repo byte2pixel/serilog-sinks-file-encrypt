@@ -6,19 +6,19 @@ using Serilog.Sinks.File.Encrypt.Models;
 namespace Serilog.Sinks.File.Encrypt;
 
 /// <summary>
-/// Version 1 header encoder that constructs a header containing the AES session key, nonce, and optional KeyId,
+/// Header encoder that constructs a header containing the AES session key and nonce,
+/// RSA-encrypted using the public key from the provided encryption options.
 /// </summary>
-internal sealed class HeaderWriterV1 : IHeaderWriter
+internal sealed class HeaderWriter : IHeaderWriter
 {
     private readonly RSA _rsa;
 
     /// <summary>
-    /// Initializes the header encoder with the RSA public key and optional KeyId.
+    /// Initializes the header encoder with the RSA public key.
     /// </summary>
-    /// <param name="options">The encryption options containing the RSA public key and optional KeyId.</param>
-    /// <exception cref="ArgumentOutOfRangeException">Thrown when the KeyId is too long for the RSA key size.</exception>
+    /// <param name="options">The encryption options containing the RSA public key.</param>
     /// <exception cref="ArgumentNullException">Thrown when the options or public key is null.</exception>
-    internal HeaderWriterV1(EncryptionOptions options)
+    internal HeaderWriter(EncryptionOptions options)
     {
         ArgumentNullException.ThrowIfNull(options);
         _rsa = options.Rsa;
@@ -28,22 +28,22 @@ internal sealed class HeaderWriterV1 : IHeaderWriter
     public ReadOnlySpan<byte> Encrypt(ReadOnlySpan<byte> aesKey, ReadOnlySpan<byte> nonce)
     {
         // Rent buffer from pool for RSA payload
-        byte[] payload = ArrayPool<byte>.Shared.Rent(HeaderMetadataV1.RsaPayloadLength);
+        byte[] payload = ArrayPool<byte>.Shared.Rent(HeaderMetadata.RsaPayloadLength);
         try
         {
             int offset = 0;
 
             // Write AES key
             aesKey.CopyTo(payload.AsSpan(offset));
-            offset += HeaderMetadataV1.AesKeyLength;
+            offset += HeaderMetadata.AesKeyLength;
 
             // Write Nonce
             nonce.CopyTo(payload.AsSpan(offset));
 
             // RSA encrypt the payload
             byte[] encryptedPayload = _rsa.Encrypt(
-                payload.AsSpan(0, HeaderMetadataV1.RsaPayloadLength),
-                HeaderMetadataV1.Padding
+                payload.AsSpan(0, HeaderMetadata.RsaPayloadLength),
+                HeaderMetadata.Padding
             );
 
             return encryptedPayload.AsSpan();
@@ -52,7 +52,7 @@ internal sealed class HeaderWriterV1 : IHeaderWriter
         {
             // Clear sensitive data and return to pool
             CryptographicOperations.ZeroMemory(
-                payload.AsSpan(0, HeaderMetadataV1.RsaPayloadLength)
+                payload.AsSpan(0, HeaderMetadata.RsaPayloadLength)
             );
             ArrayPool<byte>.Shared.Return(payload);
         }

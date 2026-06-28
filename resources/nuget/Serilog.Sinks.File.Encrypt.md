@@ -328,7 +328,7 @@ app.Run();
 ```csharp
 // publicKey — RSA public key in XML or PEM format
 // keyId     — optional identifier embedded in every session header (max 32 bytes UTF-8); default ""
-// version   — header format version; default 1
+// version   — header format version; default 1 - Obsolete and has no effect anymore.
 new EncryptHooks(string publicKey, string keyId = "", int version = 1)
 ```
 
