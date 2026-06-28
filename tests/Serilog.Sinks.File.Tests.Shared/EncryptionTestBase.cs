@@ -1,7 +1,7 @@
-namespace Serilog.Sinks.File.Encrypt.Tests;
+namespace Serilog.Sinks.File.Tests.Shared;
 
 /// <summary>
-/// Base class for encryption tests providing common test fixtures and helper methods.
+/// Base class for encryption/decryption tests providing common test fixtures and helper methods.
 /// All streams created during tests are automatically tracked and disposed.
 /// </summary>
 public abstract class EncryptionTestBase : IDisposable, IAsyncDisposable
@@ -43,8 +43,6 @@ public abstract class EncryptionTestBase : IDisposable, IAsyncDisposable
         MemoryStream memoryStream = new();
         _streamsToDispose.Add(memoryStream);
 
-        // Create EncryptedStream but don't dispose it - disposing would close the underlying MemoryStream
-        // We just need to flush the data
         LogWriter logWriter = new(memoryStream, EncryptOptions);
 
         foreach (byte[] message in messages.Select(m => Encoding.UTF8.GetBytes(m)))
@@ -52,9 +50,6 @@ public abstract class EncryptionTestBase : IDisposable, IAsyncDisposable
             logWriter.Write(message, 0, message.Length);
             logWriter.Flush();
         }
-
-        // Don't dispose encryptedStream here - let it be garbage collected
-        // The MemoryStream will be disposed by the test base
 
         memoryStream.Position = 0;
         return memoryStream;
@@ -81,7 +76,6 @@ public abstract class EncryptionTestBase : IDisposable, IAsyncDisposable
         MemoryStream memoryStream = new();
         _streamsToDispose.Add(memoryStream);
 
-        // Create EncryptedStream but don't dispose it - disposing would close the underlying MemoryStream
         LogWriter logWriter = new(memoryStream, encryptionOptions ?? EncryptOptions);
 
         foreach (byte[] message in messages.Select(m => Encoding.UTF8.GetBytes(m)))
@@ -91,9 +85,6 @@ public abstract class EncryptionTestBase : IDisposable, IAsyncDisposable
         }
 
         await logWriter.FlushAsync(ct);
-
-        // Don't dispose encryptedStream here - let it be garbage collected
-        // The MemoryStream will be disposed by the test base
 
         memoryStream.Position = 0;
         return memoryStream;
@@ -130,16 +121,6 @@ public abstract class EncryptionTestBase : IDisposable, IAsyncDisposable
     }
 
     /// <summary>
-    /// Creates a memory stream and tracks it for disposal. Use for manual stream creation.
-    /// </summary>
-    private MemoryStream CreateMemoryStream()
-    {
-        MemoryStream stream = new();
-        _streamsToDispose.Add(stream);
-        return stream;
-    }
-
-    /// <summary>
     /// Creates a memory stream with data and tracks it for disposal.
     /// </summary>
     protected MemoryStream CreateMemoryStream(byte[] data)
@@ -149,8 +130,15 @@ public abstract class EncryptionTestBase : IDisposable, IAsyncDisposable
         return stream;
     }
 
+    private MemoryStream CreateMemoryStream()
+    {
+        MemoryStream stream = new();
+        _streamsToDispose.Add(stream);
+        return stream;
+    }
+
     /// <summary>
-    /// Encrypts and decrypts messages in one step, returning decrypted content as string
+    /// Encrypts and decrypts messages in one step, returning decrypted content as string.
     /// </summary>
     protected async Task<string> EncryptAndDecryptAsync(
         string[] messages,
@@ -172,7 +160,7 @@ public abstract class EncryptionTestBase : IDisposable, IAsyncDisposable
     }
 
     /// <summary>
-    /// Encrypts and decrypts a single message in one step, returning decrypted content as string
+    /// Encrypts and decrypts a single message in one step, returning decrypted content as string.
     /// </summary>
     protected async Task<string> EncryptAndDecryptAsync(
         string message,
@@ -190,7 +178,7 @@ public abstract class EncryptionTestBase : IDisposable, IAsyncDisposable
     }
 
     /// <summary>
-    /// Decrypts a stream and returns the decrypted content as a string
+    /// Decrypts a stream and returns the decrypted content as a string.
     /// </summary>
     protected async Task<string> DecryptStreamToStringAsync(
         Stream inputStream,
@@ -233,17 +221,13 @@ public abstract class EncryptionTestBase : IDisposable, IAsyncDisposable
 
         if (disposing)
         {
-            // Dispose all tracked streams
             for (int i = _streamsToDispose.Count - 1; i >= 0; i--)
             {
                 try
                 {
                     _streamsToDispose[i].Dispose();
                 }
-                catch (ObjectDisposedException)
-                {
-                    // Ignore disposal errors in tests
-                }
+                catch (ObjectDisposedException) { }
             }
             _streamsToDispose.Clear();
         }
@@ -263,17 +247,13 @@ public abstract class EncryptionTestBase : IDisposable, IAsyncDisposable
 
         if (disposing)
         {
-            // Dispose all tracked streams asynchronously
             for (int i = _streamsToDispose.Count - 1; i >= 0; i--)
             {
                 try
                 {
                     await _streamsToDispose[i].DisposeAsync().ConfigureAwait(false);
                 }
-                catch (ObjectDisposedException)
-                {
-                    // Ignore disposal errors in tests
-                }
+                catch (ObjectDisposedException) { }
             }
 
             _streamsToDispose.Clear();

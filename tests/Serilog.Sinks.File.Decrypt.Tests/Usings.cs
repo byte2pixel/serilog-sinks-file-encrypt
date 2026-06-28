@@ -7,5 +7,6 @@ global using Serilog.Sinks.File.Decrypt.Interfaces;
 global using Serilog.Sinks.File.Decrypt.Models;
 global using Serilog.Sinks.File.Encrypt;
 global using Serilog.Sinks.File.Encrypt.Models;
+global using Serilog.Sinks.File.Tests.Shared;
 global using Shouldly;
 global using Xunit;

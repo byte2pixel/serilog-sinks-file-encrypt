@@ -1,7 +1,7 @@
-﻿
+
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 18
-VisualStudioVersion = 18.0.11012.119 d18.0
+VisualStudioVersion = 18.0.11012.119
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{827E0CD3-B72D-47B6-A68D-7590B98EB39B}"
 	ProjectSection(SolutionItems) = preProject
@@ -39,6 +39,8 @@ EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Serilog.Sinks.File.Decrypt.Tests", "tests\Serilog.Sinks.File.Decrypt.Tests\Serilog.Sinks.File.Decrypt.Tests.csproj", "{C3D4E5F6-A7B8-9012-CDEF-123456789012}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Example.WebApi", "examples\Example.WebApi\Example.WebApi.csproj", "{9D263729-D997-4D1A-8886-DE35362AC13B}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Serilog.Sinks.File.Tests.Shared", "tests\Serilog.Sinks.File.Tests.Shared\Serilog.Sinks.File.Tests.Shared.csproj", "{F5FC0159-744F-473C-AB8D-77292E3887A5}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -170,6 +172,18 @@ Global
 		{9D263729-D997-4D1A-8886-DE35362AC13B}.Release|x64.Build.0 = Release|Any CPU
 		{9D263729-D997-4D1A-8886-DE35362AC13B}.Release|x86.ActiveCfg = Release|Any CPU
 		{9D263729-D997-4D1A-8886-DE35362AC13B}.Release|x86.Build.0 = Release|Any CPU
+		{F5FC0159-744F-473C-AB8D-77292E3887A5}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{F5FC0159-744F-473C-AB8D-77292E3887A5}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{F5FC0159-744F-473C-AB8D-77292E3887A5}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{F5FC0159-744F-473C-AB8D-77292E3887A5}.Debug|x64.Build.0 = Debug|Any CPU
+		{F5FC0159-744F-473C-AB8D-77292E3887A5}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{F5FC0159-744F-473C-AB8D-77292E3887A5}.Debug|x86.Build.0 = Debug|Any CPU
+		{F5FC0159-744F-473C-AB8D-77292E3887A5}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{F5FC0159-744F-473C-AB8D-77292E3887A5}.Release|Any CPU.Build.0 = Release|Any CPU
+		{F5FC0159-744F-473C-AB8D-77292E3887A5}.Release|x64.ActiveCfg = Release|Any CPU
+		{F5FC0159-744F-473C-AB8D-77292E3887A5}.Release|x64.Build.0 = Release|Any CPU
+		{F5FC0159-744F-473C-AB8D-77292E3887A5}.Release|x86.ActiveCfg = Release|Any CPU
+		{F5FC0159-744F-473C-AB8D-77292E3887A5}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -183,8 +197,9 @@ Global
 		{810C95A0-AAFE-4932-A645-45BFF7744D5F} = {66966427-EC5F-42A8-AB6B-4239098DF247}
 		{B1D5AC31-9DB0-4AF4-ABD9-F2AA245CD2D3} = {66966427-EC5F-42A8-AB6B-4239098DF247}
 		{8FCF3215-6F29-4075-9DA0-EB594E2F1CE2} = {0C88DD14-F956-CE84-757C-A364CCF449FC}
-		{9D263729-D997-4D1A-8886-DE35362AC13B} = {66966427-EC5F-42A8-AB6B-4239098DF247}
 		{C3D4E5F6-A7B8-9012-CDEF-123456789012} = {0C88DD14-F956-CE84-757C-A364CCF449FC}
+		{9D263729-D997-4D1A-8886-DE35362AC13B} = {66966427-EC5F-42A8-AB6B-4239098DF247}
+		{F5FC0159-744F-473C-AB8D-77292E3887A5} = {0C88DD14-F956-CE84-757C-A364CCF449FC}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {800B3CB2-1770-466A-8BAE-5940517A1D92}

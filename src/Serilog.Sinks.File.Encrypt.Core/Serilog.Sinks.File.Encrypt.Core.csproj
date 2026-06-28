@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
     <IsPackable>true</IsPackable>
@@ -10,5 +10,6 @@
     <InternalsVisibleTo Include="Serilog.Sinks.File.Decrypt" />
     <InternalsVisibleTo Include="Serilog.Sinks.File.Encrypt.Tests" />
     <InternalsVisibleTo Include="Serilog.Sinks.File.Decrypt.Tests" />
+    <InternalsVisibleTo Include="Serilog.Sinks.File.Tests.Shared" />
   </ItemGroup>
 </Project>
