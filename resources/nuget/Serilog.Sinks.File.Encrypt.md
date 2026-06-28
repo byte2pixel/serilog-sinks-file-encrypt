@@ -14,12 +14,6 @@ A [Serilog.File.Sink](https://github.com/serilog/serilog-sinks-file) hook that e
 >   - `Serilog.Sinks.File.Encrypt` (this package — the file hook for encryption only)
 >   - [`Serilog.Sinks.File.Decrypt`](https://www.nuget.org/packages/Serilog.Sinks.File.Decrypt) (decryption library — `LogReader`, `LocalKeyProvider`, `DecryptionOptions`, `DecryptionUtils`, `IKeyProvider`)
 >   - [`Serilog.Sinks.File.Encrypt.Core`](https://www.nuget.org/packages/Serilog.Sinks.File.Encrypt.Core) (shared cryptographic primitives — transitive dependency, no direct reference needed)
->
-> **v4.0.0 DecryptionOptions API Change**
-> The decryption options no longer takes a dictionary of key id → private key pairs. See the [Migration Guide](#migration-from-v3x-to-v400)
-> 
-> **v3.0.0 is a breaking change from v2.x.**
-> Log files written by v2 cannot be appended to or read by v3. See the [Migration Guide](#migration-from-v2x-to-v300) below and the full [CHANGELOG](https://github.com/byte2pixel/serilog-sinks-file-encrypt/blob/main/CHANGELOG.md) before upgrading.
 
 ## Features
 
@@ -220,53 +214,27 @@ new EncryptHooks(string publicKey, string keyId = "", int version = 1)
 - Restrict filesystem access to encrypted log files and private keys
 - Rotate keys periodically and use the `keyId` parameter to track which key encrypted which files
 
-## Migration from v4.x to v5.0.0
+## Migration
 
-Decryption types have moved to the [`Serilog.Sinks.File.Decrypt`](https://www.nuget.org/packages/Serilog.Sinks.File.Decrypt) package:
+For step-by-step migration guides, see the [CHANGELOG.md](https://github.com/byte2pixel/serilog-sinks-file-encrypt/blob/main/CHANGELOG.md):
 
-| v4.x | v5.0.0 |
-|------|--------|
-| `Serilog.Sinks.File.Encrypt.LogReader` | `Serilog.Sinks.File.Decrypt.LogReader` |
-| `Serilog.Sinks.File.Encrypt.LocalKeyProvider` | `Serilog.Sinks.File.Decrypt.LocalKeyProvider` |
-| `Serilog.Sinks.File.Encrypt.Models.DecryptionOptions` | `Serilog.Sinks.File.Decrypt.Models.DecryptionOptions` |
-| `Serilog.Sinks.File.Encrypt.Models.DecryptionResult` | `Serilog.Sinks.File.Decrypt.Models.DecryptionResult` |
-| `Serilog.Sinks.File.Encrypt.Models.ErrorHandlingMode` | `Serilog.Sinks.File.Decrypt.Models.ErrorHandlingMode` |
-| `Serilog.Sinks.File.Encrypt.Interfaces.IKeyProvider` | `Serilog.Sinks.File.Decrypt.Interfaces.IKeyProvider` |
-| `CryptographicUtils.DecryptLogFileAsync(...)` | `DecryptionUtils.DecryptLogFileAsync(...)` (Decrypt package) |
+- [v4.x → v5.0.0](https://github.com/byte2pixel/serilog-sinks-file-encrypt/blob/main/CHANGELOG.md#migration-guide-v4--v5)
+- [v3.x → v4.0.0](https://github.com/byte2pixel/serilog-sinks-file-encrypt/blob/main/CHANGELOG.md#400---2026-04-05)
+- [v2.x → v3.0.0](https://github.com/byte2pixel/serilog-sinks-file-encrypt/blob/main/CHANGELOG.md#migration-guide-v2--v3)
 
-`CryptographicUtils.GenerateRsaKeyPair` and `KeyFormat` remain in this package (via the transitive `Serilog.Sinks.File.Encrypt.Core` dependency).
+## Requirements## Requirements
 
-## Migration from v3.x to v4.0.0
-
-The only breaking change is the DecryptionOptions API change. The new IKeyProvider interface is more flexible and allows you to implement your own key management strategy if you use an external system like Azure Key Vault or AWS KMS. If you were previously using the old dictionary-based API, you can switch to the new LocalKeyProvider which provides similar functionality.
-
-## Migration from v2.x to v3.0.0
-
-> [!IMPORTANT]
-> **Log files written by v2.x cannot be read by v3.x.** Archive or decrypt your existing log files with the v2 CLI before deploying v3.
-
-See the full [Migration Guide in CHANGELOG.md](https://github.com/byte2pixel/serilog-sinks-file-encrypt/blob/main/CHANGELOG.md#migration-guide-v2--v3) for step-by-step instructions.
-
-**Summary of required code changes:**
-
-| Area                    | v2                            | v3                                                                             |
-|-------------------------|-------------------------------|--------------------------------------------------------------------------------|
-| Encryption hook         | `new EncryptHooks(publicKey)` | `new EncryptHooks(publicKey, keyId: "...")` *(keyId optional but recommended)* |
-| Decryption class        | `EncryptionUtils`             | `DecryptionUtils` (in `Serilog.Sinks.File.Decrypt` from v5.0.0)               |
-| Decryption options type | `StreamingOptions`            | `DecryptionOptions` (in `Serilog.Sinks.File.Decrypt` from v5.0.0)             |
-| Private key argument    | `string privateKey`           | `DecryptionOptions { KeyProvider = new LocalKeyProvider(...) }`                |
-
-## Requirements
-
-- .NET 8.0 or higher
+- **.NET 8.0** (LTS) or **.NET 10.0** (LTS), or a compatible higher runtime
 - A project using [Serilog.Sinks.File](https://github.com/serilog/serilog-sinks-file)
-- RSA key pair for encryption/decryption in XML or PEM format (generated via CLI tool or programmatically)
+- RSA key pair in XML or PEM format (generated via CLI tool or programmatically)
+
+> **Support policy:** This library targets .NET Long-Term Support (LTS) releases only. A new LTS TFM is added when it ships; the oldest LTS TFM is dropped when Microsoft ends support for it. Users on STS or EOL runtimes can pin an older package version that targets a compatible LTS TFM.
 
 ## Related Packages
 
-| Package | Purpose |
-|---------|---------|
-| [`Serilog.Sinks.File.Decrypt`](https://www.nuget.org/packages/Serilog.Sinks.File.Decrypt) | Programmatic decryption of encrypted log files |
-| [`Serilog.Sinks.File.Encrypt.Cli`](https://www.nuget.org/packages/Serilog.Sinks.File.Encrypt.Cli) | CLI tool for key generation and ad-hoc log decryption |
+| Package                                                                                             | Purpose                                                 |
+|-----------------------------------------------------------------------------------------------------|---------------------------------------------------------|
+| [`Serilog.Sinks.File.Decrypt`](https://www.nuget.org/packages/Serilog.Sinks.File.Decrypt)           | Programmatic decryption of encrypted log files          |
+| [`Serilog.Sinks.File.Encrypt.Cli`](https://www.nuget.org/packages/Serilog.Sinks.File.Encrypt.Cli)   | CLI tool for key generation and ad-hoc log decryption   |
 | [`Serilog.Sinks.File.Encrypt.Core`](https://www.nuget.org/packages/Serilog.Sinks.File.Encrypt.Core) | Shared cryptographic primitives (transitive dependency) |
 

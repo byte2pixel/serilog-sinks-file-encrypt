@@ -7,17 +7,84 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [4.1.0] - 2026-06-29
+## [5.0.0] - 2026-06-29
 
-### ⚠️ Breaking Changes (likely not relevant for most users)
+### ⚠️ Breaking Changes
 
-- A class that was meant to be `internal` was actually public. `HeaderMetadataV1` has been made `internal` and renamed to `HeaderMetadata`.
+#### Package split — decryption types moved to `Serilog.Sinks.File.Decrypt`
 
-The only other changes here were renaming classes. Versioning of the header was removed to simplify the code base. I have decided I do not want the header to support storing additional data in the future.
+The single `Serilog.Sinks.File.Encrypt` package has been split into three packages:
 
-> [!NOTE]
-> The next major version v5.0.0 will split the Encryption and Decryption into separate NuGet packages.
-> This will allow the decryption package to be used in environments where the encryption package is not needed.
+| Package | Purpose |
+|---------|---------|
+| `Serilog.Sinks.File.Encrypt` | File sink hook — encrypts log entries as they are written (unchanged API) |
+| `Serilog.Sinks.File.Decrypt` | **New** — programmatic decryption library |
+| `Serilog.Sinks.File.Encrypt.Core` | **New** — shared cryptographic primitives; transitive dependency, no direct reference needed |
+
+All decryption types have moved from `Serilog.Sinks.File.Encrypt` to `Serilog.Sinks.File.Decrypt`:
+
+| v4 namespace | v5 namespace |
+|---|---|
+| `Serilog.Sinks.File.Encrypt.LogReader` | `Serilog.Sinks.File.Decrypt.LogReader` |
+| `Serilog.Sinks.File.Encrypt.LocalKeyProvider` | `Serilog.Sinks.File.Decrypt.LocalKeyProvider` |
+| `Serilog.Sinks.File.Encrypt.Interfaces.IKeyProvider` | `Serilog.Sinks.File.Decrypt.Interfaces.IKeyProvider` |
+| `Serilog.Sinks.File.Encrypt.Models.DecryptionOptions` | `Serilog.Sinks.File.Decrypt.Models.DecryptionOptions` |
+| `Serilog.Sinks.File.Encrypt.Models.DecryptionResult` | `Serilog.Sinks.File.Decrypt.Models.DecryptionResult` |
+| `Serilog.Sinks.File.Encrypt.Models.ErrorHandlingMode` | `Serilog.Sinks.File.Decrypt.Models.ErrorHandlingMode` |
+
+#### `CryptographicUtils.DecryptLogFileAsync` replaced by `DecryptionUtils.DecryptLogFileAsync`
+
+`CryptographicUtils` no longer contains decryption methods. Use `DecryptionUtils` from the `Serilog.Sinks.File.Decrypt` package instead. The method signatures are identical.
+
+```csharp
+// v4
+using Serilog.Sinks.File.Encrypt;
+using Serilog.Sinks.File.Encrypt.Models;
+
+await CryptographicUtils.DecryptLogFileAsync(input, output, options);
+
+// v5
+using Serilog.Sinks.File.Decrypt;
+using Serilog.Sinks.File.Decrypt.Models;
+
+await DecryptionUtils.DecryptLogFileAsync(input, output, options);
+```
+
+`CryptographicUtils.GenerateRsaKeyPair` and `KeyFormat` remain accessible from `Serilog.Sinks.File.Encrypt` via the transitive `Serilog.Sinks.File.Encrypt.Core` dependency.
+
+#### `HeaderMetadata` made internal
+
+`HeaderMetadataV1` (accidentally public in v4) has been renamed to `HeaderMetadata` and made `internal`. This type was never intended to be part of the public API.
+
+> **v5.x can still decrypt v4.x and v3.x log files.** No file format changes; this is a code-only restructuring.
+
+### New Features
+
+#### `Serilog.Sinks.File.Decrypt` package
+
+The new decryption package exposes a clean, focused API for reading encrypted log files. Install it independently when you only need decryption capabilities (e.g. a separate log-processing service):
+
+```bash
+dotnet add package Serilog.Sinks.File.Decrypt
+```
+
+```csharp
+using Serilog.Sinks.File.Decrypt;
+using Serilog.Sinks.File.Decrypt.Models;
+
+var keyMap = new Dictionary<string, string>
+{
+    { "my-app-key-2026", File.ReadAllText("private_key.xml") },
+};
+using LocalKeyProvider keyProvider = new LocalKeyProvider(keyMap);
+
+var options = new DecryptionOptions { KeyProvider = keyProvider };
+
+DecryptionResult result = await DecryptionUtils.DecryptLogFileAsync(
+    "logs/app.log",
+    "logs/app-decrypted.log",
+    options);
+```
 
 ---
 
@@ -150,6 +217,47 @@ for the same capability in programmatic use.
 ## [2.0.0] - 2025-12-02
 
 Initial public release with hybrid RSA+AES-GCM encryption.
+
+---
+
+## Migration Guide: v4 → v5
+
+### Step 1 — Install the Decrypt package
+
+If your application decrypts log files programmatically, add the new package:
+
+```bash
+dotnet add package Serilog.Sinks.File.Decrypt
+```
+
+Applications that only write encrypted logs (i.e. only use `EncryptHooks`) require no changes.
+
+### Step 2 — Update using directives
+
+```csharp
+// Before (v4)
+using Serilog.Sinks.File.Encrypt;
+using Serilog.Sinks.File.Encrypt.Models;
+
+// After (v5)
+using Serilog.Sinks.File.Decrypt;
+using Serilog.Sinks.File.Decrypt.Models;
+```
+
+### Step 3 — Replace `CryptographicUtils.DecryptLogFileAsync`
+
+```csharp
+// Before (v4)
+await CryptographicUtils.DecryptLogFileAsync(input, output, options);
+
+// After (v5)
+await DecryptionUtils.DecryptLogFileAsync(input, output, options);
+```
+
+### Step 4 — Update custom `IKeyProvider` implementations
+
+Change the implemented interface from `Serilog.Sinks.File.Encrypt.Interfaces.IKeyProvider` to
+`Serilog.Sinks.File.Decrypt.Interfaces.IKeyProvider`. The interface contract is identical.
 
 ---
 

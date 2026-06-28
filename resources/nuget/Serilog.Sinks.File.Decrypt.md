@@ -243,7 +243,7 @@ public class DecryptionResult
 
 ## Requirements
 
-- .NET 8.0 or higher
+- **.NET 8.0** (LTS) or **.NET 10.0** (LTS), or a compatible higher runtime — see the [support policy](https://github.com/byte2pixel/serilog-sinks-file-encrypt#-net-support-policy)
 - Log files created with [Serilog.Sinks.File.Encrypt](https://www.nuget.org/packages/Serilog.Sinks.File.Encrypt) v3.0.0 or later
 
 ## Related Packages
