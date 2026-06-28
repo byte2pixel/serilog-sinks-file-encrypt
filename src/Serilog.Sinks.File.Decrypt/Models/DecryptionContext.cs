@@ -1,4 +1,4 @@
-namespace Serilog.Sinks.File.Encrypt.Models;
+namespace Serilog.Sinks.File.Decrypt.Models;
 
 /// <summary>
 /// Represents the current decryption context with active encryption keys

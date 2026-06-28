@@ -1,4 +1,4 @@
-namespace Serilog.Sinks.File.Encrypt.Interfaces;
+namespace Serilog.Sinks.File.Decrypt.Interfaces;
 
 /// <summary>
 /// The IKeyProvider interface defines the contract for decrypting the random AES-GCM key and nonce.

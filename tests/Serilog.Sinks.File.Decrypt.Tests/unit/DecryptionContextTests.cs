@@ -1,4 +1,4 @@
-namespace Serilog.Sinks.File.Encrypt.Tests;
+namespace Serilog.Sinks.File.Decrypt.Tests;
 
 public class DecryptionContextTests
 {

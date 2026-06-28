@@ -1,4 +1,4 @@
-namespace Serilog.Sinks.File.Encrypt.Tests;
+namespace Serilog.Sinks.File.Decrypt.Tests;
 
 public sealed class SessionAndHeaderReaderTests : IDisposable
 {
@@ -122,10 +122,7 @@ public sealed class SessionAndHeaderReaderTests : IDisposable
 
     private byte[] CreateHeader(byte[] sessionData)
     {
-        // write the plaintext key ID 32 bytes padded with zeros
-        // then add the encrypted session key and nonce (for simplicity, we just concatenate them here)
         byte[] header = new byte[HeaderMetadata.KeyIdLength + _encryptionRsa.KeySize / 8];
-        // padded with 0s to ensure fixed length
         byte[] keyIdBytes = new byte[HeaderMetadata.KeyIdLength];
         byte[] rawKeyIdBytes = Encoding.UTF8.GetBytes(KeyId);
         Array.Copy(rawKeyIdBytes, keyIdBytes, Math.Min(rawKeyIdBytes.Length, keyIdBytes.Length));

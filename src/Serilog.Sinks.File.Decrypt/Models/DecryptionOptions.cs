@@ -1,9 +1,9 @@
-using Serilog.Sinks.File.Encrypt.Interfaces;
+using Serilog.Sinks.File.Decrypt.Interfaces;
 
-namespace Serilog.Sinks.File.Encrypt.Models;
+namespace Serilog.Sinks.File.Decrypt.Models;
 
 /// <summary>
-/// Decryption options for Serilog.Sinks.File.Encrypt decryption tools.
+/// Decryption options for Serilog.Sinks.File.Decrypt decryption tools.
 /// </summary>
 public sealed record DecryptionOptions
 {

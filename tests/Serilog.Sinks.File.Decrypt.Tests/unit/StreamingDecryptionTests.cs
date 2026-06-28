@@ -1,4 +1,4 @@
-namespace Serilog.Sinks.File.Encrypt.Tests;
+namespace Serilog.Sinks.File.Decrypt.Tests;
 
 public sealed class StreamingDecryptionTests : EncryptionTestBase
 {
@@ -89,7 +89,6 @@ public sealed class StreamingDecryptionTests : EncryptionTestBase
         DecryptionOptions decryptionOptions = new()
         {
             KeyProvider = keyProvider,
-            // ErrorLogPath = $"decryption_errors_{corruptionOffset}.log",
         };
         // create a session with 2 messages.
         MemoryStream encryptedStream = await CreateEncryptedStreamAsync(messages);

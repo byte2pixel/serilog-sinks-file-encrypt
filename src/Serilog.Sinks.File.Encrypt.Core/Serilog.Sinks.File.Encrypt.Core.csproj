@@ -1,0 +1,14 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
+    <IsPackable>true</IsPackable>
+    <Description>Shared cryptographic primitives for Serilog.Sinks.File.Encrypt and Serilog.Sinks.File.Decrypt. Not intended to be referenced directly.</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Serilog.Sinks.File.Encrypt" />
+    <InternalsVisibleTo Include="Serilog.Sinks.File.Decrypt" />
+    <InternalsVisibleTo Include="Serilog.Sinks.File.Encrypt.Tests" />
+    <InternalsVisibleTo Include="Serilog.Sinks.File.Decrypt.Tests" />
+  </ItemGroup>
+</Project>

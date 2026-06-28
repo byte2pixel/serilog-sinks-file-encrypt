@@ -1,4 +1,4 @@
-namespace Serilog.Sinks.File.Encrypt.Models;
+namespace Serilog.Sinks.File.Decrypt.Models;
 
 /// <summary>
 /// Defines how decryption errors should be handled during streaming decryption operations.

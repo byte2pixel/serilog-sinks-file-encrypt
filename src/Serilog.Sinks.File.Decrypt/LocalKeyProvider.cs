@@ -1,7 +1,8 @@
 using System.Security.Cryptography;
-using Serilog.Sinks.File.Encrypt.Interfaces;
+using Serilog.Sinks.File.Decrypt.Interfaces;
+using Serilog.Sinks.File.Encrypt;
 
-namespace Serilog.Sinks.File.Encrypt;
+namespace Serilog.Sinks.File.Decrypt;
 
 /// <summary>
 /// The <see cref="LocalKeyProvider"/> class is an implementation of the <see cref="IKeyProvider"/> interface that

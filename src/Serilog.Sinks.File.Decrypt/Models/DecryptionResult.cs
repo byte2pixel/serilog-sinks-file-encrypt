@@ -1,4 +1,4 @@
-namespace Serilog.Sinks.File.Encrypt.Models;
+namespace Serilog.Sinks.File.Decrypt.Models;
 
 /// <summary>
 /// The result of a decryption operation, containing counts of decrypted sessions, messages, failures, and resync

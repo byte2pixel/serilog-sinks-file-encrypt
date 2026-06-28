@@ -1,6 +1,4 @@
-using Serilog.Sinks.File.Encrypt.Interfaces;
-
-namespace Serilog.Sinks.File.Encrypt.Tests;
+namespace Serilog.Sinks.File.Decrypt.Tests;
 
 /// <summary>
 /// This class tests the edge cases of LogReader.

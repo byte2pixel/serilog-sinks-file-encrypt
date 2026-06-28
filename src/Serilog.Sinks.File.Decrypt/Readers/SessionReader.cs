@@ -1,7 +1,8 @@
-using Serilog.Sinks.File.Encrypt.Interfaces;
+using Serilog.Sinks.File.Decrypt.Interfaces;
+using Serilog.Sinks.File.Decrypt.Models;
 using Serilog.Sinks.File.Encrypt.Models;
 
-namespace Serilog.Sinks.File.Encrypt;
+namespace Serilog.Sinks.File.Decrypt;
 
 /// <inheritdoc />
 internal class SessionReader : ISessionReader

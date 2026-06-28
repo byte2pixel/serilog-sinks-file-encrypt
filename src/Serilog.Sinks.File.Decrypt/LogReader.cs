@@ -1,10 +1,11 @@
 using System.Buffers;
 using System.Buffers.Binary;
 using System.Security.Cryptography;
-using Serilog.Sinks.File.Encrypt.Interfaces;
-using Serilog.Sinks.File.Encrypt.Models;
+using Serilog.Sinks.File.Decrypt.Interfaces;
+using Serilog.Sinks.File.Decrypt.Models;
+using Serilog.Sinks.File.Encrypt;
 
-namespace Serilog.Sinks.File.Encrypt;
+namespace Serilog.Sinks.File.Decrypt;
 
 /// <summary>
 /// Reads an encrypted log stream, decrypting messages on-the-fly using the provided decryption keys and options.

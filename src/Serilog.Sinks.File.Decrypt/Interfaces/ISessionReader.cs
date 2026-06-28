@@ -1,7 +1,7 @@
 using System.Security.Cryptography;
-using Serilog.Sinks.File.Encrypt.Models;
+using Serilog.Sinks.File.Decrypt.Models;
 
-namespace Serilog.Sinks.File.Encrypt.Interfaces;
+namespace Serilog.Sinks.File.Decrypt.Interfaces;
 
 /// <summary>
 /// The ISessionReader interface defines the contract for reading and decrypting the session header from an encrypted log file. Implementations of this interface are responsible for extracting the AES session key and nonce from the encrypted header using the appropriate RSA private key from the provided key map.
