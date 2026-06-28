@@ -144,8 +144,8 @@ public class LocalKeyProviderTests
     public void Constructor_SingleKey_WithInvalidPrivateKey_ThrowsCryptographicException()
     {
         // Act & Assert
-        Should.Throw<CryptographicException>(
-            () => new LocalKeyProvider("key1", "not-a-valid-rsa-key")
+        Should.Throw<CryptographicException>(() =>
+            new LocalKeyProvider("key1", "not-a-valid-rsa-key")
         );
     }
 
@@ -177,7 +177,11 @@ public class LocalKeyProviderTests
         using var provider = new LocalKeyProvider("key1", _xmlKeyPair.PrivateKey);
 
         // Act
-        byte[] decrypted = await provider.DecryptAsync("key1", cipherText, TestContext.Current.CancellationToken);
+        byte[] decrypted = await provider.DecryptAsync(
+            "key1",
+            cipherText,
+            TestContext.Current.CancellationToken
+        );
 
         // Assert
         decrypted.ShouldBe(plaintext);
@@ -191,8 +195,12 @@ public class LocalKeyProviderTests
         byte[] dummyCipherText = new byte[256];
 
         // Act & Assert
-        await Should.ThrowAsync<InvalidOperationException>(
-            async () => await provider.DecryptAsync("unknown-key-id", dummyCipherText, TestContext.Current.CancellationToken)
+        await Should.ThrowAsync<InvalidOperationException>(async () =>
+            await provider.DecryptAsync(
+                "unknown-key-id",
+                dummyCipherText,
+                TestContext.Current.CancellationToken
+            )
         );
     }
 
@@ -205,9 +213,15 @@ public class LocalKeyProviderTests
         byte[] dummyCipherText = new byte[256];
 
         // Act & Assert
-        (await Should.ThrowAsync<InvalidOperationException>(
-            async () => await provider.DecryptAsync(UnknownKeyId, dummyCipherText, TestContext.Current.CancellationToken)
-        )).Message.ShouldContain(UnknownKeyId);
+        (
+            await Should.ThrowAsync<InvalidOperationException>(async () =>
+                await provider.DecryptAsync(
+                    UnknownKeyId,
+                    dummyCipherText,
+                    TestContext.Current.CancellationToken
+                )
+            )
+        ).Message.ShouldContain(UnknownKeyId);
     }
 
     [Fact]
@@ -218,8 +232,12 @@ public class LocalKeyProviderTests
         byte[] invalidCipherText = RandomNumberGenerator.GetBytes(256);
 
         // Act & Assert
-        await Should.ThrowAsync<CryptographicException>(
-            async () => await provider.DecryptAsync("key1", invalidCipherText, TestContext.Current.CancellationToken)
+        await Should.ThrowAsync<CryptographicException>(async () =>
+            await provider.DecryptAsync(
+                "key1",
+                invalidCipherText,
+                TestContext.Current.CancellationToken
+            )
         );
     }
 
@@ -260,7 +278,11 @@ public class LocalKeyProviderTests
         using var provider = new LocalKeyProvider(keyMap);
 
         // Act
-        byte[] decrypted = await provider.DecryptAsync("key2", cipherText, TestContext.Current.CancellationToken);
+        byte[] decrypted = await provider.DecryptAsync(
+            "key2",
+            cipherText,
+            TestContext.Current.CancellationToken
+        );
 
         // Assert
         decrypted.ShouldBe(plaintext);
@@ -290,7 +312,10 @@ public class LocalKeyProviderTests
         using var provider = new LocalKeyProvider("key4096", _keyPair4096.PrivateKey);
 
         // Act
-        int keySize = await provider.GetKeySizeAsync("key4096", TestContext.Current.CancellationToken);
+        int keySize = await provider.GetKeySizeAsync(
+            "key4096",
+            TestContext.Current.CancellationToken
+        );
 
         // Assert
         keySize.ShouldBe(4096);
@@ -303,8 +328,8 @@ public class LocalKeyProviderTests
         using var provider = new LocalKeyProvider("key1", _xmlKeyPair.PrivateKey);
 
         // Act & Assert
-        await Should.ThrowAsync<InvalidOperationException>(
-            async () => await provider.GetKeySizeAsync("unknown-key", TestContext.Current.CancellationToken)
+        await Should.ThrowAsync<InvalidOperationException>(async () =>
+            await provider.GetKeySizeAsync("unknown-key", TestContext.Current.CancellationToken)
         );
     }
 
@@ -334,8 +359,14 @@ public class LocalKeyProviderTests
         using var provider = new LocalKeyProvider(keyMap);
 
         // Act
-        int size2048 = await provider.GetKeySizeAsync("key-2048", TestContext.Current.CancellationToken);
-        int size4096 = await provider.GetKeySizeAsync("key-4096", TestContext.Current.CancellationToken);
+        int size2048 = await provider.GetKeySizeAsync(
+            "key-2048",
+            TestContext.Current.CancellationToken
+        );
+        int size4096 = await provider.GetKeySizeAsync(
+            "key-4096",
+            TestContext.Current.CancellationToken
+        );
 
         // Assert
         size2048.ShouldBe(2048);

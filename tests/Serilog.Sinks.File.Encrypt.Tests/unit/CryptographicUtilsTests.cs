@@ -231,7 +231,9 @@ public class CryptographicUtilsTests : EncryptionTestBase
     public async Task EncryptedStream_With4096BitKey_EncryptsAndDecryptsSuccessfully()
     {
         // Arrange
-        (string publicKey, string privateKey) = CryptographicUtils.GenerateRsaKeyPair(keySize: 4096);
+        (string publicKey, string privateKey) = CryptographicUtils.GenerateRsaKeyPair(
+            keySize: 4096
+        );
         const string OriginalText = "Testing 4096-bit RSA key with encrypted stream!";
 
         using var rsa = RSA.Create();

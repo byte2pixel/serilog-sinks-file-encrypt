@@ -50,7 +50,12 @@ public class GenerateCommandTests : CommandTestBase
         // Arrange
         GenerateCommand command = new(TestConsole, FileSystem);
         string outputPath = Path.Join("test-keys");
-        GenerateCommand.Settings settings = new() { OutputPath = outputPath, KeySize = 2048, Format = KeyFormat.Xml };
+        GenerateCommand.Settings settings = new()
+        {
+            OutputPath = outputPath,
+            KeySize = 2048,
+            Format = KeyFormat.Xml,
+        };
 
         // Act
         int result = command.Execute(
@@ -90,7 +95,12 @@ public class GenerateCommandTests : CommandTestBase
         // Arrange
         GenerateCommand command = new(TestConsole, FileSystem);
         string outputPath = Path.Join("test-keys");
-        GenerateCommand.Settings settings = new() { OutputPath = outputPath, KeySize = 2048, Format = KeyFormat.Pem };
+        GenerateCommand.Settings settings = new()
+        {
+            OutputPath = outputPath,
+            KeySize = 2048,
+            Format = KeyFormat.Pem,
+        };
 
         // Act
         int result = command.Execute(
