@@ -222,7 +222,11 @@ For step-by-step migration guides, see the [CHANGELOG.md](https://github.com/byt
 - [v3.x → v4.0.0](https://github.com/byte2pixel/serilog-sinks-file-encrypt/blob/main/CHANGELOG.md#400---2026-04-05)
 - [v2.x → v3.0.0](https://github.com/byte2pixel/serilog-sinks-file-encrypt/blob/main/CHANGELOG.md#migration-guide-v2--v3)
 
-## Requirements## Requirements
+## Versioning
+
+All packages in this repository (`Serilog.Sinks.File.Encrypt`, `Serilog.Sinks.File.Decrypt`, `Serilog.Sinks.File.Encrypt.Cli`, `Serilog.Sinks.File.Encrypt.Core`) are released in lockstep. Every package is versioned and published together on every release, even when a change only affects one of them. Always use the same version across all packages you reference.
+
+## Requirements
 
 - **.NET 8.0** (LTS) or **.NET 10.0** (LTS), or a compatible higher runtime
 - A project using [Serilog.Sinks.File](https://github.com/serilog/serilog-sinks-file)

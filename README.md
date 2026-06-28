@@ -15,6 +15,19 @@ A [Serilog.File.Sink](https://github.com/serilog/serilog-sinks-file) hook that e
 | **[Serilog.Sinks.File.Encrypt.Cli](https://www.nuget.org/packages/Serilog.Sinks.File.Encrypt.Cli)** | [![NuGet](https://img.shields.io/nuget/v/Serilog.Sinks.File.Encrypt.Cli.svg)](https://www.nuget.org/packages/Serilog.Sinks.File.Encrypt.Cli) | CLI tool for key generation and ad-hoc log decryption |
 | **[Serilog.Sinks.File.Encrypt.Core](https://www.nuget.org/packages/Serilog.Sinks.File.Encrypt.Core)** | [![NuGet](https://img.shields.io/nuget/v/Serilog.Sinks.File.Encrypt.Core.svg)](https://www.nuget.org/packages/Serilog.Sinks.File.Encrypt.Core) | Shared cryptographic primitives — transitive dependency, no direct reference needed |
 
+## 📌 Versioning
+
+All packages in this repository are released **in lockstep** — every package is versioned and published together on every release, even when a change only affects one of them.
+
+| Package | Always versioned together |
+|---------|--------------------------|
+| `Serilog.Sinks.File.Encrypt` | ✅ |
+| `Serilog.Sinks.File.Decrypt` | ✅ |
+| `Serilog.Sinks.File.Encrypt.Cli` | ✅ |
+| `Serilog.Sinks.File.Encrypt.Core` | ✅ |
+
+**Always use the same version across all packages.** For example, if you install `Serilog.Sinks.File.Encrypt` v5.1.0, install `Serilog.Sinks.File.Decrypt` v5.1.0 as well. Mixing versions is not supported and may produce unexpected behaviour.
+
 ## ✨ Features
 
 - Transparent encryption of log files using hybrid RSA + AES-GCM cryptography

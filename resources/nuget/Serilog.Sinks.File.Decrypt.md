@@ -241,6 +241,10 @@ public class DecryptionResult
 - Restrict filesystem access to encrypted log files and private keys
 - Use 2048-bit RSA keys minimum (4096-bit for enhanced security)
 
+## Versioning
+
+All packages in this repository (`Serilog.Sinks.File.Encrypt`, `Serilog.Sinks.File.Decrypt`, `Serilog.Sinks.File.Encrypt.Cli`, `Serilog.Sinks.File.Encrypt.Core`) are released in lockstep. Every package is versioned and published together on every release, even when a change only affects one of them. Always use the same version across all packages you reference.
+
 ## Requirements
 
 - **.NET 8.0** (LTS) or **.NET 10.0** (LTS), or a compatible higher runtime — see the [support policy](https://github.com/byte2pixel/serilog-sinks-file-encrypt#-net-support-policy)

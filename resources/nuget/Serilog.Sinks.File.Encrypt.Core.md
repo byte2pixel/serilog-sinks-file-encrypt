@@ -9,6 +9,10 @@ Shared cryptographic primitives for [Serilog.Sinks.File.Encrypt](https://www.nug
 > [!NOTE]
 > This package is not intended to be referenced directly. It is automatically included as a transitive dependency when you install either `Serilog.Sinks.File.Encrypt` or `Serilog.Sinks.File.Decrypt`.
 
+## Versioning
+
+All packages in this repository (`Serilog.Sinks.File.Encrypt`, `Serilog.Sinks.File.Decrypt`, `Serilog.Sinks.File.Encrypt.Cli`, `Serilog.Sinks.File.Encrypt.Core`) are released in lockstep. Every package is versioned and published together on every release, even when a change only affects one of them. Always use the same version across all packages you reference.
+
 ## What's Included
 
 - `CryptographicUtils.GenerateRsaKeyPair` — generates RSA key pairs for use with the encrypt/decrypt packages

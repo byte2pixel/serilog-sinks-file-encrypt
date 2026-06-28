@@ -196,6 +196,10 @@ serilog-encrypt decrypt "logs/*.log" -k key.xml --id my-app-key-2026
 
 This tool works with log files encrypted by the [Serilog.Sinks.File.Encrypt](https://www.nuget.org/packages/Serilog.Sinks.File.Encrypt#readme-body-tab) package. For detailed information on how to configure Serilog with encryption, see the [Encrypt package documentation](https://www.nuget.org/packages/Serilog.Sinks.File.Encrypt#readme-body-tab). For programmatic decryption in your application, see the [Decrypt package documentation](https://www.nuget.org/packages/Serilog.Sinks.File.Decrypt#readme-body-tab).
 
+## Versioning
+
+All packages in this repository (`Serilog.Sinks.File.Encrypt`, `Serilog.Sinks.File.Decrypt`, `Serilog.Sinks.File.Encrypt.Cli`, `Serilog.Sinks.File.Encrypt.Core`) are released in lockstep. Every package is versioned and published together on every release, even when a change only affects one of them. Always use the same version across all packages you reference.
+
 ## Requirements
 
 - **.NET 8.0** (LTS) or **.NET 10.0** (LTS), or a compatible higher runtime — see the [support policy](https://github.com/byte2pixel/serilog-sinks-file-encrypt#-net-support-policy)
