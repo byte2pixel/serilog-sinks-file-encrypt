@@ -1,6 +1,5 @@
 global using System.Security.Cryptography;
 global using System.Text;
-global using NSubstitute;
 global using Serilog.Core;
 global using Serilog.Formatting.Json;
 global using Serilog.Sinks.File.Decrypt;

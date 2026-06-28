@@ -86,10 +86,7 @@ public sealed class StreamingDecryptionTests : EncryptionTestBase
         // Arrange - Do not change message sizes or the marker will not be in the correct offsets for each test.
         string[] messages = ["Good message 1\n", "Good message 2\n"];
         using LocalKeyProvider keyProvider = new("", RsaKeyPair.privateKey);
-        DecryptionOptions decryptionOptions = new()
-        {
-            KeyProvider = keyProvider,
-        };
+        DecryptionOptions decryptionOptions = new() { KeyProvider = keyProvider };
         // create a session with 2 messages.
         MemoryStream encryptedStream = await CreateEncryptedStreamAsync(messages);
 
