@@ -9,10 +9,13 @@
 A [Serilog.File.Sink](https://github.com/serilog/serilog-sinks-file) hook that encrypts log files using RSA and AES-GCM hybrid encryption. This package provides secure logging by encrypting log data before writing to disk, ensuring sensitive information remains protected.
 
 > [!WARNING]
+> **Upcoming v5.0.0 Breaking Changes**
+> The next major version will split the NuGet package `Serilog.Sinks.File.Encrypt` into two separate packages:
+>   - `Serilog.Sinks.File.Encrypt` (the main file hook for encryption)
+>   - `Serilog.Sinks.File.Decrypt` (the decryption library for programmatic decryption of log files)
+>
 > **v4.0.0 DecryptionOptions API Change**
-> The decryption options no longer takes a dictionary of key id → private key pairs. Instead, you must provide
-> a IKeyProvider implementation that can decrypt the AES-GCM session data itself. There is a provided LocalKeyProvider
-> that works similarly to the old API. Use this interface if you use Azure Key Vault, AWS KMS, or any other external key management system where you don't want to load private keys into memory. v4.x can still decrypt v3.x files so there is no concern about rolling log files before upgrading. See the [Migration Guide](#migration-from-v3x-to-v400)
+> The decryption options no longer takes a dictionary of key id → private key pairs. See the [Migration Guide](#migration-from-v3x-to-v400)
 > 
 > **v3.0.0 is a breaking change from v2.x.**
 > Log files written by v2 cannot be appended to or read by v3. See the [Migration Guide](#migration-from-v2x-to-v300) below and the full [CHANGELOG](https://github.com/byte2pixel/serilog-sinks-file-encrypt/blob/main/CHANGELOG.md) before upgrading.
