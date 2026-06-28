@@ -4,7 +4,6 @@ public class HeaderWriterTests : IDisposable
 {
     private readonly RSA _publicRsa = RSA.Create();
     private readonly RSA _privateRsa = RSA.Create();
-    private readonly string _keyId;
     private readonly EncryptionOptions _options;
 
     public HeaderWriterTests()
@@ -14,7 +13,6 @@ public class HeaderWriterTests : IDisposable
         );
         _publicRsa.FromString(keyPair.publicKey);
         _privateRsa.FromString(keyPair.privateKey);
-        _keyId = Guid.NewGuid().ToString();
         _options = TestUtils.GetEncryptionOptions(_publicRsa);
     }
 
@@ -46,8 +44,7 @@ public class HeaderWriterTests : IDisposable
         // Decrypt and parse the header
         DecryptedHeader decryptedHeader = DecryptAndParseHeader(header);
 
-        // Verify all fields match
-        decryptedHeader.KeyId.ShouldBe(_keyId);
+        // Verify decrypted values match
         decryptedHeader.AesKey.ShouldBe(aesKey);
         decryptedHeader.Nonce.ShouldBe(nonce);
     }
@@ -75,12 +72,10 @@ public class HeaderWriterTests : IDisposable
         payloadOffset += HeaderMetadata.AesKeyLength;
 
         // Parse Nonce
-        byte[] nonce = decryptedPayload
-            .AsSpan(payloadOffset, HeaderMetadata.NonceLength)
-            .ToArray();
+        byte[] nonce = decryptedPayload.AsSpan(payloadOffset, HeaderMetadata.NonceLength).ToArray();
 
-        return new DecryptedHeader(_keyId, aesKey, nonce);
+        return new DecryptedHeader(aesKey, nonce);
     }
 
-    private record DecryptedHeader(string KeyId, byte[] AesKey, byte[] Nonce);
+    private record DecryptedHeader(byte[] AesKey, byte[] Nonce);
 }
