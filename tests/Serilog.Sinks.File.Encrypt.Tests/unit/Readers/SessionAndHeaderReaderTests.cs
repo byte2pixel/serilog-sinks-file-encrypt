@@ -81,9 +81,7 @@ public sealed class SessionAndHeaderReaderTests : IDisposable
     public async Task GivenHeaderShorterThanNonce_WhenReadSessionAsync_ThenThrows()
     {
         // Arrange
-        byte[] sessionData = new byte[
-            HeaderMetadata.AesKeyLength + HeaderMetadata.NonceLength - 1
-        ]; // intentionally too short for nonce
+        byte[] sessionData = new byte[HeaderMetadata.AesKeyLength + HeaderMetadata.NonceLength - 1]; // intentionally too short for nonce
         _aesKey.CopyTo(sessionData, 0);
         // copy only part of the nonce to make it too short
         _nonce[..(sessionData.Length - HeaderMetadata.AesKeyLength)]

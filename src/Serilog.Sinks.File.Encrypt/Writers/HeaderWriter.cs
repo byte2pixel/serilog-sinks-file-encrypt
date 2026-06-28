@@ -51,9 +51,7 @@ internal sealed class HeaderWriter : IHeaderWriter
         finally
         {
             // Clear sensitive data and return to pool
-            CryptographicOperations.ZeroMemory(
-                payload.AsSpan(0, HeaderMetadata.RsaPayloadLength)
-            );
+            CryptographicOperations.ZeroMemory(payload.AsSpan(0, HeaderMetadata.RsaPayloadLength));
             ArrayPool<byte>.Shared.Return(payload);
         }
     }

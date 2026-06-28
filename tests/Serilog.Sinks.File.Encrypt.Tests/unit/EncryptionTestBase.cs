@@ -17,7 +17,9 @@ public abstract class EncryptionTestBase : IDisposable, IAsyncDisposable
     protected EncryptionTestBase()
     {
         EncryptOptions = CreateEncryptionOptions();
-        LocalKeyProvider keyProvider = new(new Dictionary<string, string> { { "", RsaKeyPair.privateKey } });
+        LocalKeyProvider keyProvider = new(
+            new Dictionary<string, string> { { "", RsaKeyPair.privateKey } }
+        );
         DecryptOptions = new DecryptionOptions { KeyProvider = keyProvider };
     }
 
