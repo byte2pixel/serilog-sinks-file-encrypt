@@ -1,4 +1,4 @@
-namespace Serilog.Sinks.File.Encrypt.Cli.Tests.unit;
+namespace Serilog.Sinks.File.Encrypt.Cli.Tests;
 
 public class InputResolverTests
 {

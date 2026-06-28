@@ -1,4 +1,4 @@
-namespace Serilog.Sinks.File.Encrypt.Cli.Tests.unit;
+namespace Serilog.Sinks.File.Encrypt.Cli.Tests;
 
 /// <summary>
 /// Base class for CLI command tests that provides common test infrastructure

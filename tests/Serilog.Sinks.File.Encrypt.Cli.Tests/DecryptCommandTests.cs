@@ -2,7 +2,7 @@ using NSubstitute.ExceptionExtensions;
 using Serilog.Sinks.File.Encrypt.Models;
 using Spectre.Console;
 
-namespace Serilog.Sinks.File.Encrypt.Cli.Tests.unit;
+namespace Serilog.Sinks.File.Encrypt.Cli.Tests;
 
 public class DecryptCommandTests : CommandTestBase
 {

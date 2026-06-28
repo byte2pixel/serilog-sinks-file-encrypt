@@ -39,8 +39,4 @@
     <ProjectReference Include="..\..\src\Serilog.Sinks.File.Decrypt\Serilog.Sinks.File.Decrypt.csproj" />
     <ProjectReference Include="..\Serilog.Sinks.File.Tests.Shared\Serilog.Sinks.File.Tests.Shared.csproj" />
   </ItemGroup>
-
-  <ItemGroup>
-    <Folder Include="unit\Writers\" />
-  </ItemGroup>
 </Project>

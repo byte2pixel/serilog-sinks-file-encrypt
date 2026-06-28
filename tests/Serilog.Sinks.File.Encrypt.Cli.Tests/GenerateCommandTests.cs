@@ -1,6 +1,6 @@
 using Serilog.Sinks.File.Encrypt.Models;
 
-namespace Serilog.Sinks.File.Encrypt.Cli.Tests.unit;
+namespace Serilog.Sinks.File.Encrypt.Cli.Tests;
 
 public class GenerateCommandTests : CommandTestBase
 {
