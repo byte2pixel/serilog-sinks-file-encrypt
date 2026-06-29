@@ -2,11 +2,6 @@
 
 const string Solution = "./serilog-sinks-file-encrypt.sln";
 const string CoverageDir = "./.coverage";
-string[] testProjects =
-[
-    "./tests/Serilog.Sinks.File.Encrypt.Tests/Serilog.Sinks.File.Encrypt.Tests.csproj",
-    "./tests/Serilog.Sinks.File.Encrypt.Cli.Tests/Serilog.Sinks.File.Encrypt.Cli.Tests.csproj",
-];
 
 ////////////////////////////////////////////////////////////////
 // Arguments
@@ -70,9 +65,9 @@ Task("Test")
             ctx.CleanDirectory(CoverageDir);
         }
 
-        foreach (string testProject in testProjects)
+        foreach (FilePath testProject in ctx.GetFiles("./tests/**/*.Tests.csproj"))
         {
-            string projectName = System.IO.Path.GetFileNameWithoutExtension(testProject);
+            string projectName = testProject.GetFilenameWithoutExtension().ToString();
             var settings = new DotNetTestSettings
             {
                 Configuration = configuration,
@@ -92,7 +87,7 @@ Task("Test")
             }
 
             ctx.Information($"Running tests for {projectName}...");
-            ctx.DotNetTest(testProject, settings);
+            ctx.DotNetTest(testProject.FullPath, settings);
         }
     });
 

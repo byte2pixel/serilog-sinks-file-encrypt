@@ -25,10 +25,18 @@ coverage:
 
 component_management:
   individual_components:
+    - component_id: encrypt-core
+      name: encrypt core
+      paths:
+        - src/Serilog.Sinks.File.Encrypt.Core/
     - component_id: encrypt-lib
       name: encrypt
       paths:
         - src/Serilog.Sinks.File.Encrypt/
+    - component_id: decrypt-lib
+      name: decrypt
+      paths:
+        - src/Serilog.Sinks.File.Decrypt/
     - component_id: encrypt-cli
       name: cli tool
       paths:
