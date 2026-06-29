@@ -1,9 +1,9 @@
 global using System.Security.Cryptography;
 global using System.Text;
-global using Serilog.Core;
-global using Serilog.Formatting.Json;
-global using Serilog.Sinks.File.Decrypt;
+global using NSubstitute;
+global using Serilog.Sinks.File.Decrypt.Interfaces;
 global using Serilog.Sinks.File.Decrypt.Models;
+global using Serilog.Sinks.File.Encrypt;
 global using Serilog.Sinks.File.Encrypt.Models;
 global using Serilog.Sinks.File.Tests.Shared;
 global using Shouldly;

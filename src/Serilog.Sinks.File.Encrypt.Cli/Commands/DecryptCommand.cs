@@ -2,7 +2,8 @@ using System.ComponentModel;
 using System.Diagnostics.CodeAnalysis;
 using System.IO.Abstractions;
 using System.Security.Cryptography;
-using Serilog.Sinks.File.Encrypt.Models;
+using Serilog.Sinks.File.Decrypt;
+using Serilog.Sinks.File.Decrypt.Models;
 using Spectre.Console;
 using Spectre.Console.Cli;
 
@@ -284,7 +285,7 @@ public sealed class DecryptCommand(
                 // Perform the decryption using streaming API
                 await using FileSystemStream inputStream = fileSystem.File.OpenRead(inputFile);
                 await using FileSystemStream outputStream = fileSystem.File.Create(outputFile);
-                DecryptionResult result = await CryptographicUtils.DecryptLogFileAsync(
+                DecryptionResult result = await DecryptionUtils.DecryptLogFileAsync(
                     inputStream,
                     outputStream,
                     decryptionOptions,

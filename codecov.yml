@@ -39,8 +39,8 @@ comment:
 
 ignore:
   - "**/Program.cs"
-  - "**/examples/**"
-  - "**/tests/**"
+  - "examples"
+  - "tests"
   - "**/*.designer.cs"
   - "**/*.g.cs"
   - "**/*.g.i.cs"

@@ -9,16 +9,18 @@
 A command-line tool for managing RSA key pairs and decrypting log files created by the [Serilog.Sinks.File.Encrypt](https://www.nuget.org/packages/Serilog.Sinks.File.Encrypt#readme-body-tab) package.
 
 > [!WARNING]
+> **v5.0.0 — Package split**
+> The `Serilog.Sinks.File.Encrypt` NuGet package has been split. Decryption types (`LogReader`, `LocalKeyProvider`, `IKeyProvider`, `DecryptionOptions`) are now in [`Serilog.Sinks.File.Decrypt`](https://www.nuget.org/packages/Serilog.Sinks.File.Decrypt). The CLI tool itself is unaffected.
+>
 > **v4.x can decrypt log files written by v3.0.0, but not v2.x.**
-> **v3.0.0 is a breaking change from v2.x.**
 > The v3.x CLI cannot decrypt log files written by v2.x. Decrypt existing v2.x files with the v2.x CLI **before** upgrading. See the [CHANGELOG](https://github.com/byte2pixel/serilog-sinks-file-encrypt/blob/main/CHANGELOG.md) for the full migration guide.
 
 > [!NOTE]
 > The CLI is designed for simplicity and ease of use, with a focus mainly on testing and development scenarios.
 
-For production use, especially with complex key management needs, the correct solution is to implement an `IKeyProvider` and integrate it with your secure key management system.
+For production use, especially with complex key management needs, implement `IKeyProvider` from the [`Serilog.Sinks.File.Decrypt`](https://www.nuget.org/packages/Serilog.Sinks.File.Decrypt#readme-body-tab) package and integrate it with your secure key management system.
 
-The CLI can still be used for ad-hoc decryption tasks, but for ongoing operations, the main package's API provides more flexibility and security. See the [main package documentation](https://www.nuget.org/packages/Serilog.Sinks.File.Encrypt#readme-body-tab) for details on how to implement and integrate a custom `IKeyProvider` with your application.
+The CLI can still be used for ad-hoc decryption tasks, but for ongoing operations, the Decrypt package's API provides more flexibility and security. See the [Decrypt package documentation](https://www.nuget.org/packages/Serilog.Sinks.File.Decrypt#readme-body-tab) for details on `IKeyProvider` and programmatic decryption.
 
 ## Installation
 
@@ -142,7 +144,7 @@ serilog-encrypt decrypt "logs/2026/*.log" -k ./keys/private_key_2026.xml --id my
 ```
 
 > [!NOTE]
-> The CLI supports one key per invocation. To decrypt a mixed directory containing files from multiple key rotations, use the `IKeyProvider` API from the main package to implement custom logic for selecting the correct key and decrypting the AES session. There is a `LocalKeyProvider` implementation included.
+> The CLI supports one key per invocation. To decrypt a mixed directory containing files from multiple key rotations, use the `IKeyProvider` API from [`Serilog.Sinks.File.Decrypt`](https://www.nuget.org/packages/Serilog.Sinks.File.Decrypt#readme-body-tab) to implement custom logic for selecting the correct key and decrypting the AES session. There is a `LocalKeyProvider` implementation included.
 
 ### Error Handling
 
@@ -192,9 +194,13 @@ serilog-encrypt decrypt "logs/*.log" -k key.xml --id my-app-key-2026
 
 ## Integration with Serilog
 
-This tool works with log files encrypted by the Serilog.Sinks.File.Encrypt package. For detailed information on how to configure Serilog with encryption, see the [main package documentation](https://www.nuget.org/packages/Serilog.Sinks.File.Encrypt#readme-body-tab).
+This tool works with log files encrypted by the [Serilog.Sinks.File.Encrypt](https://www.nuget.org/packages/Serilog.Sinks.File.Encrypt#readme-body-tab) package. For detailed information on how to configure Serilog with encryption, see the [Encrypt package documentation](https://www.nuget.org/packages/Serilog.Sinks.File.Encrypt#readme-body-tab). For programmatic decryption in your application, see the [Decrypt package documentation](https://www.nuget.org/packages/Serilog.Sinks.File.Decrypt#readme-body-tab).
+
+## Versioning
+
+All packages in this repository (`Serilog.Sinks.File.Encrypt`, `Serilog.Sinks.File.Decrypt`, `Serilog.Sinks.File.Encrypt.Cli`, `Serilog.Sinks.File.Encrypt.Core`) are released in lockstep. Every package is versioned and published together on every release, even when a change only affects one of them. Always use the same version across all packages you reference.
 
 ## Requirements
 
-- .NET 8.0 or higher
+- **.NET 8.0** (LTS) or **.NET 10.0** (LTS), or a compatible higher runtime — see the [support policy](https://github.com/byte2pixel/serilog-sinks-file-encrypt#-net-support-policy)
 - Logs created with Serilog.Sinks.File.Encrypt v3.0.0 or later

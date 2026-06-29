@@ -17,5 +17,6 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Serilog.Sinks.File.Encrypt\Serilog.Sinks.File.Encrypt.csproj" />
+    <ProjectReference Include="..\Serilog.Sinks.File.Decrypt\Serilog.Sinks.File.Decrypt.csproj" />
   </ItemGroup>
 </Project>
