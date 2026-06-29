@@ -26,10 +26,17 @@ jobs:
             8.0.x
             10.0.x
 
+      # Get a short-lived NuGet API key
+      - name: NuGet login (OIDC → temp API key)
+        uses: NuGet/login@v1
+        id: login
+        with:
+          user: ${{ secrets.NUGET_USER_NAME }}
+
       - name: Publish
         shell: bash
         run: |
           dotnet tool restore
           dotnet make publish \
-            --nuget-key="${{secrets.NUGET_API_KEY}}" \
+            --nuget-key="${{ steps.login.outputs.nuget_api_key }}" \
             --github-key="${{secrets.GITHUB_TOKEN}}"
