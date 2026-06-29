@@ -11,6 +11,10 @@ env:
 jobs:
 
   build:
+    permissions:
+      id-token: write
+      contents: read
+
     name: Publish NuGet Packages
     runs-on: ubuntu-latest
     steps:
