@@ -23,5 +23,6 @@
       <PrivateAssets>all</PrivateAssets>
     </PackageVersion>
     <PackageVersion Include="xunit.v3" Version="3.0.1" />
+    <PackageVersion Include="xunit.v3.extensibility.core" Version="3.0.1" />
   </ItemGroup>
 </Project>

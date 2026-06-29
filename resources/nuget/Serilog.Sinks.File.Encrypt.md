@@ -9,23 +9,17 @@
 A [Serilog.File.Sink](https://github.com/serilog/serilog-sinks-file) hook that encrypts log files using RSA and AES-GCM hybrid encryption. This package provides secure logging by encrypting log data before writing to disk, ensuring sensitive information remains protected.
 
 > [!WARNING]
-> **Upcoming v5.0.0 Breaking Changes**
-> The next major version will split the NuGet package `Serilog.Sinks.File.Encrypt` into two separate packages:
->   - `Serilog.Sinks.File.Encrypt` (the main file hook for encryption)
->   - `Serilog.Sinks.File.Decrypt` (the decryption library for programmatic decryption of log files)
->
-> **v4.0.0 DecryptionOptions API Change**
-> The decryption options no longer takes a dictionary of key id → private key pairs. See the [Migration Guide](#migration-from-v3x-to-v400)
-> 
-> **v3.0.0 is a breaking change from v2.x.**
-> Log files written by v2 cannot be appended to or read by v3. See the [Migration Guide](#migration-from-v2x-to-v300) below and the full [CHANGELOG](https://github.com/byte2pixel/serilog-sinks-file-encrypt/blob/main/CHANGELOG.md) before upgrading.
+> **v5.0.0 Breaking Changes**
+> Split the NuGet package `Serilog.Sinks.File.Encrypt` into 3 separate packages:
+>   - `Serilog.Sinks.File.Encrypt` (this package — the file hook for encryption only)
+>   - [`Serilog.Sinks.File.Decrypt`](https://www.nuget.org/packages/Serilog.Sinks.File.Decrypt) (decryption library — `LogReader`, `LocalKeyProvider`, `DecryptionOptions`, `DecryptionUtils`, `IKeyProvider`)
+>   - [`Serilog.Sinks.File.Encrypt.Core`](https://www.nuget.org/packages/Serilog.Sinks.File.Encrypt.Core) (shared cryptographic primitives — transitive dependency, no direct reference needed)
 
 ## Features
 
 - **Hybrid Encryption**: Uses RSA for key exchange and AES-GCM for efficient, authenticated data encryption
 - **Key Rotation**: Assign a key ID to `EncryptHooks`; the decryption layer selects the correct private key automatically
 - **Seamless Integration**: Plugs directly into [Serilog.File.Sink](https://github.com/serilog/serilog-sinks-file) using file lifecycle hooks
-- **CLI Tool Integration**: Companion CLI tool for key generation and simple log decryption scenarios
 - **Optimal Performance**: Optimized encryption performance using hybrid encryption
 
 ## Use Cases
@@ -57,7 +51,13 @@ Install the package via NuGet:
 dotnet add package Serilog.Sinks.File.Encrypt
 ```
 
-For development key management and decryption capabilities, also install the CLI tool:
+For decryption in your application, install the Decrypt package:
+
+```bash
+dotnet add package Serilog.Sinks.File.Decrypt
+```
+
+For key generation and ad-hoc log decryption, install the CLI tool:
 
 ```bash
 dotnet tool install --global Serilog.Sinks.File.Encrypt.Cli
@@ -105,15 +105,7 @@ Log.CloseAndFlush();
 
 ### 3. Decrypt Logs
 
-Use the CLI tool to decrypt your log files for development testing.
-
-```bash
-# Pass the key ID that was used during encryption
-serilog-encrypt decrypt logs/app.log -k ./keys/private_key.xml --id my-app-key-2026
-
-# If no key ID was assigned (keyId defaults to ""), --id can be omitted
-serilog-encrypt decrypt logs/app.log -k ./keys/private_key.xml
-```
+To decrypt log files, see the [Serilog.Sinks.File.Decrypt](https://www.nuget.org/packages/Serilog.Sinks.File.Decrypt) package for programmatic decryption, or the [Serilog.Sinks.File.Encrypt.Cli](https://www.nuget.org/packages/Serilog.Sinks.File.Encrypt.Cli) tool for ad-hoc decryption.
 
 ## Advanced Usage
 
@@ -154,8 +146,6 @@ Log.CloseAndFlush();
 Assign a unique `keyId` to each key generation cycle. The ID is embedded in every session header
 so the decryption layer knows which private key to use without any manual lookup.
 
-**Encryption side** — set a new `keyId` when you rotate keys:
-
 ```csharp
 // Old deployment — key from 2025
 hooks: new EncryptHooks(oldPublicKey, keyId: "my-app-key-2025")
@@ -164,31 +154,7 @@ hooks: new EncryptHooks(oldPublicKey, keyId: "my-app-key-2025")
 hooks: new EncryptHooks(newPublicKey, keyId: "my-app-key-2026")
 ```
 
-**Decryption side** — Implement a key provider that can decrypt the AES-GCM session data for each key ID. The simplest way is to use the provided `LocalKeyProvider` which takes a dictionary of key ID → private key pairs or implement your own if you use an external key management system like Azure Key Vault or AWS KMS.
-
-```csharp
-using Serilog.Sinks.File.Encrypt;
-using Serilog.Sinks.File.Encrypt.Models;
-
-string oldPrivateKey = File.ReadAllText("./keys/private_key_2025.xml");
-string newPrivateKey = File.ReadAllText("./keys/private_key_2026.xml");
-
-var keyMap = new Dictionary<string, string>
-{
-    { "my-app-key-2025", oldPrivateKey },
-    { "my-app-key-2026", newPrivateKey },
-};
-
-using LocalKeyProvider keyProvider = new LocalKeyProvider(keyMap);
-var options = new DecryptionOptions
-{
-    KeyProvider = keyProvider,
-};
-
-using var input  = File.OpenRead("logs/app.log");
-using var output = File.Create("logs/app-decrypted.log");
-await CryptographicUtils.DecryptLogFileAsync(input, output, options);
-```
+For the decryption side of key rotation, see the [Serilog.Sinks.File.Decrypt documentation](https://www.nuget.org/packages/Serilog.Sinks.File.Decrypt#readme-body-tab).
 
 ### Programmatic Key Generation
 
@@ -201,101 +167,6 @@ var (publicKey, privateKey) = CryptographicUtils.GenerateRsaKeyPair();
 // Save keys to files
 File.WriteAllText("public_key.xml", publicKey);
 File.WriteAllText("private_key.xml", privateKey);
-```
-
-### Programmatic Decryption
-
-For large files, use the memory-optimized streaming API:
-
-```csharp
-using Serilog.Sinks.File.Encrypt;
-using Serilog.Sinks.File.Encrypt.Models;
-
-var keyMap = new Dictionary<string, string>
-{
-    { "my-app-key-2026", File.ReadAllText("private_key.xml") },
-};
-using LocalKeyProvider keyProvider = new LocalKeyProvider(keyMap); // or implement your own IKeyProvider.
-
-// Build decryption options with one or more keys
-var options = new DecryptionOptions
-{
-    KeyProvider = keyProvider,
-};
-
-// File-to-file decryption example
-await CryptographicUtils.DecryptLogFileAsync(
-    "logs/app.log",
-    "logs/decrypted.log",
-    options);
-
-// Or Stream-to-stream decryption example
-using var input  = File.OpenRead("large-log.encrypted");
-using var output = File.Create("large-log.decrypted");
-await CryptographicUtils.DecryptLogFileAsync(input, output, options);
-```
-
-### Error Handling Modes
-
-Choose how to handle decryption errors:
-
-```csharp
-using Serilog.Sinks.File.Encrypt.Models;
-
-// Skip corrupted sections silently (DEFAULT — ideal for JSON/structured logs)
-var skipOptions = new DecryptionOptions
-{
-    KeyProvider = ...,
-    ErrorHandlingMode = ErrorHandlingMode.Skip  // This is the default
-};
-
-// Throw exception on first error (strict validation)
-var strictOptions = new DecryptionOptions
-{
-    KeyProvider = ...,
-    ErrorHandlingMode = ErrorHandlingMode.ThrowException
-};
-
-await CryptographicUtils.DecryptLogFileAsync(input, output, skipOptions);
-```
-
-### Error Handling Use Cases
-
-**Skip Mode** - Recommended for all production use (default):
-```csharp
-// Continues past corrupted sections; output is clean and safe for structured log parsers.
-var options = new DecryptionOptions
-{
-    KeyProvider = ...,
-    ErrorHandlingMode = ErrorHandlingMode.Skip
-};
-
-// Without audit logging — errors are silently skipped
-await CryptographicUtils.DecryptLogFileAsync(input, output, options);
-
-// With audit logging — pass any Serilog ILogger to capture skipped-error details
-ILogger auditLogger = new LoggerConfiguration()
-    .WriteTo.File("decryption-audit.log")
-    .CreateLogger();
-await CryptographicUtils.DecryptLogFileAsync(input, output, options, auditLogger);
-```
-
-**ThrowException Mode** - For Data Integrity Validation:
-```csharp
-var options = new DecryptionOptions
-{
-    KeyProvider = ...,
-    ErrorHandlingMode = ErrorHandlingMode.ThrowException
-};
-
-try
-{
-    await CryptographicUtils.DecryptLogFileAsync(input, output, options);
-}
-catch (CryptographicException ex)
-{
-    Console.WriteLine($"Decryption failed: {ex.Message}");
-}
 ```
 
 ### Web Application Example
@@ -335,74 +206,6 @@ app.Run();
 new EncryptHooks(string publicKey, string keyId = "", int version = 1)
 ```
 
-### Decryption
-```csharp
-// Stream-to-stream async decryption
-Task<DecryptionResult> CryptographicUtils.DecryptLogFileAsync(
-    Stream inputStream,
-    Stream outputStream,
-    DecryptionOptions options,
-    ILogger? logger = null,
-    CancellationToken cancellationToken = default)
-
-// File-to-file async decryption
-Task<DecryptionResult> CryptographicUtils.DecryptLogFileAsync(
-    string encryptedFilePath,
-    string outputFilePath,
-    DecryptionOptions options,
-    ILogger? logger = null,
-    CancellationToken cancellationToken = default)
-```
-
-### Key Provider Interface
-```csharp
-public interface IKeyProvider
-{
-    // Decrypts the AES-GCM session key using the RSA private key corresponding to the given keyId.
-    Task<byte[]> DecryptAsync(
-        string keyId,
-        ReadOnlyMemory<byte> cipherText,
-        CancellationToken cancellationToken = default
-    );
-    
-    // The header does not contain the key size, this method is needed to determine how many bytes to read to
-    // get the full encrypted session data for decryption.
-    Task<int> GetKeySizeAsync(string keyId, CancellationToken cancellationToken = default);
-}
-```
-
-### DecryptionOptions
-```csharp
-public sealed record DecryptionOptions
-{
-    // The key provider is responsible for decrypting the AES-GCM session key using the RSA private key.
-    public required IKeyProvider KeyProvider { get; init; }
-    
-    public ErrorHandlingMode ErrorHandlingMode { get; init; } = ErrorHandlingMode.Skip;
-};
-```
-
-### ErrorHandlingMode
-```csharp
-public enum ErrorHandlingMode
-{
-    Skip            = 0,  // Skip errors silently (DEFAULT — safe for all log formats)
-    ThrowException  = 1   // Throw on first error
-}
-```
-
-### DecryptionResult
-```csharp
-public class DecryptionResult
-{
-    public int DecryptedSessions { get; init; }
-    public int DecryptedMessages { get; init; }
-    public int FailedHeaders     { get; init; }
-    public int FailedMessages    { get; init; }
-    public int ResyncAttempts    { get; init; }
-}
-```
-
 ## Security Considerations
 
 - Keep private keys secure and never include them in your application deployment
@@ -411,52 +214,31 @@ public class DecryptionResult
 - Restrict filesystem access to encrypted log files and private keys
 - Rotate keys periodically and use the `keyId` parameter to track which key encrypted which files
 
-## CLI Tool
+## Migration
 
-The companion CLI tool provides a simple interface for key generation and log decryption.
-If your logs contain multiple key IDs, you will not be able to use the CLI tool for decryption since it only supports one key at a time. In that case, use the programmatic API to supply multiple keys.
+For step-by-step migration guides, see the [CHANGELOG.md](https://github.com/byte2pixel/serilog-sinks-file-encrypt/blob/main/CHANGELOG.md):
 
-```bash
-# Generate keys
-serilog-encrypt generate --output /path/to/keys
+- [v4.x → v5.0.0](https://github.com/byte2pixel/serilog-sinks-file-encrypt/blob/main/CHANGELOG.md#migration-guide-v4--v5)
+- [v3.x → v4.0.0](https://github.com/byte2pixel/serilog-sinks-file-encrypt/blob/main/CHANGELOG.md#400---2026-04-05)
+- [v2.x → v3.0.0](https://github.com/byte2pixel/serilog-sinks-file-encrypt/blob/main/CHANGELOG.md#migration-guide-v2--v3)
 
-# Decrypt a single file (key ID matches the value used during encryption)
-serilog-encrypt decrypt app.log -k private_key.xml --id my-app-key-2026
+## Versioning
 
-# Decrypt without a key ID (when keyId was left as the default "")
-serilog-encrypt decrypt app.log -k private_key.xml
-
-# Decrypt all .log files using a glob pattern
-serilog-encrypt decrypt "logs/*.log" -k private_key.xml --id my-app-key-2026
-
-# Decrypt with audit log
-serilog-encrypt decrypt "logs/*.log" -k private_key.xml --id my-app-key-2026 --audit-log audit.log
-```
-
-For detailed CLI documentation, see the [CLI tool documentation](https://www.nuget.org/packages/Serilog.Sinks.File.Encrypt.Cli).
-
-## Migration from v3.x to v4.0.0
-
-The only breaking change is the DecryptionOptions API change. The new IKeyProvider interface is more flexible and allows you to implement your own key management strategy if you use an external system like Azure Key Vault or AWS KMS. If you were previously using the old dictionary-based API, you can switch to the new LocalKeyProvider which provides similar functionality.
-
-## Migration from v2.x to v3.0.0
-
-> [!IMPORTANT]
-> **Log files written by v2.x cannot be read by v3.x.** Archive or decrypt your existing log files with the v2 CLI before deploying v3.
-
-See the full [Migration Guide in CHANGELOG.md](https://github.com/byte2pixel/serilog-sinks-file-encrypt/blob/main/CHANGELOG.md#migration-guide-v2--v3) for step-by-step instructions.
-
-**Summary of required code changes:**
-
-| Area                    | v2                            | v3                                                                             |
-|-------------------------|-------------------------------|--------------------------------------------------------------------------------|
-| Encryption hook         | `new EncryptHooks(publicKey)` | `new EncryptHooks(publicKey, keyId: "...")` *(keyId optional but recommended)* |
-| Decryption class        | `EncryptionUtils`             | `CryptographicUtils`                                                           |
-| Decryption options type | `StreamingOptions`            | `DecryptionOptions`                                                            |
-| Private key argument    | `string privateKey`           | `DecryptionOptions { DecryptionKeys = { { "id", key } } }`                     |
+All packages in this repository (`Serilog.Sinks.File.Encrypt`, `Serilog.Sinks.File.Decrypt`, `Serilog.Sinks.File.Encrypt.Cli`, `Serilog.Sinks.File.Encrypt.Core`) are released in lockstep. Every package is versioned and published together on every release, even when a change only affects one of them. Always use the same version across all packages you reference.
 
 ## Requirements
 
-- .NET 8.0 or higher
+- **.NET 8.0** (LTS) or **.NET 10.0** (LTS), or a compatible higher runtime
 - A project using [Serilog.Sinks.File](https://github.com/serilog/serilog-sinks-file)
-- RSA key pair for encryption/decryption in XML or PEM format (generated via CLI tool or programmatically)
+- RSA key pair in XML or PEM format (generated via CLI tool or programmatically)
+
+> **Support policy:** This library targets .NET Long-Term Support (LTS) releases only. A new LTS TFM is added when it ships; the oldest LTS TFM is dropped when Microsoft ends support for it. Users on STS or EOL runtimes can pin an older package version that targets a compatible LTS TFM.
+
+## Related Packages
+
+| Package                                                                                             | Purpose                                                 |
+|-----------------------------------------------------------------------------------------------------|---------------------------------------------------------|
+| [`Serilog.Sinks.File.Decrypt`](https://www.nuget.org/packages/Serilog.Sinks.File.Decrypt)           | Programmatic decryption of encrypted log files          |
+| [`Serilog.Sinks.File.Encrypt.Cli`](https://www.nuget.org/packages/Serilog.Sinks.File.Encrypt.Cli)   | CLI tool for key generation and ad-hoc log decryption   |
+| [`Serilog.Sinks.File.Encrypt.Core`](https://www.nuget.org/packages/Serilog.Sinks.File.Encrypt.Core) | Shared cryptographic primitives (transitive dependency) |
+
