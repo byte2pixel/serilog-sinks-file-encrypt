@@ -1,6 +1,7 @@
 # Serilog.Sinks.File.Encrypt.Core
 
 [![Build Status](https://github.com/byte2pixel/serilog-sinks-file-encrypt/actions/workflows/ci.yaml/badge.svg)](https://github.com/byte2pixel/serilog-sinks-file-encrypt/actions/workflows/ci.yaml)
+[![codecov](https://codecov.io/gh/byte2pixel/serilog-sinks-file-encrypt/graph/badge.svg?token=HCDP3VVZ5B&component=encrypt-core)](https://codecov.io/gh/byte2pixel/serilog-sinks-file-encrypt)
 [![NuGet](https://img.shields.io/nuget/v/Serilog.Sinks.File.Encrypt.Core.svg)](https://www.nuget.org/packages/Serilog.Sinks.File.Encrypt.Core)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/byte2pixel/serilog-sinks-file-encrypt/blob/main/LICENSE.md)
 
