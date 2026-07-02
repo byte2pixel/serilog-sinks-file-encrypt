@@ -31,6 +31,60 @@ public class EncryptHooksTests
         Should.Throw<CryptographicException>(() => new EncryptHooks(publicKey));
     }
 
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void GivenEmptyOrWhitespacePublicKey_WhenCreatingEncryptHooks_ThenArgumentExceptionIsThrown(
+        string publicKey
+    )
+    {
+        // Act & Assert
+        ArgumentException ex = Should.Throw<ArgumentException>(() => new EncryptHooks(publicKey));
+        ex.GetType().ShouldBe(typeof(ArgumentException));
+    }
+
+    [Fact]
+    public void GivenNullPublicKey_WhenCreatingEncryptHooks_ThenArgumentNullExceptionIsThrown()
+    {
+        // Act & Assert
+        Should.Throw<ArgumentNullException>(() => new EncryptHooks(null!));
+    }
+
+    [Fact]
+    public void GivenNullKeyId_WhenCreatingEncryptHooks_ThenArgumentNullExceptionIsThrown()
+    {
+        // Arrange
+        (string publicKey, string _) = CryptographicUtils.GenerateRsaKeyPair();
+
+        // Act & Assert
+        Should.Throw<ArgumentNullException>(() => new EncryptHooks(publicKey, null!));
+    }
+
+    [Fact]
+    public void GivenKeyIdLongerThan32Bytes_WhenCreatingEncryptHooks_ThenArgumentExceptionIsThrown()
+    {
+        // Arrange
+        (string publicKey, string _) = CryptographicUtils.GenerateRsaKeyPair();
+        string tooLongKeyId = new('a', 33);
+
+        // Act & Assert - fails at construction, not on the first log write
+        ArgumentException ex = Should.Throw<ArgumentException>(() =>
+            new EncryptHooks(publicKey, tooLongKeyId)
+        );
+        ex.ParamName.ShouldBe("keyId");
+    }
+
+    [Fact]
+    public void GivenKeyIdExactly32Bytes_WhenCreatingEncryptHooks_ThenNoExceptionIsThrown()
+    {
+        // Arrange
+        (string publicKey, string _) = CryptographicUtils.GenerateRsaKeyPair();
+        string maxKeyId = new('a', 32);
+
+        // Act & Assert
+        Should.NotThrow(() => new EncryptHooks(publicKey, maxKeyId));
+    }
+
     [Fact]
     public void OnFileOpened_ReturnsEncryptedStream()
     {
