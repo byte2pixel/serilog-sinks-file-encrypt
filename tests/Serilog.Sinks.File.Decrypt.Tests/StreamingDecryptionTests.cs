@@ -1,3 +1,5 @@
+using System.Buffers.Binary;
+
 namespace Serilog.Sinks.File.Decrypt.Tests;
 
 public sealed class StreamingDecryptionTests : EncryptionTestBase
@@ -189,6 +191,67 @@ public sealed class StreamingDecryptionTests : EncryptionTestBase
         await Should.ThrowAsync<CryptographicException>(() =>
             DecryptStreamToStringAsync(corruptedStream, throwExceptionOptions)
         );
+    }
+
+    [Theory]
+    [InlineData(int.MaxValue)] // Huge positive length - previously OutOfMemoryException / large allocation
+    [InlineData(-100)] // Negative length (not the magic marker) - previously ArgumentOutOfRangeException
+    [InlineData(0)] // Zero length
+    [InlineData(EncryptionConstants.TagLength - 1)] // Too short to hold the authentication tag
+    public async Task DecryptLogFileAsync_WithCorruptMessageLengthPrefix_SkipMode_DoesNotCrash(
+        int corruptLength
+    )
+    {
+        // Arrange - a single-message session so the corrupt prefix is the only frame
+        MemoryStream encryptedStream = await CreateEncryptedStreamAsync("Only message");
+        byte[] fileBytes = encryptedStream.ToArray();
+        BinaryPrimitives.WriteInt32BigEndian(
+            fileBytes.AsSpan(GetFirstMessageLengthOffset(), sizeof(int)),
+            corruptLength
+        );
+        MemoryStream corruptedStream = CreateMemoryStream(fileBytes);
+
+        // Act - default Skip mode should resync past the corrupt frame instead of crashing
+        string result = await DecryptStreamToStringAsync(corruptedStream);
+
+        // Assert
+        result.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task DecryptLogFileAsync_WithCorruptMessageLengthPrefix_ThrowMode_ThrowsInvalidData()
+    {
+        // Arrange
+        MemoryStream encryptedStream = await CreateEncryptedStreamAsync("Only message");
+        byte[] fileBytes = encryptedStream.ToArray();
+        BinaryPrimitives.WriteInt32BigEndian(
+            fileBytes.AsSpan(GetFirstMessageLengthOffset(), sizeof(int)),
+            int.MaxValue
+        );
+        MemoryStream corruptedStream = CreateMemoryStream(fileBytes);
+        DecryptionOptions throwOptions = new()
+        {
+            KeyProvider = DecryptOptions.KeyProvider,
+            ErrorHandlingMode = ErrorHandlingMode.ThrowException,
+        };
+
+        // Act & Assert - a bounded, typed failure instead of an unhandled crash
+        await Should.ThrowAsync<InvalidDataException>(() =>
+            DecryptStreamToStringAsync(corruptedStream, throwOptions)
+        );
+    }
+
+    /// <summary>
+    /// Offset of the first message's 4-byte length prefix: magic bytes + version byte + keyId + RSA header.
+    /// </summary>
+    private int GetFirstMessageLengthOffset()
+    {
+        using RSA rsa = RSA.Create();
+        rsa.FromString(RsaKeyPair.publicKey);
+        return CryptographicUtils.MagicBytes.Length
+            + 1
+            + HeaderMetadata.KeyIdLength
+            + rsa.KeySize / 8;
     }
 
     [Fact]
