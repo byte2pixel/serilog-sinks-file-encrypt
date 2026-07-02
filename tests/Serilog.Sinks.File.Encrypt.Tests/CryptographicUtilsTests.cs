@@ -3,6 +3,20 @@ namespace Serilog.Sinks.File.Encrypt.Tests;
 public class CryptographicUtilsTests : EncryptionTestBase
 {
     [Fact]
+    public void IncreaseNonce_IncrementsCounterAsLittleEndian()
+    {
+        // Arrange - 12-byte nonce; the first 4 bytes are fixed, the last 8 are the counter.
+        byte[] nonce = new byte[EncryptionConstants.NonceLength];
+
+        // Act
+        nonce.IncreaseNonce();
+
+        // Assert - counter == 1 stored little-endian in the last 8 bytes, regardless of host endianness.
+        byte[] expected = [0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0];
+        nonce.ShouldBe(expected);
+    }
+
+    [Fact]
     public void InitializeRsa_FromXml_ReturnsInitializedRsaInstance()
     {
         // Arrange, Act
