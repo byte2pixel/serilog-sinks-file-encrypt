@@ -39,7 +39,8 @@ public class EncryptHooksTests
     )
     {
         // Act & Assert
-        Should.Throw<ArgumentException>(() => new EncryptHooks(publicKey));
+        ArgumentException ex = Should.Throw<ArgumentException>(() => new EncryptHooks(publicKey));
+        ex.GetType().ShouldBe(typeof(ArgumentException));
     }
 
     [Fact]

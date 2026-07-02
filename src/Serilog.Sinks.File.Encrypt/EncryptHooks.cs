@@ -54,7 +54,7 @@ public class EncryptHooks : FileLifecycleHooks
     /// <exception cref="ArgumentNullException">Thrown when <paramref name="publicKey"/> or <paramref name="keyId"/> is null.</exception>
     /// <exception cref="ArgumentException">Thrown when <paramref name="publicKey"/> is empty or whitespace, or when <paramref name="keyId"/> exceeds 32 bytes when UTF-8 encoded.</exception>
     /// <exception cref="FormatException">Thrown when <paramref name="publicKey"/> is in an invalid format.</exception>
-    /// <exception cref="CryptographicException">Thrown when the key format is invalid, cannot be parsed. or is too small.</exception>
+    /// <exception cref="CryptographicException">Thrown when the key format is invalid, cannot be parsed, or is too small.</exception>
     /// <remarks>
     /// The public key is loaded and validated during construction.
     /// </remarks>
