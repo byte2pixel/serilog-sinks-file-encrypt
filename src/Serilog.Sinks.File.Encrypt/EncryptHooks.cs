@@ -51,7 +51,8 @@ public class EncryptHooks : FileLifecycleHooks
     /// <param name="publicKey">The RSA public key in XML or PEM format. Use <see cref="CryptographicUtils.GenerateRsaKeyPair"/> to generate keys.</param>
     /// <param name="keyId">Optional key ID to include in the header for key rotation. Default is an empty string. Max 32 bytes.</param>
     /// <param name="version">Retained for backward compatibility. This value is ignored; the library always uses version 1 of the header format.</param>
-    /// <exception cref="ArgumentNullException">Thrown when <paramref name="publicKey"/> is null or whitespace.</exception>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="publicKey"/> or <paramref name="keyId"/> is null.</exception>
+    /// <exception cref="ArgumentException">Thrown when <paramref name="publicKey"/> is empty or whitespace, or when <paramref name="keyId"/> exceeds 32 bytes when UTF-8 encoded.</exception>
     /// <exception cref="FormatException">Thrown when <paramref name="publicKey"/> is in an invalid format.</exception>
     /// <exception cref="CryptographicException">Thrown when the key format is invalid, cannot be parsed. or is too small.</exception>
     /// <remarks>
@@ -70,7 +71,20 @@ public class EncryptHooks : FileLifecycleHooks
     /// </example>
     public EncryptHooks(string publicKey, string keyId = "", int version = 1)
     {
-        ArgumentNullException.ThrowIfNull(publicKey);
+        ArgumentException.ThrowIfNullOrWhiteSpace(publicKey);
+        ArgumentNullException.ThrowIfNull(keyId);
+
+        // Validate the keyId length up front so misconfiguration fails at logger construction
+        // rather than on the first log write, deep inside Serilog's write path.
+        int keyIdByteLength = Encoding.UTF8.GetByteCount(keyId);
+        if (keyIdByteLength > HeaderMetadata.KeyIdLength)
+        {
+            throw new ArgumentException(
+                $"KeyId is too long for the header format. Maximum length is {HeaderMetadata.KeyIdLength} bytes, but was {keyIdByteLength} bytes.",
+                nameof(keyId)
+            );
+        }
+
         RSA rsa = _rsaCache.GetOrAdd(publicKey, CreateRsaFromString);
         _encryptionOptions = new EncryptionOptions(rsa, keyId, version);
     }
