@@ -1,3 +1,4 @@
+using System.Buffers.Binary;
 using System.Security.Cryptography;
 using Serilog.Sinks.File.Encrypt.Models;
 
@@ -25,6 +26,10 @@ public static class CryptographicUtils
     /// 0xFF, 0xDA, 0x7E: Random bytes for additional uniqueness
     /// 0x00: Reserved byte (must be 0)
     /// </summary>
+    /// <remarks>
+    /// Treat this as read-only. Only the array reference is <c>readonly</c>; its elements are not, so mutating
+    /// them would corrupt the file-format marker process-wide. Do not modify the contents.
+    /// </remarks>
     public static readonly byte[] MagicBytes = [0xFF, 0x42, 0x32, 0x50, 0xFF, 0xDA, 0x7E, 0x00];
 
     /// <summary>
@@ -67,18 +72,19 @@ public static class CryptographicUtils
 
     /// <summary>
     /// AES-GCM encryption requires a unique nonce for each encryption operation.
-    /// This method retrieves the current nonce value stored in the last 8 bytes of the data array.
+    /// This method retrieves the 64-bit little-endian counter stored in the last 8 bytes of the nonce.
     /// </summary>
     /// <param name="nonce">Nonce of any length >= 12</param>
     /// <returns>The current nonce counter value.</returns>
     private static long GetNonce(this byte[] nonce)
     {
-        return BitConverter.ToInt64(nonce, nonce.Length - sizeof(long));
+        return BinaryPrimitives.ReadInt64LittleEndian(nonce.AsSpan(nonce.Length - sizeof(long)));
     }
 
     /// <summary>
     /// AES-GCM encryption requires a unique nonce for each encryption operation.
-    /// This method increments the nonce value stored in the last 12 bytes of the data array.
+    /// This method increments the 64-bit little-endian counter stored in the last 8 bytes of the nonce.
+    /// The encryptor and decryptor advance this counter in lockstep, so both must use this same helper.
     /// </summary>
     /// <param name="nonce">Nonce of any length >= 12</param>
     /// <exception cref="ArgumentNullException">
@@ -92,9 +98,8 @@ public static class CryptographicUtils
         ArgumentNullException.ThrowIfNull(nonce);
         ArgumentOutOfRangeException.ThrowIfLessThan(nonce.Length, 12);
 
-        long value = nonce.GetNonce() + (1 % long.MaxValue);
-        byte[] nonceBytes = BitConverter.GetBytes(value);
-        nonceBytes.CopyTo(nonce, nonce.Length - sizeof(long));
+        long value = nonce.GetNonce() + 1;
+        BinaryPrimitives.WriteInt64LittleEndian(nonce.AsSpan(nonce.Length - sizeof(long)), value);
     }
 
     /// <summary>

@@ -14,13 +14,14 @@ internal static class HeaderMetadata
 
     /// <summary>
     /// Version 1 AES key length in bytes. This is the length of the AES key that will be encrypted and stored in the header.
+    /// Derived from <see cref="EncryptionConstants.SessionKeyLength"/> to keep a single source of truth.
     /// </summary>
-    public const int AesKeyLength = 32;
+    public const int AesKeyLength = EncryptionConstants.SessionKeyLength;
 
     /// <summary>
-    /// Version 1 nonce length.
+    /// Version 1 nonce length. Derived from <see cref="EncryptionConstants.NonceLength"/> to keep a single source of truth.
     /// </summary>
-    public const int NonceLength = 12;
+    public const int NonceLength = EncryptionConstants.NonceLength;
 
     /// <summary>
     /// The padding scheme used for RSA in the version 1 header.
