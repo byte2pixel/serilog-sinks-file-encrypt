@@ -137,8 +137,8 @@ Log.CloseAndFlush();
 - Performance is critical (background workers, high-volume systems)
 
 ⚠️ **Minor Risks**
-- On a crash, buffered (unflushed) entries are lost and the file may end with a partially written session or frame. This is a completeness/data-loss concern, not a confidentiality one: each session uses a fresh random AES key and nonce and the decryptor resyncs past incomplete data, so no key or nonce is reused.
-- Nonce-counter wrapping within a single session is not explicitly handled. It would require 2^64 encryptions in one continuous session before the 64-bit counter cycles.
+- On a crash, buffered (unflushed) entries are lost and the file may end with a partially written session or frame. This is a completeness/data-loss concern rather than a confidentiality one: because each session generates a fresh random AES key and nonce, and the decryptor skips incomplete trailing data, a crash does not cause key or nonce reuse.
+- Nonce-counter wrapping within a single session is not explicitly handled. Each session uses a 96-bit AES-GCM nonce — a 32-bit random prefix plus a 64-bit counter — so wrapping would require 2^64 encryptions in one continuous session before the counter cycles.
   - At 1 million logs/second, that is roughly 585,000 years.
 
 ### Key Rotation
@@ -225,7 +225,7 @@ This package protects the **confidentiality and per-frame integrity** of your lo
 
 **What is *not* protected (current format)**
 
-- ❌ **Silent truncation, deletion, and reordering.** Frame position, the length prefix, and session metadata are not bound into the authentication, and there is no end-of-log marker. An attacker with write access to a log file can drop trailing frames, or delete/reorder whole sessions, and decryption still succeeds on what remains — with no indication that anything is missing. Tampering *by omission* is invisible.
+- ❌ **Silent truncation, deletion, and reordering.** The format provides no cryptographically verifiable completeness or ordering guarantee: frame ordering and the framing metadata are not covered by the per-frame authentication, and there is no end-of-log marker. An attacker with write access to a log file can drop trailing frames, or delete/reorder whole sessions, and decryption still succeeds on what remains — with no indication that anything is missing. Tampering *by omission* is invisible.
 - ❌ **Fabricated log entries.** Encryption only requires the **public** key, which ships with your application. Anyone who has that public key and can write to the log file can generate their own AES session key, wrap it with the public key, and append entirely fabricated sessions. They **cannot** read or alter the contents of your existing sessions (that requires the private key), but they can add convincing-looking new ones. Preventing this requires a secret the attacker does not have — for example a symmetric MAC or a producer-side signing key kept off the public distribution — which this package does not currently provide.
 
 > [!IMPORTANT]
