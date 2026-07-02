@@ -147,12 +147,13 @@ public sealed class LogWriter : Stream
     public override bool CanWrite => true;
 
     /// <summary>
-    /// The length of the underlying stream. This may not reflect the actual length of the encrypted log data until after flushing, as data is buffered for encryption.
+    /// The length, in bytes, of the underlying (encrypted) stream. Each write is encrypted and forwarded to the
+    /// underlying stream immediately, so this reflects the encrypted bytes written so far, not the plaintext length.
     /// </summary>
     public override long Length => _inner.Length;
 
     /// <summary>
-    /// The current position within the buffered log data.
+    /// The current position within the underlying (encrypted) stream.
     /// </summary>
     /// <exception cref="NotSupportedException">
     /// Setting the position is not supported on <see cref="LogWriter"/> as it is designed for sequential writes.
@@ -164,7 +165,8 @@ public sealed class LogWriter : Stream
     }
 
     /// <summary>
-    /// Flushes the buffered log data by encrypting it and writing it to the underlying stream. After flushing, the buffer is cleared.
+    /// Flushes the underlying stream. Each write is encrypted and forwarded immediately, so the writer itself
+    /// buffers no plaintext; this simply flushes the underlying stream to disk.
     /// </summary>
     public override void Flush()
     {
@@ -185,7 +187,8 @@ public sealed class LogWriter : Stream
         throw new NotSupportedException();
 
     /// <summary>
-    /// Disposes the stream by flushing any remaining buffered log data, encrypting it, and writing it to the underlying stream before disposing of the inner stream.
+    /// Flushes and disposes the underlying stream, disposes the AES-GCM instance, and wipes the session key
+    /// and nonce from memory. No plaintext is buffered by the writer, so there is nothing further to encrypt.
     /// </summary>
     /// <param name="disposing"></param>
     protected override void Dispose(bool disposing)
