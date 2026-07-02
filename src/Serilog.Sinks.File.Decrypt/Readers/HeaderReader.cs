@@ -49,7 +49,7 @@ internal class HeaderReader : IHeaderReader
                 throw new InvalidDataException("Decrypted payload is too short to read AES key");
             }
 
-            byte[] aesKey = decryptedPayload[offset..(HeaderMetadata.AesKeyLength)];
+            byte[] aesKey = decryptedPayload[offset..(offset + HeaderMetadata.AesKeyLength)];
             offset += HeaderMetadata.AesKeyLength;
 
             if (decryptedPayload.Length < offset + HeaderMetadata.NonceLength)
