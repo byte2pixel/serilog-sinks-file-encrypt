@@ -137,9 +137,9 @@ Log.CloseAndFlush();
 - Performance is critical (background workers, high-volume systems)
 
 ⚠️ **Minor Risks**
-- Theoretical nonce reuse on crash with corrupted header (extremely low probability)
-- Nonce counter wrapping not explicitly handled (would require 2^96 encryptions per session)
-  - At 1 million logs/second, this would take 2.5 trillion years to reach.
+- On a crash, buffered (unflushed) entries are lost and the file may end with a partially written session or frame. This is a completeness/data-loss concern rather than a confidentiality one: because each session generates a fresh random AES key and nonce, and the decryptor skips incomplete trailing data, a crash does not cause key or nonce reuse.
+- Nonce-counter wrapping within a single session is not explicitly handled. Each session uses a 96-bit AES-GCM nonce — a 32-bit random prefix plus a 64-bit counter — so wrapping would require 2^64 encryptions in one continuous session before the counter cycles.
+  - At 1 million logs/second, that is roughly 585,000 years.
 
 ### Key Rotation
 
@@ -213,6 +213,25 @@ new EncryptHooks(string publicKey, string keyId = "", int version = 1)
 - Use 2048-bit RSA keys minimum (4096-bit for enhanced security)
 - Restrict filesystem access to encrypted log files and private keys
 - Rotate keys periodically and use the `keyId` parameter to track which key encrypted which files
+
+### Threat model & known limitations
+
+This package protects the **confidentiality and per-frame integrity** of your log data. It is **not** a tamper-evident or append-only log. Understand what it does and does not defend against before relying on it for security/audit purposes.
+
+**What is protected**
+
+- ✅ **Confidentiality** — log contents are encrypted with AES-256-GCM and the per-session key is wrapped with RSA-OAEP-SHA256. Reading the logs requires the private key.
+- ✅ **Per-frame integrity** — every encrypted frame carries a 128-bit GCM authentication tag, so modifying the bytes of an existing frame is detected during decryption.
+
+**What is *not* protected (current format)**
+
+- ❌ **Silent truncation, deletion, and reordering.** The format provides no cryptographically verifiable completeness or ordering guarantee: frame ordering and the framing metadata are not covered by the per-frame authentication, and there is no end-of-log marker. An attacker with write access to a log file can drop trailing frames, or delete/reorder whole sessions, and decryption still succeeds on what remains — with no indication that anything is missing. Tampering *by omission* is invisible.
+- ❌ **Fabricated log entries.** Encryption only requires the **public** key, which ships with your application. Anyone who has that public key and can write to the log file can generate their own AES session key, wrap it with the public key, and append entirely fabricated sessions. They **cannot** read or alter the contents of your existing sessions (that requires the private key), but they can add convincing-looking new ones. Preventing this requires a secret the attacker does not have — for example a symmetric MAC or a producer-side signing key kept off the public distribution — which this package does not currently provide.
+
+> [!IMPORTANT]
+> If your use case needs tamper-evidence (for example security or audit logs), treat the encrypted file as **confidential but not authoritative on completeness**, and pair it with an external integrity mechanism such as append-only/WORM storage, remote log shipping, or signing.
+
+> A future major version will add a versioned format that binds frame ordering into the authenticated data and adds an optional end-of-log seal, making truncation and reordering detectable. See [issue #83](https://github.com/byte2pixel/serilog-sinks-file-encrypt/issues/83) for progress.
 
 ## Migration
 
