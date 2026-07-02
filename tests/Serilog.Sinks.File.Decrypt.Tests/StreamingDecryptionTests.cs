@@ -197,7 +197,7 @@ public sealed class StreamingDecryptionTests : EncryptionTestBase
     [InlineData(int.MaxValue)] // Huge positive length - previously OutOfMemoryException / large allocation
     [InlineData(-100)] // Negative length (not the magic marker) - previously ArgumentOutOfRangeException
     [InlineData(0)] // Zero length
-    [InlineData(EncryptionConstants.TagLength)] // Too short to contain any ciphertext + tag
+    [InlineData(EncryptionConstants.TagLength - 1)] // Too short to hold the authentication tag
     public async Task DecryptLogFileAsync_WithCorruptMessageLengthPrefix_SkipMode_DoesNotCrash(
         int corruptLength
     )

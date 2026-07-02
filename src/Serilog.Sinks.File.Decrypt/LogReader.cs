@@ -199,10 +199,10 @@ public sealed class LogReader : IDisposable
             // unbounded allocation. Treat it as corruption so Skip mode can resync instead
             // of throwing an unhandled ArgumentOutOfRangeException/OutOfMemoryException.
             long remainingBytes = _input.Length - _input.Position;
-            if (messageLength <= EncryptionConstants.TagLength || messageLength > remainingBytes)
+            if (messageLength < EncryptionConstants.TagLength || messageLength > remainingBytes)
             {
                 throw new InvalidDataException(
-                    $"Invalid message length {messageLength} at position {_input.Position}."
+                    $"Invalid message length {messageLength} at position {_input.Position - sizeof(int)}."
                 );
             }
 
