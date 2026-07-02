@@ -137,9 +137,9 @@ Log.CloseAndFlush();
 - Performance is critical (background workers, high-volume systems)
 
 ⚠️ **Minor Risks**
-- Theoretical nonce reuse on crash with corrupted header (extremely low probability)
-- Nonce counter wrapping not explicitly handled (would require 2^96 encryptions per session)
-  - At 1 million logs/second, this would take 2.5 trillion years to reach.
+- On a crash, buffered (unflushed) entries are lost and the file may end with a partially written session or frame. This is a completeness/data-loss concern, not a confidentiality one: each session uses a fresh random AES key and nonce and the decryptor resyncs past incomplete data, so no key or nonce is reused.
+- Nonce-counter wrapping within a single session is not explicitly handled. It would require 2^64 encryptions in one continuous session before the 64-bit counter cycles.
+  - At 1 million logs/second, that is roughly 585,000 years.
 
 ### Key Rotation
 
