@@ -41,22 +41,31 @@ internal class HeaderReader : IHeaderReader
         {
             throw new CryptographicException("RSA decryption of header failed.", ex);
         }
-        // Read AES key
-        if (decryptedPayload.Length < HeaderMetadata.AesKeyLength)
+        try
         {
-            throw new InvalidDataException("Decrypted payload is too short to read AES key");
+            // Read AES key
+            if (decryptedPayload.Length < HeaderMetadata.AesKeyLength)
+            {
+                throw new InvalidDataException("Decrypted payload is too short to read AES key");
+            }
+
+            byte[] aesKey = decryptedPayload[offset..(HeaderMetadata.AesKeyLength)];
+            offset += HeaderMetadata.AesKeyLength;
+
+            if (decryptedPayload.Length < offset + HeaderMetadata.NonceLength)
+            {
+                throw new InvalidDataException("Decrypted payload is too short to read the nonce.");
+            }
+
+            byte[] nonce = decryptedPayload[offset..(offset + HeaderMetadata.NonceLength)];
+
+            return (aesKey, nonce);
         }
-
-        byte[] aesKey = decryptedPayload[offset..(HeaderMetadata.AesKeyLength)];
-        offset += HeaderMetadata.AesKeyLength;
-
-        if (decryptedPayload.Length < offset + HeaderMetadata.NonceLength)
+        finally
         {
-            throw new InvalidDataException("Decrypted payload is too short to read the nonce.");
+            // The RSA-decrypted payload contains the AES key and nonce; wipe it once the
+            // key and nonce have been copied out (or on any failure) so it does not linger.
+            CryptographicOperations.ZeroMemory(decryptedPayload);
         }
-
-        byte[] nonce = decryptedPayload[offset..(offset + HeaderMetadata.NonceLength)];
-
-        return (aesKey, nonce);
     }
 }

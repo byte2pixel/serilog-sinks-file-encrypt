@@ -1,3 +1,5 @@
+using System.Security.Cryptography;
+
 namespace Serilog.Sinks.File.Decrypt.Models;
 
 /// <summary>
@@ -26,4 +28,14 @@ public class DecryptionContext(byte[] nonce, byte[] sessionKey)
     /// Returns true if both the Nonce and SessionKey are present, indicating that decryption can proceed.
     /// </summary>
     public bool HasKeys => Nonce.Length > 0 && SessionKey.Length > 0;
+
+    /// <summary>
+    /// Zeroes the session key and nonce so this sensitive key material does not linger in managed memory
+    /// after the session has been processed.
+    /// </summary>
+    public void Clear()
+    {
+        CryptographicOperations.ZeroMemory(SessionKey);
+        CryptographicOperations.ZeroMemory(Nonce);
+    }
 }

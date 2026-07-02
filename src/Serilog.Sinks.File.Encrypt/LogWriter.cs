@@ -195,6 +195,10 @@ public sealed class LogWriter : Stream
             Flush();
             _inner.Dispose();
             _aesGcm?.Dispose();
+
+            // Wipe the session key and nonce so they do not linger in managed memory.
+            CryptographicOperations.ZeroMemory(_aesKey);
+            CryptographicOperations.ZeroMemory(_nonce);
         }
         base.Dispose(disposing);
     }
