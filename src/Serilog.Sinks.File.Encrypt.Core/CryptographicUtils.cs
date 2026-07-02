@@ -104,7 +104,7 @@ public static class CryptographicUtils
     /// <param name="format">The format in which to export the keys. Default is XML.</param>
     /// <returns>A tuple containing the public and private keys in XML or PEM format. The public key should be distributed to log producers, while the private key must be kept secure.</returns>
     /// <exception cref="NotSupportedException">Thrown when the key format is not supported.</exception>
-    /// <exception cref="CryptographicException">Thrown when key generation fails or the key size is invalid.</exception>
+    /// <exception cref="CryptographicException">Thrown when key generation fails, or when <paramref name="keySize"/> is less than the 2048-bit minimum.</exception>
     /// <remarks>
     /// <para>
     /// <b>Key Size Recommendations:</b>
@@ -134,6 +134,15 @@ public static class CryptographicUtils
         KeyFormat format = KeyFormat.Xml
     )
     {
+        // Enforce the documented minimum up front. RSA.Create would happily create a weak
+        // (e.g. 1024-bit) key otherwise, contradicting the contract and MinimumRsaKeySize.
+        if (keySize < EncryptionConstants.MinimumRsaKeySize)
+        {
+            throw new CryptographicException(
+                $"RSA key size must be at least {EncryptionConstants.MinimumRsaKeySize} bits, but was {keySize}."
+            );
+        }
+
         using RSA rsa = RSA.Create(keySize);
 
         (string publicKey, string privateKey) = format switch

@@ -188,6 +188,39 @@ public class CryptographicUtilsTests : EncryptionTestBase
         decryptedData.ShouldBe(data);
     }
 
+    [Theory]
+    [InlineData(1024)]
+    [InlineData(2047)]
+    [InlineData(512)]
+    public void GenerateRsaKeyPair_WithKeySizeBelowMinimum_ThrowsCryptographicException(int keySize)
+    {
+        // Act & Assert
+        Should
+            .Throw<CryptographicException>(() =>
+                CryptographicUtils.GenerateRsaKeyPair(keySize: keySize)
+            )
+            .Message.ShouldContain("at least");
+    }
+
+    [Fact]
+    public void GenerateRsaKeyPair_WithMinimumKeySize_ReturnsValidKeys()
+    {
+        // Arrange & Act
+        (string publicKey, string privateKey) = CryptographicUtils.GenerateRsaKeyPair(
+            keySize: EncryptionConstants.MinimumRsaKeySize
+        );
+
+        using var privateKeyRsa = RSA.Create();
+        privateKeyRsa.FromString(privateKey);
+
+        using var publicKeyRsa = RSA.Create();
+        publicKeyRsa.FromString(publicKey);
+
+        // Assert
+        privateKeyRsa.KeySize.ShouldBe(EncryptionConstants.MinimumRsaKeySize);
+        publicKeyRsa.KeySize.ShouldBe(EncryptionConstants.MinimumRsaKeySize);
+    }
+
     [Fact]
     public void GenerateRsaKeyPair_WithInvalidFormat_ThrowsArgumentException()
     {
