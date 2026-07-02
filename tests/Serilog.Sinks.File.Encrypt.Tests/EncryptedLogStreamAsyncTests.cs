@@ -196,7 +196,7 @@ public sealed class EncryptedLogStreamAsyncTests : EncryptionTestBase
     }
 
     [Fact]
-    public void Dispose_ZeroesSessionKeyAndNonce()
+    public async Task Dispose_ZeroesSessionKeyAndNonce()
     {
         // Arrange
         (string publicKey, _) = CryptographicUtils.GenerateRsaKeyPair();
@@ -204,7 +204,7 @@ public sealed class EncryptedLogStreamAsyncTests : EncryptionTestBase
         using RSA rsa = RSA.Create();
         rsa.FromXmlString(publicKey);
         EncryptionOptions options = new(rsa);
-        LogWriter logWriter = new(fs, options);
+        await using LogWriter logWriter = new(fs, options);
 
         byte[] data = "sensitive log data"u8.ToArray();
         logWriter.Write(data, 0, data.Length);
@@ -216,7 +216,7 @@ public sealed class EncryptedLogStreamAsyncTests : EncryptionTestBase
         aesKey.ShouldContain(b => b != 0); // the session key was generated
 
         // Act
-        logWriter.Dispose();
+        await logWriter.DisposeAsync();
 
         // Assert - the buffers are wiped in place
         aesKey.ShouldAllBe(b => b == 0);
