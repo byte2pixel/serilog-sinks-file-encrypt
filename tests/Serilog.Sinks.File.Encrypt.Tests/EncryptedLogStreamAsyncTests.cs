@@ -1,4 +1,5 @@
 using System.Diagnostics.CodeAnalysis;
+using System.Reflection;
 
 namespace Serilog.Sinks.File.Encrypt.Tests;
 
@@ -192,5 +193,42 @@ public sealed class EncryptedLogStreamAsyncTests : EncryptionTestBase
         await Should.ThrowAsync<OperationCanceledException>(async () =>
             await logWriter.WriteAsync(data, cts.Token)
         );
+    }
+
+    [Fact]
+    public async Task Dispose_ZeroesSessionKeyAndNonce()
+    {
+        // Arrange
+        (string publicKey, _) = CryptographicUtils.GenerateRsaKeyPair();
+        using MemoryStream fs = new();
+        using RSA rsa = RSA.Create();
+        rsa.FromXmlString(publicKey);
+        EncryptionOptions options = new(rsa);
+        await using LogWriter logWriter = new(fs, options);
+
+        byte[] data = "sensitive log data"u8.ToArray();
+        logWriter.Write(data, 0, data.Length);
+        logWriter.Flush();
+
+        // Grab references to the reusable key/nonce buffers before disposing.
+        byte[] aesKey = GetPrivateArray(logWriter, "_aesKey");
+        byte[] nonce = GetPrivateArray(logWriter, "_nonce");
+        aesKey.ShouldContain(b => b != 0); // the session key was generated
+
+        // Act
+        await logWriter.DisposeAsync();
+
+        // Assert - the buffers are wiped in place
+        aesKey.ShouldAllBe(b => b == 0);
+        nonce.ShouldAllBe(b => b == 0);
+    }
+
+    private static byte[] GetPrivateArray(LogWriter writer, string fieldName)
+    {
+        FieldInfo field = typeof(LogWriter).GetField(
+            fieldName,
+            BindingFlags.NonPublic | BindingFlags.Instance
+        )!;
+        return (byte[])field.GetValue(writer)!;
     }
 }

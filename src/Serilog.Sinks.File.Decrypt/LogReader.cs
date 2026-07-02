@@ -187,7 +187,7 @@ public sealed class LogReader : IDisposable
                 _logger?.Information(
                     "Session header marker likely encountered while reading messages."
                 );
-                _context = DecryptionContext.Empty;
+                ReplaceContext(DecryptionContext.Empty);
                 _state = ReaderState.ReadingHeader;
                 _nextSyncPosition = _input.Position - sizeof(int); // Rewind to start of potential header
                 return;
@@ -236,7 +236,7 @@ public sealed class LogReader : IDisposable
             _logger?.Error(ex, "Message processing error at position: {Position}", _input.Position);
             _resyncAttempts++;
             _failedMessages++;
-            _context = DecryptionContext.Empty;
+            ReplaceContext(DecryptionContext.Empty);
             _state = ReaderState.ReadingHeader;
         }
     }
@@ -376,10 +376,12 @@ public sealed class LogReader : IDisposable
                 throw new NotSupportedException($"Unsupported encryption version: {version[0]}");
             }
             ISessionReader sessionReader = new SessionReader();
-            _context = await sessionReader.ReadSessionAsync(
-                _input,
-                _options.KeyProvider,
-                cancellationToken
+            ReplaceContext(
+                await sessionReader.ReadSessionAsync(
+                    _input,
+                    _options.KeyProvider,
+                    cancellationToken
+                )
             );
             _decryptedSessions++;
             _nextSyncPosition = _input.Position;
@@ -412,8 +414,22 @@ public sealed class LogReader : IDisposable
     private bool IsRoomForMagicBytes() =>
         _input.Length - _input.Position >= CryptographicUtils.MagicBytes.Length;
 
+    /// <summary>
+    /// Replaces the active decryption context, zeroing the previous session's key material first
+    /// so it does not linger in managed memory.
+    /// </summary>
+    private void ReplaceContext(DecryptionContext next)
+    {
+        _context.Clear();
+        _context = next;
+    }
+
     /// <inheritdoc />
-    public void Dispose() { }
+    public void Dispose()
+    {
+        // Wipe any remaining session key material.
+        _context.Clear();
+    }
 
     private int BoyerMooreSearch()
     {
