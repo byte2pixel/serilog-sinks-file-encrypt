@@ -37,20 +37,28 @@ Task("Build")
     .IsDependentOn("Lint")
     .Does(ctx =>
     {
-        ctx.DotNetBuild(
-            Solution,
-            new DotNetBuildSettings
-            {
-                Configuration = configuration,
-                Verbosity = DotNetVerbosity.Minimal,
-                NoLogo = true,
-                NoRestore = true,
-                NoIncremental = ctx.HasArgument("rebuild"),
-                MSBuildSettings = new DotNetMSBuildSettings().TreatAllWarningsAs(
-                    MSBuildTreatAllWarningsAs.Error
-                ),
-            }
-        );
+        var settings = new DotNetBuildSettings
+        {
+            Configuration = configuration,
+            Verbosity = DotNetVerbosity.Minimal,
+            NoLogo = true,
+            NoRestore = true,
+            NoIncremental = ctx.HasArgument("rebuild"),
+            MSBuildSettings = new DotNetMSBuildSettings().TreatAllWarningsAs(
+                MSBuildTreatAllWarningsAs.Error
+            ),
+        };
+
+        // Build only the shipped source and test projects. Example projects under
+        // ./examples are intentionally excluded: they are not shipped, so their
+        // dependencies' vulnerability advisories or warnings should not fail the build.
+        foreach (
+            FilePath project in ctx.GetFiles("./src/**/*.csproj")
+                + ctx.GetFiles("./tests/**/*.csproj")
+        )
+        {
+            ctx.DotNetBuild(project.FullPath, settings);
+        }
     });
 
 Task("Test")
@@ -95,21 +103,24 @@ Task("Package")
     .IsDependentOn("Test")
     .Does(ctx =>
     {
-        ctx.DotNetPack(
-            Solution,
-            new DotNetPackSettings
-            {
-                Configuration = configuration,
-                Verbosity = DotNetVerbosity.Minimal,
-                NoLogo = true,
-                NoRestore = true,
-                NoBuild = true,
-                OutputDirectory = "./.artifacts",
-                MSBuildSettings = new DotNetMSBuildSettings().TreatAllWarningsAs(
-                    MSBuildTreatAllWarningsAs.Error
-                ),
-            }
-        );
+        var settings = new DotNetPackSettings
+        {
+            Configuration = configuration,
+            Verbosity = DotNetVerbosity.Minimal,
+            NoLogo = true,
+            NoRestore = true,
+            NoBuild = true,
+            OutputDirectory = "./.artifacts",
+            MSBuildSettings = new DotNetMSBuildSettings().TreatAllWarningsAs(
+                MSBuildTreatAllWarningsAs.Error
+            ),
+        };
+
+        // Pack only the shipped source projects; example projects are excluded (see Build).
+        foreach (FilePath project in ctx.GetFiles("./src/**/*.csproj"))
+        {
+            ctx.DotNetPack(project.FullPath, settings);
+        }
     });
 
 Task("Publish-NuGet")
