@@ -214,6 +214,25 @@ new EncryptHooks(string publicKey, string keyId = "", int version = 1)
 - Restrict filesystem access to encrypted log files and private keys
 - Rotate keys periodically and use the `keyId` parameter to track which key encrypted which files
 
+### Threat model & known limitations
+
+This package protects the **confidentiality and per-frame integrity** of your log data. It is **not** a tamper-evident or append-only log. Understand what it does and does not defend against before relying on it for security/audit purposes.
+
+**What is protected**
+
+- ✅ **Confidentiality** — log contents are encrypted with AES-256-GCM and the per-session key is wrapped with RSA-OAEP-SHA256. Reading the logs requires the private key.
+- ✅ **Per-frame integrity** — every encrypted frame carries a 128-bit GCM authentication tag, so modifying the bytes of an existing frame is detected during decryption.
+
+**What is *not* protected (current format)**
+
+- ❌ **Silent truncation, deletion, and reordering.** Frame position, the length prefix, and session metadata are not bound into the authentication, and there is no end-of-log marker. An attacker with write access to a log file can drop trailing frames, or delete/reorder whole sessions, and decryption still succeeds on what remains — with no indication that anything is missing. Tampering *by omission* is invisible.
+- ❌ **Fabricated log entries.** Encryption only requires the **public** key, which ships with your application. Anyone who has that public key and can write to the log file can generate their own AES session key, wrap it with the public key, and append entirely fabricated sessions. They **cannot** read or alter the contents of your existing sessions (that requires the private key), but they can add convincing-looking new ones. Preventing this requires a secret the attacker does not have — for example a symmetric MAC or a producer-side signing key kept off the public distribution — which this package does not currently provide.
+
+> [!IMPORTANT]
+> If your use case needs tamper-evidence (for example security or audit logs), treat the encrypted file as **confidential but not authoritative on completeness**, and pair it with an external integrity mechanism such as append-only/WORM storage, remote log shipping, or signing.
+
+> A future major version will add a versioned format that binds frame ordering into the authenticated data and adds an optional end-of-log seal, making truncation and reordering detectable. See [issue #83](https://github.com/byte2pixel/serilog-sinks-file-encrypt/issues/83) for progress.
+
 ## Migration
 
 For step-by-step migration guides, see the [CHANGELOG.md](https://github.com/byte2pixel/serilog-sinks-file-encrypt/blob/main/CHANGELOG.md):
