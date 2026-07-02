@@ -1,3 +1,4 @@
+using System.Buffers.Binary;
 using System.Security.Cryptography;
 using Serilog.Sinks.File.Encrypt.Models;
 
@@ -71,13 +72,13 @@ public static class CryptographicUtils
 
     /// <summary>
     /// AES-GCM encryption requires a unique nonce for each encryption operation.
-    /// This method retrieves the current nonce value stored in the last 8 bytes of the data array.
+    /// This method retrieves the 64-bit little-endian counter stored in the last 8 bytes of the nonce.
     /// </summary>
     /// <param name="nonce">Nonce of any length >= 12</param>
     /// <returns>The current nonce counter value.</returns>
     private static long GetNonce(this byte[] nonce)
     {
-        return BitConverter.ToInt64(nonce, nonce.Length - sizeof(long));
+        return BinaryPrimitives.ReadInt64LittleEndian(nonce.AsSpan(nonce.Length - sizeof(long)));
     }
 
     /// <summary>
@@ -98,8 +99,7 @@ public static class CryptographicUtils
         ArgumentOutOfRangeException.ThrowIfLessThan(nonce.Length, 12);
 
         long value = nonce.GetNonce() + 1;
-        byte[] nonceBytes = BitConverter.GetBytes(value);
-        nonceBytes.CopyTo(nonce, nonce.Length - sizeof(long));
+        BinaryPrimitives.WriteInt64LittleEndian(nonce.AsSpan(nonce.Length - sizeof(long)), value);
     }
 
     /// <summary>

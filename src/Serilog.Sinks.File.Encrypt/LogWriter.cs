@@ -166,7 +166,7 @@ public sealed class LogWriter : Stream
 
     /// <summary>
     /// Flushes the underlying stream. Each write is encrypted and forwarded immediately, so the writer itself
-    /// buffers no plaintext; this simply flushes the underlying stream to disk.
+    /// buffers no plaintext; this simply flushes the underlying stream.
     /// </summary>
     public override void Flush()
     {
