@@ -9,15 +9,16 @@
 A [Serilog.File.Sink](https://github.com/serilog/serilog-sinks-file) hook that encrypts log files using RSA and AES-GCM hybrid encryption. This package provides secure logging by encrypting log data before writing to disk, ensuring sensitive information remains protected.
 
 > [!WARNING]
-> **v5.0.0 Breaking Changes**
-> Split the NuGet package `Serilog.Sinks.File.Encrypt` into 3 separate packages:
->   - `Serilog.Sinks.File.Encrypt` (this package — the file hook for encryption only)
->   - [`Serilog.Sinks.File.Decrypt`](https://www.nuget.org/packages/Serilog.Sinks.File.Decrypt) (decryption library — `LogReader`, `LocalKeyProvider`, `DecryptionOptions`, `DecryptionUtils`, `IKeyProvider`)
->   - [`Serilog.Sinks.File.Encrypt.Core`](https://www.nuget.org/packages/Serilog.Sinks.File.Encrypt.Core) (shared cryptographic primitives — transitive dependency, no direct reference needed)
+> **v6.0.0 Breaking Changes**
+> The writer now emits the **v2 on-disk format**: every frame binds its session and position into the AES-GCM authenticated data, and a cleanly closed log ends with an authenticated **end-of-log seal**, making truncation, reordering, and splicing detectable ([#83](https://github.com/byte2pixel/serilog-sinks-file-encrypt/issues/83)).
+>   - v6 readers still decrypt v1-format files produced by v3.x–v5.x; **v5.x and earlier cannot read v6 files**.
+>   - The ignored `version` parameter was removed from `EncryptHooks` and `EncryptionOptions`.
+>   - See the [CHANGELOG](https://github.com/byte2pixel/serilog-sinks-file-encrypt/blob/main/CHANGELOG.md) for the full migration guide.
 
 ## Features
 
 - **Hybrid Encryption**: Uses RSA for key exchange and AES-GCM for efficient, authenticated data encryption
+- **Tamper-Evident Framing (v2)**: Frame order, session identity, and header metadata are bound into the AES-GCM authenticated data; a sealed log's truncation is cryptographically detectable
 - **Key Rotation**: Assign a key ID to `EncryptHooks`; the decryption layer selects the correct private key automatically
 - **Seamless Integration**: Plugs directly into [Serilog.File.Sink](https://github.com/serilog/serilog-sinks-file) using file lifecycle hooks
 - **Optimal Performance**: Optimized encryption performance using hybrid encryption
@@ -137,7 +138,7 @@ Log.CloseAndFlush();
 - Performance is critical (background workers, high-volume systems)
 
 ⚠️ **Minor Risks**
-- On a crash, buffered (unflushed) entries are lost and the file may end with a partially written session or frame. This is a completeness/data-loss concern rather than a confidentiality one: because each session generates a fresh random AES key and nonce, and the decryptor skips incomplete trailing data, a crash does not cause key or nonce reuse.
+- On a crash, buffered (unflushed) entries are lost and the file may end with a partially written session or frame, and without the end-of-log seal. This is a completeness/data-loss concern rather than a confidentiality one: because each session generates a fresh random AES key and nonce, and the decryptor skips incomplete trailing data, a crash does not cause key or nonce reuse. The decryptor reports such sessions as **unsealed** (see `SealStatus` in the Decrypt package) rather than silently treating them as complete.
 - Nonce-counter wrapping within a single session is not explicitly handled. Each session uses a 96-bit AES-GCM nonce — a 32-bit random prefix plus a 64-bit counter — so wrapping would require 2^64 encryptions in one continuous session before the counter cycles.
   - At 1 million logs/second, that is roughly 585,000 years.
 
@@ -202,9 +203,12 @@ app.Run();
 ```csharp
 // publicKey — RSA public key in XML or PEM format
 // keyId     — optional identifier embedded in every session header (max 32 bytes UTF-8); default ""
-// version   — header format version; default 1 - Obsolete and has no effect anymore.
-new EncryptHooks(string publicKey, string keyId = "", int version = 1)
+new EncryptHooks(string publicKey, string keyId = "")
 ```
+
+### On-disk format (v2)
+
+Each file open starts a **session**: a header (`magic(8) + version(1) + keyId(32) + RSA-OAEP-SHA256(AES key ‖ nonce)`), followed by self-framing AES-256-GCM frames (`length(4, big-endian) + ciphertext + tag(16)`). In v2, every frame authenticates 41 bytes of associated data — the SHA-256 hash of the session header, the frame's sequence number, and a frame-type byte — so dropped, reordered, duplicated, or cross-session-spliced frames fail authentication. On clean close (`Dispose`/`Log.CloseAndFlush()`) the writer appends a 28-byte authenticated **seal record** carrying the final frame count, encrypted under a reserved nonce so it stays verifiable even if trailing frames are missing.
 
 ## Security Considerations
 
@@ -216,22 +220,22 @@ new EncryptHooks(string publicKey, string keyId = "", int version = 1)
 
 ### Threat model & known limitations
 
-This package protects the **confidentiality and per-frame integrity** of your log data. It is **not** a tamper-evident or append-only log. Understand what it does and does not defend against before relying on it for security/audit purposes.
+This package protects the **confidentiality and integrity** of your log data, and — as of the v2 format — makes tampering *within* a session cryptographically detectable. Understand what it does and does not defend against before relying on it for security/audit purposes.
 
-**What is protected**
+**What is protected (v2 format, v6.0.0+)**
 
 - ✅ **Confidentiality** — log contents are encrypted with AES-256-GCM and the per-session key is wrapped with RSA-OAEP-SHA256. Reading the logs requires the private key.
 - ✅ **Per-frame integrity** — every encrypted frame carries a 128-bit GCM authentication tag, so modifying the bytes of an existing frame is detected during decryption.
+- ✅ **Frame ordering and completeness within a session** — each frame's associated data binds the session header (version, keyId, wrapped key) and the frame's sequence number. Dropping, reordering, duplicating, or splicing frames between sessions fails authentication.
+- ✅ **Truncation of a cleanly closed log** — a sealed session's authenticated frame count exposes removed trailing frames (`SealCountMismatch`). A session with no seal is reported as **unsealed**: either the application crashed or the tail was truncated — the two are byte-for-byte indistinguishable *by design*, so the decryptor reports the ambiguity instead of silently claiming completeness.
 
-**What is *not* protected (current format)**
+**What is *not* protected**
 
-- ❌ **Silent truncation, deletion, and reordering.** The format provides no cryptographically verifiable completeness or ordering guarantee: frame ordering and the framing metadata are not covered by the per-frame authentication, and there is no end-of-log marker. An attacker with write access to a log file can drop trailing frames, or delete/reorder whole sessions, and decryption still succeeds on what remains — with no indication that anything is missing. Tampering *by omission* is invisible.
-- ❌ **Fabricated log entries.** Encryption only requires the **public** key, which ships with your application. Anyone who has that public key and can write to the log file can generate their own AES session key, wrap it with the public key, and append entirely fabricated sessions. They **cannot** read or alter the contents of your existing sessions (that requires the private key), but they can add convincing-looking new ones. Preventing this requires a secret the attacker does not have — for example a symmetric MAC or a producer-side signing key kept off the public distribution — which this package does not currently provide.
+- ❌ **Fabricated sessions.** Encryption only requires the **public** key, which ships with your application. Anyone who has that public key and can write to the log file can generate their own AES session key, wrap it with the public key, and append entirely fabricated *sessions* (they cannot inject frames into your existing sessions — the AAD binding prevents that). They **cannot** read or alter the contents of your existing sessions (that requires the private key). Preventing whole-session fabrication requires a secret the attacker does not have — for example a symmetric MAC or a producer-side signing key kept off the public distribution — which this package does not currently provide.
+- ❌ **Deletion of entire sessions.** Sessions are independently keyed; nothing chains one session to the next, so removing a whole session (e.g. one rolled file's worth) from the middle of a multi-session file is not detectable by the format itself.
 
 > [!IMPORTANT]
-> If your use case needs tamper-evidence (for example security or audit logs), treat the encrypted file as **confidential but not authoritative on completeness**, and pair it with an external integrity mechanism such as append-only/WORM storage, remote log shipping, or signing.
-
-> A future major version will add a versioned format that binds frame ordering into the authenticated data and adds an optional end-of-log seal, making truncation and reordering detectable. See [issue #83](https://github.com/byte2pixel/serilog-sinks-file-encrypt/issues/83) for progress.
+> If your use case needs full tamper-evidence against a writer with the public key (for example security or audit logs), pair the encrypted file with an external integrity mechanism such as append-only/WORM storage, remote log shipping, or signing.
 
 ## Migration
 

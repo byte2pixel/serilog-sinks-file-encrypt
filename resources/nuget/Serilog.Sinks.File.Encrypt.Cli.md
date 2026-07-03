@@ -81,11 +81,13 @@ serilog-encrypt decrypt "logs/*.log" -k private_key.xml -o ./decrypted
 - `--id <KEY_ID>`: The key ID that was supplied to `EncryptHooks` during encryption (default: `""` — matches files encrypted without a key ID)
 - `-o|--output <OUTPUT>`: Output directory or file path (default: adds `.decrypted` to original filename)
 - `-s|--strict`: Fail immediately on first decryption error (default: continues processing all files)
+- `--require-sealed`: Treat sessions without a verified end-of-log seal (crashed, truncated, or v1-format) as errors. Combine with `--strict` to fail the file instead of only warning.
 - `--audit-log <PATH>`: Write detailed audit information to a rolling log file (max 10 MB, 7 retained files). If omitted, a randomly-named file is created in the temp directory.
 
 **Features:**
 - Memory-optimized for large log files
 - Simple error handling: continues on errors by default, or use `--strict` to fail fast
+- Per-session **seal verification** (v6.0.0+ logs): reports whether each session was cleanly closed and complete, warns on unsealed (crashed or truncated) sessions, and flags detected truncation or tampering
 - Batch processing with glob patterns
 - Automatically skips files with `.decrypted.` in the name to prevent re-decryption
 
@@ -158,6 +160,12 @@ serilog-encrypt decrypt "logs/*.log" -k private_key.xml --id my-app-key-2026
 Stop immediately on first error (useful for validation):
 ```bash
 serilog-encrypt decrypt app.log -k private_key.xml --strict
+```
+
+**Seal Verification (v2-format logs, v6.0.0+):**
+Each decrypted session's end-of-log seal status is reported: `✓ All N session(s) sealed and complete` for verified logs, a warning for unsealed sessions (the application crashed or the tail was truncated — indistinguishable), and an error when a sealed log's tail was provably truncated or the seal was tampered with. To fail on anything that is not verified complete:
+```bash
+serilog-encrypt decrypt app.log -k private_key.xml --strict --require-sealed
 ```
 
 **Audit Logging:**

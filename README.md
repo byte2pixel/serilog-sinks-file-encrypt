@@ -31,10 +31,12 @@ All packages in this repository are released **in lockstep** — every package i
 ## ✨ Features
 
 - Transparent encryption of log files using hybrid RSA + AES-GCM cryptography
+- **Tamper-evident v2 format (v6.0.0+)** — frame ordering and session identity are bound into the AES-GCM authenticated data, and cleanly closed logs end with an authenticated seal, making truncation, reordering, and splicing detectable; per-session `SealStatus` is reported on decryption
 - **Key rotation** — assign a key ID to each `EncryptHooks` instance; the decryption layer selects the correct key automatically
-- CLI utilities for key generation, decryption, and batch processing of encrypted logs
+- CLI utilities for key generation, decryption (including `--require-sealed` verification), and batch processing of encrypted logs
 - Memory-optimized streaming for large log files
 - Programmatic decryption via `Serilog.Sinks.File.Decrypt` — supports custom key providers for Azure Key Vault, AWS KMS, etc.
+- **Backward compatible reading** — v6.x decrypts v1-format files written by v3.x–v5.x (v5.x and earlier cannot read v6 files)
 
 ## 📖 Documentation
 
