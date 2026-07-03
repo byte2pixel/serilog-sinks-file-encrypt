@@ -31,13 +31,13 @@ A [Serilog.File.Sink](https://github.com/serilog/serilog-sinks-file) hook that e
 
 ## Performance
 
-Production-ready performance with minimal overhead:
+Production-ready performance with minimal overhead (v6.0.0 benchmark run, including the v2 format's
+per-frame authenticated data and end-of-log seal):
 
-- ✅ **8-12% time overhead** in real-world unbuffered scenarios (well under typical targets)
-- ✅ **300K+ logs/second** throughput with buffered writes (vs. ~174K baseline)
-- ✅ **AES-GCM: ~1.03–1.07x memory overhead** — near-baseline
-- ✅ **~5-16% throughput reduction** with unbuffered encryption (148K–153K logs/sec)
-- 🚀 **Buffered mode outperforms non-encrypted unbuffered by ~66%** — encrypted buffered I/O is faster than plain unbuffered
+- ✅ **~5-13% time overhead** in real-world unbuffered scenarios (well under typical targets)
+- ✅ **~1.00x memory** — allocations are effectively identical to unencrypted logging
+- ✅ **Integrity effectively free** — the v2 tamper-evidence features add no measurable cost over plain AES-GCM
+- 🚀 **Buffered mode is dramatically faster than non-encrypted unbuffered** — up to ~5x at high volume
 - ✅ **Zero lock contentions** — safe for multithreaded applications handled by Serilog.File.Sink
 
 **Buffering Trade-off:** While buffered writes provide excellent performance, they carry a risk of data loss if the application crashes before flushing. **Always call `Log.CloseAndFlush()` on application shutdown.**
