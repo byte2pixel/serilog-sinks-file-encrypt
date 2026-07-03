@@ -111,6 +111,28 @@ Run 2:
 | **PlainMemoryStreamWrite** | **2048**   | **58.22 ns** | **0.211 ns** | **0.197 ns** | **1.00** | **0.00** | **0.0408** | **0.0001** | **2048 B** |    **1.00** |
 | EncryptedMemoryStreamWrite | 2048       | 13,946.36 ns |    20.492 ns |    19.168 ns |   239.56 |     0.85 |     0.1068 |          - |     5752 B |        2.81 |
 
+#### v2 format: AES-GCM + AAD + seal (v6.0.0)
+
+Run 1 (2026-07-03, branch `feature/83-v2-format`, BenchmarkDotNet v0.14.0, Windows 11, .NET 8.0.28):
+
+> ⚠️ Different machine than the earlier eras — compare **ratios**, not absolute times. Each frame now
+> binds 41 bytes of associated data; each `LogWriter` construction also derives the seal nonce.
+
+| Method                  | BufferSize | Mean         | Error      | StdDev     | Median       | Ratio  | RatioSD | Gen0   | Gen1   | Allocated | Alloc Ratio |
+|------------------------ |----------- |-------------:|-----------:|-----------:|-------------:|-------:|--------:|-------:|-------:|----------:|------------:|
+| PlainMemoryStreamWrite  | 512        |     25.86 ns |   0.539 ns |   0.972 ns |     25.82 ns |   1.00 |    0.05 | 0.0105 |      - |     528 B |        1.00 |
+| EncryptedLogStreamWrite | 512        | 14,482.03 ns |  62.407 ns |  52.112 ns | 14,459.67 ns | 560.77 |   20.73 | 0.0610 |      - |    3064 B |        5.80 |
+|                         |            |              |            |            |              |        |         |        |        |           |             |
+| PlainMemoryStreamWrite  | 1024       |     34.71 ns |   0.509 ns |   0.397 ns |     34.77 ns |   1.00 |    0.02 | 0.0191 |      - |     960 B |        1.00 |
+| EncryptedLogStreamWrite | 1024       | 14,735.18 ns | 140.074 ns | 131.025 ns | 14,704.00 ns | 424.59 |    5.98 | 0.1068 |      - |    5464 B |        5.69 |
+|                         |            |              |            |            |              |        |         |        |        |           |             |
+| PlainMemoryStreamWrite  | 2048       |     64.59 ns |   1.448 ns |   4.223 ns |     63.37 ns |   1.00 |    0.09 | 0.0408 | 0.0001 |    2048 B |        1.00 |
+| EncryptedLogStreamWrite | 2048       | 15,137.19 ns | 141.596 ns | 125.521 ns | 15,131.97 ns | 235.33 |   15.04 | 0.1526 |      - |    8664 B |        4.23 |
+
+This benchmark creates a new `LogWriter` per operation, so it measures **per-session setup** (RSA-OAEP
+key wrap dominates the ~14–15 μs) plus one frame — not steady-state frame throughput. Comparable to the
+prior AES-GCM era (~13.6–13.9 μs on faster hardware); the AAD adds no measurable per-frame cost.
+
 ### Serilog File Sink Benchmarks
 
 #### Original: AES-CBC no Escaping
@@ -359,6 +381,59 @@ Run 2:
 | LogWithEncryption         | 10000         | Small       |     25,526.2 μs |      81.35 μs |      67.93 μs |     25,515.2 μs |     1.14 |     0.01 |      31.2500 |                    - |                - |      1900.41 KB |        1.21 |
 | LogWithEncryptionBuffered | 10000         | Small       |      4,275.5 μs |      30.97 μs |      27.46 μs |      4,271.7 μs |     0.19 |     0.00 |      31.2500 |                    - |                - |      1609.29 KB |        1.02 |
 
+#### v2 format: AES-GCM + AAD + seal (v6.0.0)
+
+Run 1 (2026-07-03, branch `feature/83-v2-format`, BenchmarkDotNet v0.14.0, Windows 11, .NET 8.0.28):
+
+> ⚠️ Different machine than the earlier eras — compare **ratios**, not absolute times.
+>
+> The `LogWithEncryption / 1000 / Medium` mean (11.6 ms, Ratio 2.92) is a disturbed measurement:
+> RatioSD is 2.97 and the StdDev exceeds the mean. The **median** (4,551 μs vs baseline median
+> 4,020 μs ≈ +13%) is in line with every neighbouring cell.
+
+| Method                    | LogEntryCount | MessageSize | Mean        | Error       | StdDev       | Median      | Ratio | RatioSD | Gen0     | Completed Work Items | Lock Contentions | Allocated   | Alloc Ratio |
+|-------------------------- |-------------- |------------ |------------:|------------:|-------------:|------------:|------:|--------:|---------:|---------------------:|-----------------:|------------:|------------:|
+| LogWithoutEncryption      | 100           | Large       |    968.8 μs |     9.73 μs |      8.12 μs |    968.9 μs |  1.00 |    0.01 |   3.9063 |                    - |                - |   235.19 KB |        1.00 |
+| LogWithEncryption         | 100           | Large       |    897.5 μs |    17.55 μs |     31.20 μs |    891.6 μs |  0.93 |    0.03 |   3.9063 |                    - |                - |   235.97 KB |        1.00 |
+| LogWithEncryptionBuffered | 100           | Large       |    682.3 μs |    13.44 μs |     30.89 μs |    677.7 μs |  0.70 |    0.03 |   3.9063 |                    - |                - |      236 KB |        1.00 |
+|                           |               |             |             |             |              |             |       |         |          |                      |                  |             |             |
+| LogWithoutEncryption      | 100           | Medium      |    743.2 μs |     9.82 μs |      9.19 μs |    743.3 μs |  1.00 |    0.02 |        - |                    - |                - |    75.13 KB |        1.00 |
+| LogWithEncryption         | 100           | Medium      |    791.4 μs |    13.13 μs |     13.48 μs |    793.3 μs |  1.06 |    0.02 |        - |                    - |                - |    75.95 KB |        1.01 |
+| LogWithEncryptionBuffered | 100           | Medium      |    504.5 μs |    20.19 μs |     57.59 μs |    482.6 μs |  0.68 |    0.08 |   0.9766 |                    - |                - |    78.98 KB |        1.05 |
+|                           |               |             |             |             |              |             |       |         |          |                      |                  |             |             |
+| LogWithoutEncryption      | 100           | Small       |    707.8 μs |    14.02 μs |     19.19 μs |    704.4 μs |  1.00 |    0.04 |        - |                    - |                - |    28.14 KB |        1.00 |
+| LogWithEncryption         | 100           | Small       |    789.7 μs |    15.40 μs |     25.31 μs |    786.0 μs |  1.12 |    0.05 |        - |                    - |                - |    28.89 KB |        1.03 |
+| LogWithEncryptionBuffered | 100           | Small       |    505.5 μs |    16.23 μs |     45.25 μs |    491.9 μs |  0.71 |    0.07 |        - |                    - |                - |    31.95 KB |        1.14 |
+|                           |               |             |             |             |              |             |       |         |          |                      |                  |             |             |
+| LogWithoutEncryption      | 1000          | Large       |  5,527.4 μs |   109.36 μs |    284.23 μs |  5,451.6 μs |  1.00 |    0.07 |  31.2500 |                    - |                - |  2225.83 KB |        1.00 |
+| LogWithEncryption         | 1000          | Large       |  5,791.9 μs |   115.78 μs |    305.02 μs |  5,730.2 μs |  1.05 |    0.08 |  31.2500 |                    - |                - |  2226.62 KB |        1.00 |
+| LogWithEncryptionBuffered | 1000          | Large       |  3,365.8 μs |    97.39 μs |    279.42 μs |  3,308.0 μs |  0.61 |    0.06 |  31.2500 |                    - |                - |  2226.66 KB |        1.00 |
+|                           |               |             |             |             |              |             |       |         |          |                      |                  |             |             |
+| LogWithoutEncryption      | 1000          | Medium      |  3,976.2 μs |    78.80 μs |    142.10 μs |  4,019.9 μs |  1.00 |    0.05 |   7.8125 |                    - |                - |   652.49 KB |        1.00 |
+| LogWithEncryption         | 1000          | Medium      | 11,607.7 μs | 4,015.22 μs | 11,838.97 μs |  4,551.3 μs |  2.92 |    2.97 |        - |                    - |                - |   653.63 KB |        1.00 |
+| LogWithEncryptionBuffered | 1000          | Medium      |  1,477.1 μs |    30.43 μs |     86.83 μs |  1,450.4 μs |  0.37 |    0.03 |  11.7188 |                    - |                - |   656.33 KB |        1.01 |
+|                           |               |             |             |             |              |             |       |         |          |                      |                  |             |             |
+| LogWithoutEncryption      | 1000          | Small       |  3,425.0 μs |    65.50 μs |    156.93 μs |  3,385.8 μs |  1.00 |    0.06 |        - |                    - |                - |   168.79 KB |        1.00 |
+| LogWithEncryption         | 1000          | Small       |  3,888.7 μs |    77.39 μs |    137.57 μs |  3,864.7 μs |  1.14 |    0.06 |        - |                    - |                - |   169.52 KB |        1.00 |
+| LogWithEncryptionBuffered | 1000          | Small       |  1,035.8 μs |    32.88 μs |     94.85 μs |  1,042.0 μs |  0.30 |    0.03 |        - |                    - |                - |   172.58 KB |        1.02 |
+|                           |               |             |             |             |              |             |       |         |          |                      |                  |             |             |
+| LogWithoutEncryption      | 10000         | Large       | 46,630.5 μs |   929.53 μs |  1,447.17 μs | 46,426.6 μs |  1.00 |    0.04 | 400.0000 |                    - |                - |  22265.1 KB |        1.00 |
+| LogWithEncryption         | 10000         | Large       | 47,832.7 μs |   679.73 μs |    635.82 μs | 47,971.9 μs |  1.03 |    0.03 | 363.6364 |                    - |                - | 22265.91 KB |        1.00 |
+| LogWithEncryptionBuffered | 10000         | Large       | 24,867.1 μs |   370.09 μs |    309.04 μs | 24,869.8 μs |  0.53 |    0.02 | 437.5000 |                    - |                - |  22265.9 KB |        1.00 |
+|                           |               |             |             |             |              |             |       |         |          |                      |                  |             |             |
+| LogWithoutEncryption      | 10000         | Medium      | 35,200.5 μs |   732.82 μs |  2,160.75 μs | 34,563.7 μs |  1.00 |    0.09 | 100.0000 |                    - |                - |  6558.84 KB |        1.00 |
+| LogWithEncryption         | 10000         | Medium      | 38,421.3 μs |   759.55 μs |  1,760.37 μs | 37,831.7 μs |  1.10 |    0.08 |  90.9091 |                    - |                - |  6559.65 KB |        1.00 |
+| LogWithEncryptionBuffered | 10000         | Medium      |  9,908.0 μs |   196.90 μs |    388.67 μs |  9,807.5 μs |  0.28 |    0.02 | 125.0000 |                    - |                - |  6562.64 KB |        1.00 |
+|                           |               |             |             |             |              |             |       |         |          |                      |                  |             |             |
+| LogWithoutEncryption      | 10000         | Small       | 29,703.0 μs |   591.85 μs |  1,462.90 μs | 29,071.1 μs |  1.00 |    0.07 |        - |                    - |                - |  1575.06 KB |        1.00 |
+| LogWithEncryption         | 10000         | Small       | 33,413.2 μs |   660.03 μs |  1,555.76 μs | 32,935.9 μs |  1.13 |    0.07 |        - |                    - |                - |  1575.88 KB |        1.00 |
+| LogWithEncryptionBuffered | 10000         | Small       |  5,398.1 μs |   107.13 μs |    254.60 μs |  5,365.8 μs |  0.18 |    0.01 |  31.2500 |                    - |                - |  1578.85 KB |        1.00 |
+
+Notable vs the previous AES-GCM era: **allocation overhead is now ~1.00x across the board** (previously
+up to 1.21x at 10K Small) thanks to the post-5.0.0 pooled-buffer fixes, even with the added AAD + seal.
+Unbuffered time overhead stays in the same 3–14% band; buffered stays dramatically faster than the
+unencrypted unbuffered baseline.
+
 ### Simulated Scenario Benchmarks
 
 #### Web API Request Simulation
@@ -429,6 +504,25 @@ Run 2:
 | **SimulateApiRequestsWithoutEncryption** | **1000**     | **1,312.0 μs** | **25.71 μs** | **42.24 μs** | **1,291.5 μs** | **1.00** | **0.04** | **19.5313** |           **0.0039** |            **-** | **1002.41 KB** |    **1.00** |
 | SimulateApiRequestsWithEncryption        | 1000         |     1,481.6 μs |     26.31 μs |     67.92 μs |     1,457.5 μs |     1.13 |     0.06 |     15.6250 |                    - |                - |     1020.69 KB |        1.02 |
 
+##### v2 format: AES-GCM + AAD + seal (v6.0.0)
+
+Run 1 (2026-07-03, branch `feature/83-v2-format`, BenchmarkDotNet v0.14.0, Windows 11, .NET 8.0.28 —
+different machine than earlier eras; the benchmark now also has a `Buffered` parameter):
+
+| Method                               | Buffered | RequestCount | Mean       | Error     | StdDev    | Median     | Ratio | RatioSD | Completed Work Items | Lock Contentions | Gen0    | Allocated  | Alloc Ratio |
+|------------------------------------- |--------- |------------- |-----------:|----------:|----------:|-----------:|------:|--------:|---------------------:|-----------------:|--------:|-----------:|------------:|
+| SimulateApiRequestsWithoutEncryption | False    | 100          |   963.3 μs |  27.37 μs |  78.08 μs |   943.2 μs |  1.01 |    0.11 |                    - |                - |       - |   114.6 KB |        1.00 |
+| SimulateApiRequestsWithEncryption    | False    | 100          | 1,032.8 μs |  20.63 μs |  35.03 μs | 1,037.4 μs |  1.08 |    0.09 |               0.0020 |                - |  1.9531 |  115.35 KB |        1.01 |
+|                                      |          |              |            |           |           |            |       |         |                      |                  |         |            |             |
+| SimulateApiRequestsWithoutEncryption | False    | 1000         | 4,914.2 μs |  97.11 μs | 151.19 μs | 4,925.8 μs |  1.00 |    0.04 |                    - |                - | 15.6250 |  999.38 KB |        1.00 |
+| SimulateApiRequestsWithEncryption    | False    | 1000         | 5,382.5 μs | 134.46 μs | 377.03 μs | 5,262.1 μs |  1.10 |    0.08 |                    - |                - |       - |  1000.2 KB |        1.00 |
+|                                      |          |              |            |           |           |            |       |         |                      |                  |         |            |             |
+| SimulateApiRequestsWithoutEncryption | True     | 100          |   623.9 μs |  27.92 μs |  76.44 μs |   598.0 μs |  1.01 |    0.16 |               0.0029 |                - |  1.9531 |   117.6 KB |        1.00 |
+| SimulateApiRequestsWithEncryption    | True     | 100          |   676.0 μs |  24.39 μs |  68.80 μs |   657.1 μs |  1.10 |    0.16 |                    - |                - |  1.9531 |  118.38 KB |        1.01 |
+|                                      |          |              |            |           |           |            |       |         |                      |                  |         |            |             |
+| SimulateApiRequestsWithoutEncryption | True     | 1000         | 1,754.0 μs |  46.28 μs | 131.29 μs | 1,695.2 μs |  1.01 |    0.10 |               0.0078 |                - | 15.6250 | 1002.42 KB |        1.00 |
+| SimulateApiRequestsWithEncryption    | True     | 1000         | 1,849.2 μs |  36.61 μs |  97.09 μs | 1,824.5 μs |  1.06 |    0.09 |                    - |                - | 15.6250 |  1003.2 KB |        1.00 |
+
 #### Background Worker Simulation
 
 ##### Original: AES-CBC
@@ -496,3 +590,27 @@ Run 2:
 |                                               |              |              |               |               |          |             |                      |                  |             |             |
 | **SimulateBackgroundWorkerWithoutEncryption** | **10000**    | **5.675 ms** | **0.0281 ms** | **0.0219 ms** | **1.00** | **85.9375** |                **-** |            **-** | **4.34 MB** |    **1.00** |
 | SimulateBackgroundWorkerWithEncryption        | 10000        |     6.256 ms |     0.0376 ms |     0.0333 ms |     1.10 |     85.9375 |                    - |                - |     4.38 MB |        1.01 |
+
+##### v2 format: AES-GCM + AAD + seal (v6.0.0)
+
+Run 1 (2026-07-03, branch `feature/83-v2-format`, BenchmarkDotNet v0.14.0, Windows 11, .NET 8.0.28 —
+different machine than earlier eras; the benchmark now also has a `Buffered` parameter):
+
+| Method                                    | Buffered | MessageCount | Mean      | Error     | StdDev    | Median    | Ratio | RatioSD | Completed Work Items | Lock Contentions | Gen0    | Allocated | Alloc Ratio |
+|------------------------------------------ |--------- |------------- |----------:|----------:|----------:|----------:|------:|--------:|---------------------:|-----------------:|--------:|----------:|------------:|
+| SimulateBackgroundWorkerWithoutEncryption | False    | 5000         | 17.156 ms | 0.3415 ms | 0.7278 ms | 17.192 ms |  1.00 |    0.06 |                    - |                - | 31.2500 |   2.18 MB |        1.00 |
+| SimulateBackgroundWorkerWithEncryption    | False    | 5000         | 19.809 ms | 0.3953 ms | 0.9395 ms | 19.570 ms |  1.16 |    0.07 |                    - |                - |       - |   2.18 MB |        1.00 |
+|                                           |          |              |           |           |           |           |       |         |                      |                  |         |           |             |
+| SimulateBackgroundWorkerWithoutEncryption | False    | 10000        | 37.191 ms | 1.3423 ms | 3.8942 ms | 36.042 ms |  1.01 |    0.14 |                    - |                - | 71.4286 |   4.34 MB |        1.00 |
+| SimulateBackgroundWorkerWithEncryption    | False    | 10000        | 45.564 ms | 1.2065 ms | 3.4030 ms | 46.231 ms |  1.24 |    0.15 |                    - |                - |       - |   4.34 MB |        1.00 |
+|                                           |          |              |           |           |           |           |       |         |                      |                  |         |           |             |
+| SimulateBackgroundWorkerWithoutEncryption | True     | 5000         |  4.595 ms | 0.1897 ms | 0.5565 ms |  4.811 ms |  1.02 |    0.19 |                    - |                - | 31.2500 |   2.18 MB |        1.00 |
+| SimulateBackgroundWorkerWithEncryption    | True     | 5000         |  4.025 ms | 0.0797 ms | 0.1940 ms |  3.990 ms |  0.89 |    0.13 |                    - |                - | 39.0625 |   2.18 MB |        1.00 |
+|                                           |          |              |           |           |           |           |       |         |                      |                  |         |           |             |
+| SimulateBackgroundWorkerWithoutEncryption | True     | 10000        |  6.969 ms | 0.1623 ms | 0.4630 ms |  6.814 ms |  1.00 |    0.09 |                    - |                - | 62.5000 |   4.34 MB |        1.00 |
+| SimulateBackgroundWorkerWithEncryption    | True     | 10000        |  7.481 ms | 0.1492 ms | 0.3457 ms |  7.395 ms |  1.08 |    0.08 |                    - |                - | 78.1250 |   4.34 MB |        1.00 |
+
+Unbuffered shows +16–24% on this run (vs ~10% historically) with wide StdDev — likely file-I/O noise on
+this machine; the buffered numbers (+8%, and one run *faster* than baseline) and identical allocations
+suggest the crypto cost itself is unchanged. Worth re-running unbuffered on quiet hardware before
+release notes cite it.

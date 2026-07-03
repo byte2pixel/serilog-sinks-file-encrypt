@@ -96,6 +96,8 @@ StyleCopReport.xml
 *.tmp_proj
 *_wpftmp.csproj
 *.log
+# Committed binary test fixtures are exempt from the *.log ignore rule
+!tests/**/Fixtures/**/*.log
 *.tlog
 *.vspscc
 *.vssscc

@@ -15,6 +15,7 @@ internal interface ISessionReader
     /// </summary>
     /// <param name="input">The input to decrypt.</param>
     /// <param name="keyProvider">The key provider used to decrypt the AES session key and nonce.</param>
+    /// <param name="version">The format version byte already read from the header, which determines whether v2 verification state (header hash, seal nonce) is computed.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>A <see cref="DecryptionContext"/> containing the AES key, nonce for decrypting subsequent messages.</returns>
     /// <exception cref="EndOfStreamException">The end of the stream is reached before the full session info is read.</exception>
@@ -24,6 +25,7 @@ internal interface ISessionReader
     internal Task<DecryptionContext> ReadSessionAsync(
         Stream input,
         IKeyProvider keyProvider,
+        byte version,
         CancellationToken cancellationToken
     );
 }

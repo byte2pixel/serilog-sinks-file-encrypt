@@ -103,6 +103,29 @@ public static class CryptographicUtils
     }
 
     /// <summary>
+    /// Decrements the 64-bit little-endian counter stored in the last 8 bytes of the nonce.
+    /// Used to derive the reserved seal nonce (initial session nonce counter − 1), which keeps the
+    /// seal record decryptable independently of how many data frames precede it. It cannot collide
+    /// with a data-frame nonce (initial counter + n) unless a session exceeds 2^64 − 1 frames,
+    /// the same bound as the documented counter wrap limit.
+    /// </summary>
+    /// <param name="nonce">Nonce of any length >= 12</param>
+    /// <exception cref="ArgumentNullException">
+    /// Thrown when <paramref name="nonce"/> is null.
+    /// </exception>
+    /// <exception cref="ArgumentOutOfRangeException">
+    /// Thrown when <paramref name="nonce"/> length is less than 12 bytes.
+    /// </exception>
+    internal static void DecreaseNonce(this byte[] nonce)
+    {
+        ArgumentNullException.ThrowIfNull(nonce);
+        ArgumentOutOfRangeException.ThrowIfLessThan(nonce.Length, 12);
+
+        long value = nonce.GetNonce() - 1;
+        BinaryPrimitives.WriteInt64LittleEndian(nonce.AsSpan(nonce.Length - sizeof(long)), value);
+    }
+
+    /// <summary>
     /// Generates a new RSA key pair for encryption and decryption operations.
     /// </summary>
     /// <param name="keySize">The size of the key in bits. Must be at least 2048. Recommended: 2048 (default) or 4096 for enhanced security.</param>

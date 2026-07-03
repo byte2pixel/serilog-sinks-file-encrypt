@@ -7,6 +7,73 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [6.0.0] - Unreleased
+
+### ⚠️ Breaking Changes
+
+#### New v2 on-disk format ([#83](https://github.com/byte2pixel/serilog-sinks-file-encrypt/issues/83))
+
+The writer now emits **format version 2**, which closes the truncation/reordering/splicing
+integrity gap documented in [#82](https://github.com/byte2pixel/serilog-sinks-file-encrypt/issues/82):
+
+- Every AES-GCM record binds 41 bytes of **associated data**: the SHA-256 hash of the session
+  header (covering version, keyId, and the RSA-wrapped key), the frame's sequence number
+  (big-endian, starting at 0), and a record-type byte. Dropped, reordered, duplicated, or
+  cross-session-spliced frames now fail authentication.
+- On clean close (`Dispose` / `Log.CloseAndFlush()`) the writer appends a 28-byte authenticated
+  **end-of-log seal** (marker `FF 42 32 53` + encrypted final frame count). The seal uses a
+  reserved nonce (initial session nonce counter − 1) so it verifies regardless of how many
+  trailing frames survive, which lets the reader distinguish *truncation of a cleanly closed
+  log* (`SealCountMismatch`) from generic corruption.
+- The header layout is byte-identical to v1 except the version byte (`0x02`).
+
+**Compatibility: v6.x reads v1-format files produced by v3.x–v5.x. v5.x and earlier cannot
+read v6 (v2-format) files.**
+
+#### `version` parameter removed
+
+The ignored `version` parameter is gone from `EncryptHooks` and `EncryptionOptions`:
+
+```csharp
+// v5
+new EncryptHooks(publicKey, keyId: "my-key", version: 1);
+new EncryptionOptions(rsa, KeyId: "my-key", Version: 1);
+
+// v6 — drop the argument
+new EncryptHooks(publicKey, keyId: "my-key");
+new EncryptionOptions(rsa, KeyId: "my-key");
+```
+
+#### Decryption result and context shape
+
+- `DecryptionResult` is now `sealed` and gains `Sessions` (`IReadOnlyList<SessionResult>`),
+  `UnsealedSessions`, and `AllSessionsSealed`. The existing flat counters are unchanged.
+- `DecryptionContext` gains `Version`, `HeaderHash`, `SealNonce`, and `KeyId`; its constructor
+  signature changed.
+- Internal writer/reader interfaces (`IFrameWriter`, `ISessionWriter`, `ISessionReader`) changed
+  signatures.
+
+### New Features
+
+- **Per-session seal verification** — `DecryptionResult.Sessions` reports each session's
+  `SealStatus`: `Sealed`, `Unsealed` (crash *or* truncation — indistinguishable by design),
+  `SealCountMismatch` (tail truncation of a sealed log), `SealInvalid` (tampering), or
+  `NotApplicable` (v1 session).
+- **`DecryptionOptions.RequireSealed`** — with `ErrorHandlingMode.ThrowException`, any session
+  that is not cryptographically verified as sealed (including v1 sessions) throws. A positively
+  detected `SealCountMismatch` always throws in `ThrowException` mode, even without the flag.
+- **CLI `--require-sealed`** — the `decrypt` command reports per-session seal status and, combined
+  with `--strict`, fails on unsealed/legacy sessions.
+
+### Notes
+
+- Crash tolerance is preserved: an unsealed log still decrypts fully by default and is *reported*
+  as unsealed rather than failing. Buffered mode retains its documented data-loss caveat.
+- Fabrication of whole *sessions* by an attacker holding the public key remains out of scope
+  (requires a producer-side secret); see the threat model in the package README.
+- Write-path performance is unchanged in structure: the AAD adds ~41 hashed bytes per frame with
+  zero additional allocations, plus one 28-byte seal per session at close.
+
 ## [5.0.0] - 2026-06-29
 
 ### ⚠️ Breaking Changes

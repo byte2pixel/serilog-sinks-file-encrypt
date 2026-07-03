@@ -75,6 +75,18 @@ public sealed class DecryptCommand(
         public bool Strict { get; init; }
 
         /// <summary>
+        /// Treat any session that is not cryptographically verified as sealed as an error.
+        /// Combined with --strict, an unsealed (crashed or truncated) or v1-format session
+        /// fails the file instead of only being reported.
+        /// </summary>
+        [CommandOption("--require-sealed")]
+        [Description(
+            "Treat sessions without a verified end-of-log seal (crashed, truncated, or v1-format) as errors. Combine with --strict to fail the file."
+        )]
+        [DefaultValue(false)]
+        public bool RequireSealed { get; init; }
+
+        /// <summary>
         /// Path to write detailed audit information. If not specified, a temporary file will be used.
         /// </summary>
         [CommandOption("--audit-log <PATH>")]
@@ -190,6 +202,7 @@ public sealed class DecryptCommand(
             {
                 KeyProvider = keyProvider,
                 ErrorHandlingMode = errorMode,
+                RequireSealed = settings.RequireSealed,
             };
 
             console.WriteLine();
@@ -304,6 +317,8 @@ public sealed class DecryptCommand(
                     console.MarkupLineInterpolated($"[green]✓ Decrypted:[/] {inputFile}");
                 }
 
+                ReportSealStatus(result);
+
                 console.MarkupLineInterpolated($"  [dim]→ {outputFile}[/]");
                 successCount++;
             }
@@ -322,5 +337,78 @@ public sealed class DecryptCommand(
         }
 
         return (successCount, failureCount);
+    }
+
+    /// <summary>
+    /// Reports the end-of-log seal verification status of each decrypted session, so the operator
+    /// can tell verified-complete logs apart from crashed, truncated, or tampered ones.
+    /// </summary>
+    /// <param name="result">The decryption result to report on.</param>
+    private void ReportSealStatus(DecryptionResult result)
+    {
+        foreach (SessionResult session in result.Sessions)
+        {
+            switch (session.SealStatus)
+            {
+                case SealStatus.Sealed:
+                    _logger?.Information(
+                        "Session {Index}: sealed and complete ({Messages} message(s)).",
+                        session.Index,
+                        session.DecryptedMessages
+                    );
+                    break;
+                case SealStatus.NotApplicable:
+                    console.MarkupLineInterpolated(
+                        $"  [dim]• Session {session.Index} (v1): legacy format, completeness cannot be verified[/]"
+                    );
+                    _logger?.Information(
+                        "Session {Index}: v1 format, no seal support.",
+                        session.Index
+                    );
+                    break;
+                case SealStatus.Unsealed:
+                    console.MarkupLineInterpolated(
+                        $"  [yellow]⚠ Session {session.Index}: UNSEALED — the log was truncated or the application did not close cleanly[/]"
+                    );
+                    _logger?.Warning(
+                        "Session {Index}: unsealed (crash or truncation; {Messages} message(s) recovered).",
+                        session.Index,
+                        session.DecryptedMessages
+                    );
+                    break;
+                case SealStatus.SealCountMismatch:
+                    console.MarkupLineInterpolated(
+                        $"  [red]✗ Session {session.Index}: seal count mismatch — seal declares {session.DeclaredFrameCount} frame(s), {session.DecryptedMessages} decrypted (tail truncated)[/]"
+                    );
+                    _logger?.Error(
+                        "Session {Index}: seal declares {Declared} frame(s) but {Decrypted} were decrypted — tail truncated.",
+                        session.Index,
+                        session.DeclaredFrameCount,
+                        session.DecryptedMessages
+                    );
+                    break;
+                case SealStatus.SealInvalid:
+                    console.MarkupLineInterpolated(
+                        $"  [red]✗ Session {session.Index}: invalid seal — the end of the session was tampered with or corrupted[/]"
+                    );
+                    _logger?.Error(
+                        "Session {Index}: seal record failed verification (tampering or corruption).",
+                        session.Index
+                    );
+                    break;
+                default:
+                    break;
+            }
+        }
+
+        if (
+            result.Sessions.Count > 0
+            && result.Sessions.All(s => s.SealStatus == SealStatus.Sealed)
+        )
+        {
+            console.MarkupLineInterpolated(
+                $"  [green]✓ All {result.Sessions.Count} session(s) sealed and complete[/]"
+            );
+        }
     }
 }

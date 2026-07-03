@@ -9,6 +9,10 @@
 A library for decrypting log files encrypted with [Serilog.Sinks.File.Encrypt](https://www.nuget.org/packages/Serilog.Sinks.File.Encrypt).
 
 > [!WARNING]
+> **v6.0.0 — Seal verification**
+> This version reads both the new **v2 format** (with per-frame authenticated ordering and an end-of-log seal) and the legacy v1 format from v3.x–v5.x. `DecryptionResult` now includes per-session detail (`Sessions`, `SealStatus`) and `DecryptionOptions` gains `RequireSealed`. See [Verifying completeness](#verifying-completeness-seal-status) below.
+
+> [!WARNING]
 > **v5.0.0 — New package**
 > Decryption types have moved out of `Serilog.Sinks.File.Encrypt` into this package. Namespaces have changed:
 >
@@ -140,6 +144,58 @@ catch (CryptographicException ex)
 }
 ```
 
+## Verifying completeness (seal status)
+
+Logs written in the v2 format (v6.0.0+) end each cleanly closed session with an authenticated **seal record** carrying the final frame count. After decryption, inspect the per-session results:
+
+```csharp
+DecryptionResult result = await DecryptionUtils.DecryptLogFileAsync(input, output, options);
+
+foreach (SessionResult session in result.Sessions)
+{
+    switch (session.SealStatus)
+    {
+        case SealStatus.Sealed:
+            // Verified complete: cleanly closed, no trailing frames removed.
+            break;
+        case SealStatus.Unsealed:
+            // The writer crashed OR the tail was truncated — indistinguishable by design.
+            // The decrypted messages themselves are authentic.
+            break;
+        case SealStatus.SealCountMismatch:
+            // The seal is authentic but declares more frames than were decrypted:
+            // the tail of a cleanly closed log was truncated.
+            Console.WriteLine(
+                $"Session {session.Index}: expected {session.DeclaredFrameCount}, got {session.DecryptedMessages}");
+            break;
+        case SealStatus.SealInvalid:
+            // Tampering or corruption at the end of the session.
+            break;
+        case SealStatus.NotApplicable:
+            // v1-format session (pre-v6 writer): no seal support.
+            break;
+    }
+}
+
+// Convenience aggregates
+bool trustworthy = result.AllSessionsSealed;   // every session Sealed or v1
+int suspect      = result.UnsealedSessions;    // Unsealed + SealCountMismatch + SealInvalid
+```
+
+For a strict audit posture, set `RequireSealed` — combined with `ErrorHandlingMode.ThrowException`, any session that is not cryptographically verified as sealed (including all v1 sessions) throws:
+
+```csharp
+var auditOptions = new DecryptionOptions
+{
+    KeyProvider = keyProvider,
+    ErrorHandlingMode = ErrorHandlingMode.ThrowException,
+    RequireSealed = true,
+};
+```
+
+> [!NOTE]
+> A positively detected truncation (`SealCountMismatch`) always throws in `ThrowException` mode, even without `RequireSealed`. An *unsealed* session never fails by default because a crashed writer produces exactly the same bytes as a truncated tail — crash tolerance is preserved unless you opt into `RequireSealed`.
+
 ## Custom Key Provider
 
 Implement `IKeyProvider` to integrate with external key management systems (Azure Key Vault, AWS KMS, etc.):
@@ -211,6 +267,10 @@ public sealed record DecryptionOptions
 {
     public required IKeyProvider KeyProvider { get; init; }
     public ErrorHandlingMode ErrorHandlingMode { get; init; } = ErrorHandlingMode.Skip;
+
+    // Treat sessions without a verified seal (crashed, truncated, or v1-format) as errors.
+    // Only fatal together with ErrorHandlingMode.ThrowException.
+    public bool RequireSealed { get; init; } = false;
 }
 ```
 
@@ -225,13 +285,44 @@ public enum ErrorHandlingMode
 
 ### DecryptionResult
 ```csharp
-public class DecryptionResult
+public sealed class DecryptionResult
 {
     public int DecryptedSessions { get; init; }
     public int DecryptedMessages { get; init; }
     public int FailedHeaders     { get; init; }
     public int FailedMessages    { get; init; }
     public int ResyncAttempts    { get; init; }
+
+    // Per-session detail, in the order sessions appear in the file
+    public IReadOnlyList<SessionResult> Sessions { get; init; }
+    public int UnsealedSessions  { get; }   // Unsealed + SealCountMismatch + SealInvalid
+    public bool AllSessionsSealed { get; }  // every session Sealed or NotApplicable (v1)
+}
+```
+
+### SessionResult
+```csharp
+public sealed record SessionResult
+{
+    public required int Index { get; init; }            // order encountered in the file
+    public required byte FormatVersion { get; init; }   // 1 or 2
+    public string KeyId { get; init; }
+    public required SealStatus SealStatus { get; init; }
+    public ulong? DeclaredFrameCount { get; init; }     // from an authenticated seal
+    public int DecryptedMessages { get; init; }
+    public int FailedMessages { get; init; }
+}
+```
+
+### SealStatus
+```csharp
+public enum SealStatus
+{
+    NotApplicable     = 0,  // v1 session — format has no seal
+    Sealed            = 1,  // seal verified, frame count matches: complete
+    Unsealed          = 2,  // no seal: crash OR truncation (indistinguishable)
+    SealCountMismatch = 3,  // seal authentic, frames missing: tail truncated
+    SealInvalid       = 4,  // seal failed verification: tampering/corruption
 }
 ```
 

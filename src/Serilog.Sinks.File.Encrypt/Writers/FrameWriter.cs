@@ -6,23 +6,30 @@ namespace Serilog.Sinks.File.Encrypt;
 internal class FrameWriter : IFrameWriter
 {
     /// <inheritdoc />
-    public void WriteHeader(
-        Stream output,
+    public int WriteHeader(
+        Span<byte> destination,
         byte version,
         ReadOnlySpan<byte> keyId,
         ReadOnlySpan<byte> header
     )
     {
+        int offset = 0;
+
         // Write the magic bytes
-        output.Write(CryptographicUtils.MagicBytes, 0, CryptographicUtils.MagicBytes.Length);
+        CryptographicUtils.MagicBytes.CopyTo(destination);
+        offset += CryptographicUtils.MagicBytes.Length;
 
         // Write the encrypted log format version
-        output.WriteByte(version);
+        destination[offset++] = version;
 
         // Write the key ID bytes
-        output.Write(keyId);
+        keyId.CopyTo(destination[offset..]);
+        offset += keyId.Length;
 
         // Write the header bytes
-        output.Write(header);
+        header.CopyTo(destination[offset..]);
+        offset += header.Length;
+
+        return offset;
     }
 }

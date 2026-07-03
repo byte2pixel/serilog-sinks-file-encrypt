@@ -6,8 +6,10 @@ We release security updates for the following versions:
 
 | Version | Supported          |
 |---------|--------------------|
-| 4.x.x   | :white_check_mark: |
-| 3.x.x   | :white_check_mark: |
+| 6.x.x   | :white_check_mark: |
+| 5.x.x   | :white_check_mark: |
+| 4.x.x   | :x:                |
+| 3.x.x   | :x:                |
 | 2.x.x   | :x:                |
 
 We provide security updates for the latest pre-release version and the current major version and the previous major version for a minimum of 6 months after the next major release.
@@ -89,6 +91,7 @@ Key rotation is essential for long-term security:
 
 ✅ **Protects log data at rest**: Encrypted files on disk are unreadable without the private key
 ✅ **Protects against unauthorized file access**: Even with file system access, logs can't be read
+✅ **Tamper evidence within a session (v2 format, v6.0.0+)**: Frame order, session identity, and header metadata are bound into the AES-GCM authenticated data — dropped, reordered, duplicated, or spliced frames fail authentication, and truncation of a cleanly closed (sealed) log is detected via the authenticated end-of-log seal
 ✅ **Supports compliance requirements**: Helps meet data protection regulations (GDPR, HIPAA, etc.)
 
 #### What This Library Does NOT Protect Against
@@ -96,6 +99,9 @@ Key rotation is essential for long-term security:
 - ❌ **In-memory data**: Log data is unencrypted in application memory before encryption
 - ❌ **Transport encryption**: Logs are encrypted on disk, but should still use secure transport (e.g., TLS) if sent over the network
 - ❌ **Key compromise**: If an attacker obtains the private key, all logs can be decrypted
+- ❌ **Fabricated sessions**: Encryption needs only the public key, which ships with the application; an attacker with the public key and file write access can append entirely fabricated *sessions* (they cannot alter or inject into existing sessions). Preventing this requires a secret the attacker lacks (an HMAC or producer-side signing key), which this library does not provide
+- ❌ **Deletion of entire sessions**: Sessions are independently keyed and not chained together, so removing a whole session from a multi-session file is not detectable by the format
+- ❌ **Crash-vs-truncation ambiguity**: A session with no end-of-log seal means the writer crashed *or* the tail was truncated — the two are byte-for-byte indistinguishable by design; the decryptor reports such sessions as *unsealed* rather than guessing
 - ❌ **Side-channel attacks**: Physical access to the machine may enable advanced attacks
 - ❌ **Malicious code**: Malware running with application privileges can potentially access log data before encryption
 
@@ -117,7 +123,8 @@ Key rotation is essential for long-term security:
 This library uses the .NET cryptographic libraries (`System.Security.Cryptography`) and relies on:
 
 - **RSA-OAEP-SHA256**: For encrypting AES keys and nonce
-- **AES-256-GCM**: For log content encryption
+- **AES-256-GCM**: For log content encryption; in the v2 format (v6.0.0+) each record additionally authenticates 41 bytes of associated data (SHA-256 of the session header + frame sequence + record type), and each cleanly closed session ends with an authenticated seal record carrying the final frame count
+- **SHA-256**: For hashing the session header into the per-frame associated data
 
 We monitor dependencies through:
 - GitHub Dependabot (automated PRs for dependency updates)

@@ -1,0 +1,3 @@
+# Binary test fixtures pin exact on-disk bytes (including LF line endings inside
+# .expected.txt); they must never be line-ending normalized.
+tests/**/Fixtures/** -text

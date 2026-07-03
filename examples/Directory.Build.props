@@ -9,5 +9,6 @@
     <ExcludeFromCodeCoverage>true</ExcludeFromCodeCoverage>
     <CollectCoverage>false</CollectCoverage>
     <IsTestProject>false</IsTestProject>
+    <NoWarn>$(NoWarn);NU1903</NoWarn>
   </PropertyGroup>
 </Project>
