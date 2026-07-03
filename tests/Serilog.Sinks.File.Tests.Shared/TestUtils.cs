@@ -2,24 +2,16 @@ namespace Serilog.Sinks.File.Tests.Shared;
 
 public static class TestUtils
 {
-    public static EncryptionOptions GetEncryptionOptions(
-        RSA publicRsa,
-        string? keyId = null,
-        int version = 1
-    )
+    public static EncryptionOptions GetEncryptionOptions(RSA publicRsa, string? keyId = null)
     {
-        return new EncryptionOptions(publicRsa, keyId ?? "", version);
+        return new EncryptionOptions(publicRsa, keyId ?? "");
     }
 
-    public static EncryptionOptions GetEncryptionOptions(
-        string publicKey,
-        string? keyId = null,
-        int version = 1
-    )
+    public static EncryptionOptions GetEncryptionOptions(string publicKey, string? keyId = null)
     {
         var rsa = RSA.Create();
         rsa.FromString(publicKey);
-        return GetEncryptionOptions(rsa, keyId, version);
+        return GetEncryptionOptions(rsa, keyId);
     }
 
     /// <summary>

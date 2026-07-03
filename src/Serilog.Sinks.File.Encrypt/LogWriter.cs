@@ -27,11 +27,32 @@ public sealed class LogWriter : Stream
     private readonly byte[] _nonce = new byte[EncryptionConstants.NonceLength];
 
     /// <summary>
+    /// Reserved nonce for the end-of-log seal record: the initial session nonce with its
+    /// 64-bit counter decremented by one. Independent of the number of data frames written,
+    /// so the decryptor can authenticate the seal even when trailing frames are missing.
+    /// </summary>
+    private readonly byte[] _sealNonce = new byte[EncryptionConstants.NonceLength];
+
+    /// <summary>
+    /// Reusable associated-data buffer bound into every AES-GCM record:
+    /// headerHash(32) + frameSequence(8, big-endian) + frameType(1).
+    /// The header hash is filled once per session; only the last 9 bytes change per record.
+    /// </summary>
+    private readonly byte[] _aad = new byte[EncryptionConstants.AadLength];
+
+    /// <summary>
+    /// Number of data frames written in the current session. Bound into each frame's
+    /// associated data as the frame sequence and carried in the seal record's payload.
+    /// </summary>
+    private ulong _frameCount;
+
+    /// <summary>
     /// Reusable AES-GCM instance
     /// </summary>
     private AesGcm? _aesGcm;
 
     private bool _sessionHeaderWritten;
+    private bool _disposed;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="LogWriter"/> class.
@@ -79,10 +100,16 @@ public sealed class LogWriter : Stream
 
         _aesGcm ??= StartNewSession();
 
-        // Write session header only once per session
+        // Write session header only once per session; its SHA-256 hash becomes the
+        // session-binding prefix of every record's associated data.
         if (!_sessionHeaderWritten)
         {
-            _writer.WriteHeader(_inner, _aesKey, _nonce);
+            _writer.WriteHeader(
+                _inner,
+                _aesKey,
+                _nonce,
+                _aad.AsSpan(0, EncryptionConstants.HeaderHashLength)
+            );
             _sessionHeaderWritten = true;
         }
 
@@ -95,15 +122,24 @@ public sealed class LogWriter : Stream
 
         try
         {
+            // Bind the frame's position and type into the associated data so that dropped,
+            // reordered, duplicated, or cross-session-spliced frames fail authentication.
+            BinaryPrimitives.WriteUInt64BigEndian(
+                _aad.AsSpan(EncryptionConstants.HeaderHashLength),
+                _frameCount
+            );
+            _aad[EncryptionConstants.AadLength - 1] = EncryptionConstants.FrameTypeData;
+
             // Encrypt directly into pooled buffers
             _aesGcm.Encrypt(
                 _nonce,
                 buffer,
                 ciphertext.AsSpan(0, plaintextLength),
                 tag,
-                associatedData: null
+                associatedData: _aad
             );
 
+            _frameCount++;
             _nonce.IncreaseNonce();
 
             // Write 4-byte length prefix (big-endian) for self-framing
@@ -128,7 +164,64 @@ public sealed class LogWriter : Stream
         // Generate random values directly into reusable buffers (no allocation)
         RandomNumberGenerator.Fill(_aesKey);
         RandomNumberGenerator.Fill(_nonce);
+
+        // Reserve the nonce just below the initial counter for the seal record. Data frames
+        // count upward from the initial nonce, so this value is never reused for a frame
+        // (unless a session exceeds 2^64 - 1 frames, the documented counter wrap bound).
+        _nonce.CopyTo(_sealNonce, 0);
+        _sealNonce.DecreaseNonce();
+
         return new AesGcm(_aesKey, EncryptionConstants.TagLength);
+    }
+
+    /// <summary>
+    /// Writes the end-of-log seal record: a 4-byte marker followed by the AES-GCM-encrypted
+    /// final frame count. The seal is authenticated with the session's header hash and the
+    /// seal frame type as associated data, using the reserved seal nonce. Its presence lets
+    /// the decryptor distinguish a cleanly closed (sealed) session from a truncated or
+    /// crashed (unsealed) one, and its frame count makes tail truncation detectable.
+    /// No-op if the session never wrote a header.
+    /// </summary>
+    private void WriteSeal()
+    {
+        if (!_sessionHeaderWritten || _aesGcm is null)
+        {
+            return;
+        }
+
+        // Seal associated data: headerHash (already in place) + zeroed sequence field + seal type.
+        // The frame count travels in the encrypted payload, not the AAD, so a count mismatch is
+        // reportable as truncation rather than failing as opaque tampering.
+        _aad.AsSpan(EncryptionConstants.HeaderHashLength, EncryptionConstants.FrameSequenceLength)
+            .Clear();
+        _aad[EncryptionConstants.AadLength - 1] = EncryptionConstants.FrameTypeSeal;
+
+        Span<byte> plaintext = stackalloc byte[EncryptionConstants.SealPlaintextLength];
+        BinaryPrimitives.WriteUInt64BigEndian(plaintext, _frameCount);
+
+        Span<byte> seal =
+            stackalloc byte[
+                EncryptionConstants.SealMarkerBytes.Length
+                    + EncryptionConstants.SealRecordRemainderLength
+            ];
+        EncryptionConstants.SealMarkerBytes.CopyTo(seal);
+        _aesGcm.Encrypt(
+            _sealNonce,
+            plaintext,
+            seal.Slice(
+                EncryptionConstants.SealMarkerBytes.Length,
+                EncryptionConstants.SealPlaintextLength
+            ),
+            seal.Slice(
+                EncryptionConstants.SealMarkerBytes.Length
+                    + EncryptionConstants.SealPlaintextLength,
+                EncryptionConstants.TagLength
+            ),
+            _aad
+        );
+
+        // Single write keeps the window for a partially persisted seal as small as possible.
+        _inner.Write(seal);
     }
 
     /// <summary>
@@ -187,26 +280,38 @@ public sealed class LogWriter : Stream
         throw new NotSupportedException();
 
     /// <summary>
-    /// Flushes and disposes the underlying stream, disposes the AES-GCM instance, and wipes the session key
-    /// and nonce from memory. No plaintext is buffered by the writer, so there is nothing further to encrypt.
+    /// Writes the end-of-log seal record, then flushes and disposes the underlying stream,
+    /// disposes the AES-GCM instance, and wipes the session key and nonces from memory.
+    /// No plaintext is buffered by the writer, so there is nothing further to encrypt.
+    /// If writing the seal fails (e.g. the disk is full), the stream is still disposed and key
+    /// material still wiped; the file then simply ends unsealed, which the decryptor reports.
     /// </summary>
     /// <param name="disposing"></param>
     protected override void Dispose(bool disposing)
     {
-        if (disposing)
+        if (disposing && !_disposed)
         {
+            _disposed = true;
             try
             {
-                Flush();
-                _inner.Dispose();
-                _aesGcm?.Dispose();
+                try
+                {
+                    WriteSeal();
+                }
+                finally
+                {
+                    Flush();
+                    _inner.Dispose();
+                    _aesGcm?.Dispose();
+                }
             }
             finally
             {
-                // Wipe the session key and nonce so they do not linger in managed memory,
-                // even if flushing or disposing the inner stream throws.
+                // Wipe the session key and nonces so they do not linger in managed memory,
+                // even if sealing, flushing, or disposing the inner stream throws.
                 CryptographicOperations.ZeroMemory(_aesKey);
                 CryptographicOperations.ZeroMemory(_nonce);
+                CryptographicOperations.ZeroMemory(_sealNonce);
             }
         }
         base.Dispose(disposing);

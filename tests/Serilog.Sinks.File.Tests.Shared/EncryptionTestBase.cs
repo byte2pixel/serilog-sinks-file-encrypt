@@ -36,21 +36,27 @@ public abstract class EncryptionTestBase : IDisposable, IAsyncDisposable
     }
 
     /// <summary>
-    /// Creates an encrypted memory stream with the given messages using synchronous Flush. Stream is automatically disposed.
+    /// Creates an encrypted memory stream with the given messages using synchronous Flush.
+    /// The <see cref="LogWriter"/> is disposed, so the session ends with a seal record (clean close).
+    /// Stream is automatically disposed.
     /// </summary>
     protected MemoryStream CreateEncryptedStream(string[] messages)
     {
-        MemoryStream memoryStream = new();
-        _streamsToDispose.Add(memoryStream);
-
-        LogWriter logWriter = new(memoryStream, EncryptOptions);
-
-        foreach (byte[] message in messages.Select(m => Encoding.UTF8.GetBytes(m)))
+        using MemoryStream temp = new();
+        using (LogWriter logWriter = new(temp, EncryptOptions))
         {
-            logWriter.Write(message, 0, message.Length);
-            logWriter.Flush();
+            foreach (byte[] message in messages.Select(m => Encoding.UTF8.GetBytes(m)))
+            {
+                logWriter.Write(message, 0, message.Length);
+                logWriter.Flush();
+            }
         }
 
+        // LogWriter.Dispose seals the session and disposes the inner stream;
+        // re-wrap the bytes in a fresh expandable stream for the caller.
+        MemoryStream memoryStream = new();
+        _streamsToDispose.Add(memoryStream);
+        memoryStream.Write(temp.ToArray());
         memoryStream.Position = 0;
         return memoryStream;
     }
@@ -64,9 +70,40 @@ public abstract class EncryptionTestBase : IDisposable, IAsyncDisposable
     }
 
     /// <summary>
-    /// Creates an encrypted memory stream with the given messages using asynchronous FlushAsync. Stream is automatically disposed.
+    /// Creates an encrypted memory stream with the given messages using asynchronous FlushAsync.
+    /// The <see cref="LogWriter"/> is disposed, so the session ends with a seal record (clean close).
+    /// Stream is automatically disposed.
     /// </summary>
     protected async Task<MemoryStream> CreateEncryptedStreamAsync(
+        string[] messages,
+        EncryptionOptions? encryptionOptions = null,
+        CancellationToken? cancellationToken = null
+    )
+    {
+        CancellationToken ct = cancellationToken ?? TestContext.Current.CancellationToken;
+        using MemoryStream temp = new();
+        await using (LogWriter logWriter = new(temp, encryptionOptions ?? EncryptOptions))
+        {
+            foreach (byte[] message in messages.Select(m => Encoding.UTF8.GetBytes(m)))
+            {
+                await logWriter.WriteAsync(message, ct);
+                await logWriter.FlushAsync(ct);
+            }
+        }
+
+        MemoryStream memoryStream = new();
+        _streamsToDispose.Add(memoryStream);
+        memoryStream.Write(temp.ToArray());
+        memoryStream.Position = 0;
+        return memoryStream;
+    }
+
+    /// <summary>
+    /// Creates an encrypted memory stream whose <see cref="LogWriter"/> is deliberately never
+    /// disposed, simulating a writer crash: all frames are flushed but no seal record is written.
+    /// Stream is automatically disposed.
+    /// </summary>
+    protected async Task<MemoryStream> CreateUnsealedEncryptedStreamAsync(
         string[] messages,
         EncryptionOptions? encryptionOptions = null,
         CancellationToken? cancellationToken = null
@@ -84,8 +121,6 @@ public abstract class EncryptionTestBase : IDisposable, IAsyncDisposable
             await logWriter.FlushAsync(ct);
         }
 
-        await logWriter.FlushAsync(ct);
-
         memoryStream.Position = 0;
         return memoryStream;
     }
@@ -102,6 +137,10 @@ public abstract class EncryptionTestBase : IDisposable, IAsyncDisposable
         return await CreateEncryptedStreamAsync([message], encryptionOptions, cancellationToken);
     }
 
+    /// <summary>
+    /// Appends a complete (sealed) session with the given message to an existing stream,
+    /// simulating an application restart or rolling append.
+    /// </summary>
     protected async Task<MemoryStream> CreateAppendedMemoryStream(
         MemoryStream memoryStream,
         string message,
@@ -110,12 +149,17 @@ public abstract class EncryptionTestBase : IDisposable, IAsyncDisposable
     )
     {
         CancellationToken ct = cancellationToken ?? TestContext.Current.CancellationToken;
-        memoryStream.Position = memoryStream.Length;
 
-        LogWriter logWriter = new(memoryStream, encryptionOptions ?? EncryptOptions);
-        byte[] messageBytes = Encoding.UTF8.GetBytes(message);
-        await logWriter.WriteAsync(messageBytes, ct);
-        await logWriter.FlushAsync(ct);
+        using MemoryStream temp = new();
+        await using (LogWriter logWriter = new(temp, encryptionOptions ?? EncryptOptions))
+        {
+            byte[] messageBytes = Encoding.UTF8.GetBytes(message);
+            await logWriter.WriteAsync(messageBytes, ct);
+            await logWriter.FlushAsync(ct);
+        }
+
+        memoryStream.Position = memoryStream.Length;
+        memoryStream.Write(temp.ToArray());
         memoryStream.Position = 0;
         return memoryStream;
     }
@@ -205,11 +249,10 @@ public abstract class EncryptionTestBase : IDisposable, IAsyncDisposable
 
     protected EncryptionOptions CreateEncryptionOptions(
         string? publicKey = null,
-        string? keyId = null,
-        int version = 1
+        string? keyId = null
     )
     {
-        return TestUtils.GetEncryptionOptions(publicKey ?? RsaKeyPair.publicKey, keyId, version);
+        return TestUtils.GetEncryptionOptions(publicKey ?? RsaKeyPair.publicKey, keyId);
     }
 
     protected virtual void Dispose(bool disposing)

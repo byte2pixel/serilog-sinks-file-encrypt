@@ -26,7 +26,11 @@ public class SessionWriterTests
 
         // Act & Assert
         Should
-            .Throw<InvalidOperationException>(() => writer.WriteHeader(output, _aesKey, _nonce))
+            .Throw<InvalidOperationException>(() =>
+            {
+                byte[] headerHash = new byte[EncryptionConstants.HeaderHashLength];
+                writer.WriteHeader(output, _aesKey, _nonce, headerHash);
+            })
             .Message.ShouldContain(
                 "KeyId is too long for the header format. Maximum length is 32 bytes, but was 33 bytes."
             );
@@ -44,9 +48,10 @@ public class SessionWriterTests
 
         SessionWriter writer = new(_headerWriter, KeyId, _frameWriter);
         using MemoryStream output = new();
+        byte[] headerHash = new byte[EncryptionConstants.HeaderHashLength];
 
         // Act
-        writer.WriteHeader(output, _aesKey, _nonce);
+        writer.WriteHeader(output, _aesKey, _nonce, headerHash);
 
         // Assert
         _headerWriter.ExpectedHeader.ShouldBe(expectedHeader);
@@ -56,12 +61,27 @@ public class SessionWriterTests
             .Take(CryptographicUtils.MagicBytes.Length)
             .ShouldBe(CryptographicUtils.MagicBytes);
         offset += CryptographicUtils.MagicBytes.Length;
-        outputBytes[offset].ShouldBe((byte)1); // Version byte
+        outputBytes[offset].ShouldBe(EncryptionConstants.CurrentFormatVersion); // Version byte
         offset += 1;
         outputBytes.Skip(offset).Take(HeaderMetadata.KeyIdLength).ShouldBe(expectedKeyId);
         offset += HeaderMetadata.KeyIdLength;
         outputBytes.Skip(offset).Take(HeaderMetadata.AesKeyLength).ShouldBe(_aesKey);
         offset += HeaderMetadata.AesKeyLength;
         outputBytes.Skip(offset).Take(HeaderMetadata.NonceLength).ShouldBe(_nonce);
+    }
+
+    [Fact]
+    public void GivenValidKeyId_WhenWriteHeader_ThenHeaderHashIsSha256OfWrittenBytes()
+    {
+        // Arrange
+        SessionWriter writer = new(_headerWriter, "TestKeyId", _frameWriter);
+        using MemoryStream output = new();
+        byte[] headerHash = new byte[EncryptionConstants.HeaderHashLength];
+
+        // Act
+        writer.WriteHeader(output, _aesKey, _nonce, headerHash);
+
+        // Assert: the hash must cover the exact bytes that landed in the stream.
+        headerHash.ShouldBe(SHA256.HashData(output.ToArray()));
     }
 }

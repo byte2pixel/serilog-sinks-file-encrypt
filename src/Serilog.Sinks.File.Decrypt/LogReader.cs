@@ -33,6 +33,7 @@ public sealed class LogReader : IDisposable
     private int _failedMessages;
     private int _resyncAttempts;
     private long _nextSyncPosition;
+    private readonly List<SessionResult> _sessions = [];
 
     /// <summary>
     /// Initializes a new instance of the EncryptedLogReader class with the specified input stream and decryption options.
@@ -105,6 +106,7 @@ public sealed class LogReader : IDisposable
                 FailedMessages = _failedMessages,
                 FailedHeaders = _failedHeaders,
                 ResyncAttempts = _resyncAttempts,
+                Sessions = _sessions,
             };
         }
 
@@ -132,6 +134,7 @@ public sealed class LogReader : IDisposable
             FailedMessages = _failedMessages,
             FailedHeaders = _failedHeaders,
             ResyncAttempts = _resyncAttempts,
+            Sessions = _sessions,
         };
     }
 
@@ -149,6 +152,7 @@ public sealed class LogReader : IDisposable
                 // If end of stream is reached, set state to Completed
                 if (IsEndOfStream())
                 {
+                    FinalizeSession();
                     _state = ReaderState.Completed;
                     break;
                 }
@@ -187,10 +191,32 @@ public sealed class LogReader : IDisposable
                 _logger?.Information(
                     "Session header marker likely encountered while reading messages."
                 );
+                FinalizeSession();
                 ReplaceContext(DecryptionContext.Empty);
                 _state = ReaderState.ReadingHeader;
                 _nextSyncPosition = _input.Position - sizeof(int); // Rewind to start of potential header
                 return;
+            }
+
+            // SealMarkerDetection introduces the v2 end-of-log seal record where a length
+            // prefix would otherwise be. Only meaningful within a v2 session; in a v1 session
+            // the value falls through to the length validation below and is treated as corruption.
+            if (
+                _context.Version == EncryptionConstants.FormatVersionV2
+                && messageLength == EncryptionConstants.SealMarkerDetection
+            )
+            {
+                await ProcessSealAsync(cancellationToken);
+                return;
+            }
+
+            // Nothing but a new session header (handled above) may legitimately follow the seal.
+            if (_context.SealSeen)
+            {
+                _context.SealStatus = SealStatus.SealInvalid;
+                throw new CryptographicException(
+                    "Encrypted data encountered after the end-of-log seal record."
+                );
             }
 
             // Validate the length prefix before allocating. A corrupt or malicious value
@@ -232,10 +258,17 @@ public sealed class LogReader : IDisposable
                         or EndOfStreamException
             )
         {
-            // Handle message processing errors, try to recover if possible
+            // Handle message processing errors, try to recover if possible. The failed session is
+            // poisoned: after one authentication failure neither the nonce lockstep nor the frame
+            // sequence can be trusted, so the reader only re-establishes decryption at the next
+            // session header (Boyer-Moore resync). The remainder of the failed session is never
+            // re-entered, which is what guarantees a frame can never be silently accepted with
+            // the wrong sequence after an error.
             _logger?.Error(ex, "Message processing error at position: {Position}", _input.Position);
             _resyncAttempts++;
             _failedMessages++;
+            _context.FailedMessages++;
+            FinalizeSession();
             ReplaceContext(DecryptionContext.Empty);
             _state = ReaderState.ReadingHeader;
         }
@@ -260,16 +293,12 @@ public sealed class LogReader : IDisposable
         byte[] plaintext = ArrayPool<byte>.Shared.Rent(ciphertextLength);
         try
         {
-            using var aes = new AesGcm(_context.SessionKey, EncryptionConstants.TagLength);
-            aes.Decrypt(
-                _context.Nonce,
-                encryptedMessage.AsSpan(0, ciphertextLength),
-                encryptedMessage.AsSpan(ciphertextLength, EncryptionConstants.TagLength),
-                plaintext.AsSpan(0, ciphertextLength)
-            );
+            DecryptFrame(encryptedMessage, ciphertextLength, plaintext);
 
             // Increment nonce for next message
             _context.Nonce.IncreaseNonce();
+            _context.FrameSequence++;
+            _context.DecryptedMessages++;
 
             // Write decrypted chunk
             await output.WriteAsync(plaintext.AsMemory(0, ciphertextLength), cancellationToken);
@@ -280,6 +309,203 @@ public sealed class LogReader : IDisposable
         finally
         {
             ArrayPool<byte>.Shared.Return(plaintext);
+        }
+    }
+
+    /// <summary>
+    /// Decrypts a single data frame. For v2 sessions the frame's associated data
+    /// (header hash + frame sequence + frame type) is reconstructed from the reader's own state,
+    /// so any dropped, reordered, duplicated, or cross-session-spliced frame fails authentication.
+    /// v1 frames carry no associated data.
+    /// </summary>
+    private void DecryptFrame(byte[] encryptedMessage, int ciphertextLength, byte[] plaintext)
+    {
+        using var aes = new AesGcm(_context.SessionKey, EncryptionConstants.TagLength);
+        if (_context.Version == EncryptionConstants.FormatVersionV2)
+        {
+            Span<byte> aad = stackalloc byte[EncryptionConstants.AadLength];
+            BuildAad(aad, _context.FrameSequence, EncryptionConstants.FrameTypeData);
+            aes.Decrypt(
+                _context.Nonce,
+                encryptedMessage.AsSpan(0, ciphertextLength),
+                encryptedMessage.AsSpan(ciphertextLength, EncryptionConstants.TagLength),
+                plaintext.AsSpan(0, ciphertextLength),
+                aad
+            );
+        }
+        else
+        {
+            aes.Decrypt(
+                _context.Nonce,
+                encryptedMessage.AsSpan(0, ciphertextLength),
+                encryptedMessage.AsSpan(ciphertextLength, EncryptionConstants.TagLength),
+                plaintext.AsSpan(0, ciphertextLength)
+            );
+        }
+    }
+
+    /// <summary>
+    /// Composes the associated data for a v2 record from the active session's header hash,
+    /// the given frame sequence, and the record type.
+    /// </summary>
+    private void BuildAad(Span<byte> aad, ulong frameSequence, byte frameType)
+    {
+        _context.HeaderHash.CopyTo(aad);
+        BinaryPrimitives.WriteUInt64BigEndian(
+            aad.Slice(EncryptionConstants.HeaderHashLength),
+            frameSequence
+        );
+        aad[EncryptionConstants.AadLength - 1] = frameType;
+    }
+
+    /// <summary>
+    /// Processes the v2 end-of-log seal record whose 4-byte marker has just been consumed.
+    /// A fully present, authenticated seal resolves the session to <see cref="SealStatus.Sealed"/>
+    /// (or <see cref="SealStatus.SealCountMismatch"/> when its declared frame count differs from
+    /// the frames actually decrypted — the fingerprint of tail truncation of a cleanly closed log).
+    /// A partially written seal is an unclean close, not tampering: the session stays unsealed and
+    /// no error is raised. A seal that fails authentication, or a second seal, is tampering.
+    /// </summary>
+    private async Task ProcessSealAsync(CancellationToken cancellationToken)
+    {
+        if (_context.SealSeen)
+        {
+            _context.SealStatus = SealStatus.SealInvalid;
+            throw new CryptographicException("Duplicate end-of-log seal record encountered.");
+        }
+
+        long remainingBytes = _input.Length - _input.Position;
+        if (remainingBytes < EncryptionConstants.SealRecordRemainderLength)
+        {
+            // Partially written seal: the writer was interrupted mid-close. Indistinguishable
+            // from a crash, so report the session as unsealed rather than tampered.
+            _logger?.Information(
+                "Partially written seal record at position {Position}; session remains unsealed.",
+                _input.Position
+            );
+            _input.Position = _input.Length;
+            return;
+        }
+
+        byte[] sealRecord = new byte[EncryptionConstants.SealRecordRemainderLength];
+        await _input.ReadExactlyAsync(sealRecord, cancellationToken);
+
+        ulong declaredFrameCount;
+        try
+        {
+            declaredFrameCount = DecryptSeal(sealRecord);
+        }
+        catch (CryptographicException)
+        {
+            _context.SealSeen = true;
+            _context.SealStatus = SealStatus.SealInvalid;
+            throw;
+        }
+
+        _context.SealSeen = true;
+        _context.DeclaredFrameCount = declaredFrameCount;
+        _context.SealStatus =
+            declaredFrameCount == _context.FrameSequence
+                ? SealStatus.Sealed
+                : SealStatus.SealCountMismatch;
+        _nextSyncPosition = _input.Position;
+
+        if (_context.SealStatus == SealStatus.SealCountMismatch)
+        {
+            _logger?.Error(
+                "Seal record declares {Declared} frames but {Decrypted} were decrypted — the session tail was truncated.",
+                declaredFrameCount,
+                _context.FrameSequence
+            );
+        }
+    }
+
+    /// <summary>
+    /// Authenticates and decrypts the seal record's payload using the session's reserved seal
+    /// nonce (initial nonce counter − 1), which keeps the seal verifiable regardless of how many
+    /// data frames survived. Returns the declared final frame count.
+    /// </summary>
+    private ulong DecryptSeal(byte[] sealRecord)
+    {
+        Span<byte> aad = stackalloc byte[EncryptionConstants.AadLength];
+        BuildAad(aad, 0, EncryptionConstants.FrameTypeSeal);
+
+        Span<byte> plaintext = stackalloc byte[EncryptionConstants.SealPlaintextLength];
+        using var aes = new AesGcm(_context.SessionKey, EncryptionConstants.TagLength);
+        aes.Decrypt(
+            _context.SealNonce,
+            sealRecord.AsSpan(0, EncryptionConstants.SealPlaintextLength),
+            sealRecord.AsSpan(
+                EncryptionConstants.SealPlaintextLength,
+                EncryptionConstants.TagLength
+            ),
+            plaintext,
+            aad
+        );
+
+        return BinaryPrimitives.ReadUInt64BigEndian(plaintext);
+    }
+
+    /// <summary>
+    /// Records the outcome of the active session (if any) as a <see cref="SessionResult"/>.
+    /// Called when a session ends: a new session header is found, the end of the stream is
+    /// reached, or the session is abandoned after an error. In
+    /// <see cref="ErrorHandlingMode.ThrowException"/> mode this is also where a positively
+    /// detected truncation (seal count mismatch) and — when
+    /// <see cref="DecryptionOptions.RequireSealed"/> is set — any non-sealed session fail the run.
+    /// </summary>
+    private void FinalizeSession()
+    {
+        if (!_context.HasKeys)
+        {
+            return;
+        }
+
+        SealStatus status = _context.Version switch
+        {
+            EncryptionConstants.FormatVersionV1 => SealStatus.NotApplicable,
+            _ => _context.SealSeen ? _context.SealStatus : SealStatus.Unsealed,
+        };
+
+        var session = new SessionResult
+        {
+            Index = _sessions.Count,
+            FormatVersion = _context.Version,
+            KeyId = _context.KeyId,
+            SealStatus = status,
+            DeclaredFrameCount = _context.DeclaredFrameCount,
+            DecryptedMessages = _context.DecryptedMessages,
+            FailedMessages = _context.FailedMessages,
+        };
+        _sessions.Add(session);
+
+        if (status is not SealStatus.Sealed and not SealStatus.NotApplicable)
+        {
+            _logger?.Warning(
+                "Session {Index} completed with seal status {SealStatus}.",
+                session.Index,
+                status
+            );
+        }
+
+        if (_options.ErrorHandlingMode != ErrorHandlingMode.ThrowException)
+        {
+            return;
+        }
+
+        if (status == SealStatus.SealCountMismatch)
+        {
+            throw new CryptographicException(
+                $"Session {session.Index}: seal record declares {session.DeclaredFrameCount} frames "
+                    + $"but {session.DecryptedMessages} were decrypted — the log tail was truncated."
+            );
+        }
+
+        if (_options.RequireSealed && status != SealStatus.Sealed)
+        {
+            throw new CryptographicException(
+                $"Session {session.Index} is not verified as sealed (status: {status}) and RequireSealed is enabled."
+            );
         }
     }
 
@@ -371,7 +597,10 @@ public sealed class LogReader : IDisposable
         await _input.ReadExactlyAsync(version, cancellationToken);
         try
         {
-            if (version[0] != 1)
+            if (
+                version[0]
+                is not (EncryptionConstants.FormatVersionV1 or EncryptionConstants.FormatVersionV2)
+            )
             {
                 throw new NotSupportedException($"Unsupported encryption version: {version[0]}");
             }
@@ -380,6 +609,7 @@ public sealed class LogReader : IDisposable
                 await sessionReader.ReadSessionAsync(
                     _input,
                     _options.KeyProvider,
+                    version[0],
                     cancellationToken
                 )
             );
