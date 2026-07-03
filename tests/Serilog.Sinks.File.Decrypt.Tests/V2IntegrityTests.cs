@@ -229,11 +229,16 @@ public sealed class V2IntegrityTests : EncryptionTestBase
             CreateMemoryStream(combined)
         );
 
-        // All of A's frames and all of B decrypt; B is sealed, A is not verifiable.
+        // All of A's frames and all of B decrypt; B is sealed. A's bare marker followed by
+        // B's header is recognized as a partially written seal (crash mid-close), so A reports
+        // Unsealed — not tampering — with no failures and no resync churn.
         text.ShouldBe(string.Concat(_messages) + "survivor message\n");
         result.Sessions.Count.ShouldBe(2);
-        result.Sessions[0].SealStatus.ShouldBeOneOf(SealStatus.Unsealed, SealStatus.SealInvalid);
+        result.Sessions[0].SealStatus.ShouldBe(SealStatus.Unsealed);
+        result.Sessions[0].FailedMessages.ShouldBe(0);
         result.Sessions[1].SealStatus.ShouldBe(SealStatus.Sealed);
+        result.FailedMessages.ShouldBe(0);
+        result.ResyncAttempts.ShouldBe(0);
     }
 
     // ---------------------------------------------------------------------

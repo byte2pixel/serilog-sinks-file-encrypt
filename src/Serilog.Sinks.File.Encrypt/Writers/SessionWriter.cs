@@ -42,6 +42,14 @@ internal sealed class SessionWriter : ISessionWriter
         Span<byte> headerHash
     )
     {
+        if (headerHash.Length != EncryptionConstants.HeaderHashLength)
+        {
+            throw new ArgumentException(
+                $"headerHash must be exactly {EncryptionConstants.HeaderHashLength} bytes, but was {headerHash.Length} bytes.",
+                nameof(headerHash)
+            );
+        }
+
         Span<byte> keyIdBytes = Encoding.UTF8.GetBytes(_keyId);
         if (keyIdBytes.Length > HeaderMetadata.KeyIdLength)
         {

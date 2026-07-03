@@ -375,6 +375,27 @@ public sealed class LogReader : IDisposable
         }
 
         long remainingBytes = _input.Length - _input.Position;
+
+        // A marker immediately followed by a new session header means the writer crashed after
+        // persisting only the 4-byte marker and the file was appended to on restart: a partially
+        // written seal, not tampering. Leave the stream positioned at the header so the next
+        // read finds the magic bytes and the appended session processes normally; this session
+        // finalizes as unsealed.
+        if (remainingBytes >= CryptographicUtils.MagicBytes.Length)
+        {
+            byte[] peek = new byte[CryptographicUtils.MagicBytes.Length];
+            await _input.ReadExactlyAsync(peek, cancellationToken);
+            _input.Position -= CryptographicUtils.MagicBytes.Length;
+            if (peek.AsSpan().SequenceEqual(CryptographicUtils.MagicBytes))
+            {
+                _logger?.Information(
+                    "Seal marker followed by a new session header at position {Position}; treating as a partially written seal, session remains unsealed.",
+                    _input.Position
+                );
+                return;
+            }
+        }
+
         if (remainingBytes < EncryptionConstants.SealRecordRemainderLength)
         {
             // Partially written seal: the writer was interrupted mid-close. Indistinguishable

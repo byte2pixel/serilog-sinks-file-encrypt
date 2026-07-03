@@ -22,6 +22,17 @@ public static class V1TestStreamBuilder
         IEnumerable<string> messages
     )
     {
+        // Match the product writer's contract instead of silently truncating: a keyId longer
+        // than the 32-byte header field would produce a header no real v1 writer could emit.
+        int keyIdByteLength = Encoding.UTF8.GetByteCount(keyId);
+        if (keyIdByteLength > 32)
+        {
+            throw new ArgumentException(
+                $"KeyId is too long for the v1 header format. Maximum length is 32 bytes, but was {keyIdByteLength} bytes.",
+                nameof(keyId)
+            );
+        }
+
         byte[] aesKey = RandomNumberGenerator.GetBytes(32);
         byte[] nonce = RandomNumberGenerator.GetBytes(12);
 

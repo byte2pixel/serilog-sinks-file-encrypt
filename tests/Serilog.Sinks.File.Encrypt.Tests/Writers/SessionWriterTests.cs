@@ -70,6 +70,28 @@ public class SessionWriterTests
         outputBytes.Skip(offset).Take(HeaderMetadata.NonceLength).ShouldBe(_nonce);
     }
 
+    [Theory]
+    [InlineData(EncryptionConstants.HeaderHashLength - 1)]
+    [InlineData(EncryptionConstants.HeaderHashLength + 1)]
+    [InlineData(0)]
+    public void GivenWrongSizeHeaderHash_WhenWriteHeader_ThenThrowsArgumentException(int hashSize)
+    {
+        // Arrange
+        SessionWriter writer = new(_headerWriter, "TestKeyId", _frameWriter);
+        using MemoryStream output = new();
+
+        // Act & Assert
+        Should
+            .Throw<ArgumentException>(() =>
+            {
+                byte[] headerHash = new byte[hashSize];
+                writer.WriteHeader(output, _aesKey, _nonce, headerHash);
+            })
+            .Message.ShouldContain(
+                $"headerHash must be exactly {EncryptionConstants.HeaderHashLength} bytes"
+            );
+    }
+
     [Fact]
     public void GivenValidKeyId_WhenWriteHeader_ThenHeaderHashIsSha256OfWrittenBytes()
     {
