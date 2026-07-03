@@ -42,9 +42,8 @@ public static class V1TestStreamBuilder
         // (last 8 bytes, little-endian) incremented per frame.
         using var aesGcm = new AesGcm(aesKey, 16);
         Span<byte> lengthPrefix = stackalloc byte[sizeof(int)];
-        foreach (string message in messages)
+        foreach (byte[] plaintext in messages.Select(Encoding.UTF8.GetBytes))
         {
-            byte[] plaintext = Encoding.UTF8.GetBytes(message);
             byte[] ciphertext = new byte[plaintext.Length];
             byte[] tag = new byte[16];
             aesGcm.Encrypt(nonce, plaintext, ciphertext, tag, associatedData: null);

@@ -8,7 +8,7 @@ namespace Serilog.Sinks.File.Decrypt.Tests;
 /// </summary>
 public sealed class V2IntegrityTests : EncryptionTestBase
 {
-    private static readonly string[] Messages =
+    private static readonly string[] _messages =
     [
         "message one\n",
         "message two\n",
@@ -28,16 +28,16 @@ public sealed class V2IntegrityTests : EncryptionTestBase
     [Fact]
     public async Task SealedV2_RoundTrip_ReportsSealed()
     {
-        MemoryStream input = await CreateEncryptedStreamAsync(Messages);
+        MemoryStream input = await CreateEncryptedStreamAsync(_messages);
 
         (string text, DecryptionResult result) = await DecryptWithResultAsync(input);
 
-        text.ShouldBe(string.Concat(Messages));
+        text.ShouldBe(string.Concat(_messages));
         result.Sessions.Count.ShouldBe(1);
         result.Sessions[0].FormatVersion.ShouldBe(EncryptionConstants.FormatVersionV2);
         result.Sessions[0].SealStatus.ShouldBe(SealStatus.Sealed);
-        result.Sessions[0].DeclaredFrameCount.ShouldBe((ulong)Messages.Length);
-        result.Sessions[0].DecryptedMessages.ShouldBe(Messages.Length);
+        result.Sessions[0].DeclaredFrameCount.ShouldBe((ulong)_messages.Length);
+        result.Sessions[0].DecryptedMessages.ShouldBe(_messages.Length);
         result.AllSessionsSealed.ShouldBeTrue();
         result.UnsealedSessions.ShouldBe(0);
     }
@@ -45,7 +45,7 @@ public sealed class V2IntegrityTests : EncryptionTestBase
     [Fact]
     public async Task SealedV2_RoundTrip_ThrowMode_Succeeds()
     {
-        MemoryStream input = await CreateEncryptedStreamAsync(Messages);
+        MemoryStream input = await CreateEncryptedStreamAsync(_messages);
 
         (string text, DecryptionResult result) = await DecryptWithResultAsync(
             input,
@@ -55,19 +55,19 @@ public sealed class V2IntegrityTests : EncryptionTestBase
             }
         );
 
-        text.ShouldBe(string.Concat(Messages));
+        text.ShouldBe(string.Concat(_messages));
         result.AllSessionsSealed.ShouldBeTrue();
     }
 
     [Fact]
     public async Task TwoSealedSessionsAppended_BothReportSealed()
     {
-        MemoryStream input = await CreateEncryptedStreamAsync(Messages);
+        MemoryStream input = await CreateEncryptedStreamAsync(_messages);
         input = await CreateAppendedMemoryStream(input, "appended session\n");
 
         (string text, DecryptionResult result) = await DecryptWithResultAsync(input);
 
-        text.ShouldBe(string.Concat(Messages) + "appended session\n");
+        text.ShouldBe(string.Concat(_messages) + "appended session\n");
         result.Sessions.Count.ShouldBe(2);
         result.Sessions.ShouldAllBe(s => s.SealStatus == SealStatus.Sealed);
         result.Sessions[0].Index.ShouldBe(0);
@@ -82,11 +82,11 @@ public sealed class V2IntegrityTests : EncryptionTestBase
     public async Task UnsealedTail_AllMessagesDecrypt_ReportedUnsealed()
     {
         // Writer never disposed = crash: frames flushed, no seal
-        MemoryStream input = await CreateUnsealedEncryptedStreamAsync(Messages);
+        MemoryStream input = await CreateUnsealedEncryptedStreamAsync(_messages);
 
         (string text, DecryptionResult result) = await DecryptWithResultAsync(input);
 
-        text.ShouldBe(string.Concat(Messages));
+        text.ShouldBe(string.Concat(_messages));
         result.FailedMessages.ShouldBe(0);
         result.Sessions.Count.ShouldBe(1);
         result.Sessions[0].SealStatus.ShouldBe(SealStatus.Unsealed);
@@ -98,7 +98,7 @@ public sealed class V2IntegrityTests : EncryptionTestBase
     [Fact]
     public async Task UnsealedTail_RequireSealed_SkipMode_ReportsButDoesNotThrow()
     {
-        MemoryStream input = await CreateUnsealedEncryptedStreamAsync(Messages);
+        MemoryStream input = await CreateUnsealedEncryptedStreamAsync(_messages);
 
         (string text, DecryptionResult result) = await DecryptWithResultAsync(
             input,
@@ -108,14 +108,14 @@ public sealed class V2IntegrityTests : EncryptionTestBase
             }
         );
 
-        text.ShouldBe(string.Concat(Messages));
+        text.ShouldBe(string.Concat(_messages));
         result.UnsealedSessions.ShouldBe(1);
     }
 
     [Fact]
     public async Task UnsealedTail_RequireSealed_ThrowMode_Throws()
     {
-        MemoryStream input = await CreateUnsealedEncryptedStreamAsync(Messages);
+        MemoryStream input = await CreateUnsealedEncryptedStreamAsync(_messages);
 
         CryptographicException exception = await Should.ThrowAsync<CryptographicException>(
             async () =>
@@ -131,7 +131,7 @@ public sealed class V2IntegrityTests : EncryptionTestBase
     [Fact]
     public async Task SealedLog_TailFrameRemoved_ReportsSealCountMismatch()
     {
-        byte[] data = (await CreateEncryptedStreamAsync(Messages)).ToArray();
+        byte[] data = (await CreateEncryptedStreamAsync(_messages)).ToArray();
         V2Layout layout = ParseLayout(data);
 
         // Remove the last data frame but keep the seal — the attack the seal count detects.
@@ -141,18 +141,18 @@ public sealed class V2IntegrityTests : EncryptionTestBase
             CreateMemoryStream(truncated)
         );
 
-        text.ShouldBe(string.Concat(Messages[..^1]));
+        text.ShouldBe(string.Concat(_messages[..^1]));
         result.Sessions.Count.ShouldBe(1);
         result.Sessions[0].SealStatus.ShouldBe(SealStatus.SealCountMismatch);
-        result.Sessions[0].DeclaredFrameCount.ShouldBe((ulong)Messages.Length);
-        result.Sessions[0].DecryptedMessages.ShouldBe(Messages.Length - 1);
+        result.Sessions[0].DeclaredFrameCount.ShouldBe((ulong)_messages.Length);
+        result.Sessions[0].DecryptedMessages.ShouldBe(_messages.Length - 1);
         result.UnsealedSessions.ShouldBe(1);
     }
 
     [Fact]
     public async Task SealedLog_AllFramesRemoved_ReportsSealCountMismatch()
     {
-        byte[] data = (await CreateEncryptedStreamAsync(Messages)).ToArray();
+        byte[] data = (await CreateEncryptedStreamAsync(_messages)).ToArray();
         V2Layout layout = ParseLayout(data);
 
         byte[] truncated = [.. data[..layout.HeaderLength], .. data[layout.SealOffset..]];
@@ -163,14 +163,14 @@ public sealed class V2IntegrityTests : EncryptionTestBase
 
         text.ShouldBeEmpty();
         result.Sessions[0].SealStatus.ShouldBe(SealStatus.SealCountMismatch);
-        result.Sessions[0].DeclaredFrameCount.ShouldBe((ulong)Messages.Length);
+        result.Sessions[0].DeclaredFrameCount.ShouldBe((ulong)_messages.Length);
         result.Sessions[0].DecryptedMessages.ShouldBe(0);
     }
 
     [Fact]
     public async Task SealedLog_TailFrameRemoved_ThrowMode_Throws()
     {
-        byte[] data = (await CreateEncryptedStreamAsync(Messages)).ToArray();
+        byte[] data = (await CreateEncryptedStreamAsync(_messages)).ToArray();
         V2Layout layout = ParseLayout(data);
         byte[] truncated = [.. data[..layout.Frames[^1].Offset], .. data[layout.SealOffset..]];
 
@@ -187,13 +187,13 @@ public sealed class V2IntegrityTests : EncryptionTestBase
     [InlineData(24)]
     public async Task PartiallyWrittenSeal_ReportsUnsealed_WithoutFailures(int bytesDropped)
     {
-        byte[] data = (await CreateEncryptedStreamAsync(Messages)).ToArray();
+        byte[] data = (await CreateEncryptedStreamAsync(_messages)).ToArray();
 
         (string text, DecryptionResult result) = await DecryptWithResultAsync(
             CreateMemoryStream(data[..^bytesDropped])
         );
 
-        text.ShouldBe(string.Concat(Messages));
+        text.ShouldBe(string.Concat(_messages));
         result.FailedMessages.ShouldBe(0);
         result.Sessions[0].SealStatus.ShouldBe(SealStatus.Unsealed);
     }
@@ -201,14 +201,14 @@ public sealed class V2IntegrityTests : EncryptionTestBase
     [Fact]
     public async Task TornSealMarker_ReportsUnsealed()
     {
-        byte[] data = (await CreateEncryptedStreamAsync(Messages)).ToArray();
+        byte[] data = (await CreateEncryptedStreamAsync(_messages)).ToArray();
 
         // Keep only 2 of the 4 marker bytes — too short even for a length prefix.
         (string text, DecryptionResult result) = await DecryptWithResultAsync(
             CreateMemoryStream(data[..^26])
         );
 
-        text.ShouldBe(string.Concat(Messages));
+        text.ShouldBe(string.Concat(_messages));
         result.Sessions[0].SealStatus.ShouldBe(SealStatus.Unsealed);
     }
 
@@ -217,7 +217,7 @@ public sealed class V2IntegrityTests : EncryptionTestBase
     {
         // Session A crashed exactly after writing the 4-byte seal marker,
         // then the application restarted and appended session B.
-        byte[] sessionA = (await CreateEncryptedStreamAsync(Messages)).ToArray();
+        byte[] sessionA = (await CreateEncryptedStreamAsync(_messages)).ToArray();
         byte[] sessionB = (await CreateEncryptedStreamAsync(["survivor message\n"])).ToArray();
         byte[] combined =
         [
@@ -230,7 +230,7 @@ public sealed class V2IntegrityTests : EncryptionTestBase
         );
 
         // All of A's frames and all of B decrypt; B is sealed, A is not verifiable.
-        text.ShouldBe(string.Concat(Messages) + "survivor message\n");
+        text.ShouldBe(string.Concat(_messages) + "survivor message\n");
         result.Sessions.Count.ShouldBe(2);
         result.Sessions[0].SealStatus.ShouldBeOneOf(SealStatus.Unsealed, SealStatus.SealInvalid);
         result.Sessions[1].SealStatus.ShouldBe(SealStatus.Sealed);
@@ -262,7 +262,7 @@ public sealed class V2IntegrityTests : EncryptionTestBase
     [Fact]
     public async Task DuplicatedFrame_FailsAuthentication()
     {
-        byte[] data = (await CreateEncryptedStreamAsync(Messages)).ToArray();
+        byte[] data = (await CreateEncryptedStreamAsync(_messages)).ToArray();
         V2Layout layout = ParseLayout(data);
         (int offset, int length) = layout.Frames[0];
         byte[] tampered =
@@ -277,7 +277,7 @@ public sealed class V2IntegrityTests : EncryptionTestBase
         );
 
         // Only the first (authentic) copy decrypts; the replay fails.
-        text.ShouldBe(Messages[0]);
+        text.ShouldBe(_messages[0]);
         result.FailedMessages.ShouldBeGreaterThanOrEqualTo(1);
         result.Sessions[0].SealStatus.ShouldNotBe(SealStatus.Sealed);
     }
@@ -285,7 +285,7 @@ public sealed class V2IntegrityTests : EncryptionTestBase
     [Fact]
     public async Task DeletedMiddleFrame_FailsAuthentication()
     {
-        byte[] data = (await CreateEncryptedStreamAsync(Messages)).ToArray();
+        byte[] data = (await CreateEncryptedStreamAsync(_messages)).ToArray();
         V2Layout layout = ParseLayout(data);
         (int offset, int length) = layout.Frames[1];
         byte[] tampered = [.. data[..offset], .. data[(offset + length)..]];
@@ -295,7 +295,7 @@ public sealed class V2IntegrityTests : EncryptionTestBase
         );
 
         // Frame 0 decrypts; the frame that slid into position 1 fails (wrong seq + nonce).
-        text.ShouldBe(Messages[0]);
+        text.ShouldBe(_messages[0]);
         result.FailedMessages.ShouldBeGreaterThanOrEqualTo(1);
         result.Sessions[0].SealStatus.ShouldNotBe(SealStatus.Sealed);
     }
@@ -365,7 +365,7 @@ public sealed class V2IntegrityTests : EncryptionTestBase
     [Fact]
     public async Task DataFrameAfterSeal_ReportsSealInvalid()
     {
-        byte[] data = (await CreateEncryptedStreamAsync(Messages)).ToArray();
+        byte[] data = (await CreateEncryptedStreamAsync(_messages)).ToArray();
         V2Layout layout = ParseLayout(data);
         (int offset, int length) = layout.Frames[0];
         byte[] tampered = [.. data, .. data[offset..(offset + length)]];
@@ -374,7 +374,7 @@ public sealed class V2IntegrityTests : EncryptionTestBase
             CreateMemoryStream(tampered)
         );
 
-        text.ShouldBe(string.Concat(Messages));
+        text.ShouldBe(string.Concat(_messages));
         result.FailedMessages.ShouldBeGreaterThanOrEqualTo(1);
         result.Sessions[0].SealStatus.ShouldBe(SealStatus.SealInvalid);
     }
@@ -382,7 +382,7 @@ public sealed class V2IntegrityTests : EncryptionTestBase
     [Fact]
     public async Task DuplicateSeal_ReportsSealInvalid()
     {
-        byte[] data = (await CreateEncryptedStreamAsync(Messages)).ToArray();
+        byte[] data = (await CreateEncryptedStreamAsync(_messages)).ToArray();
         V2Layout layout = ParseLayout(data);
         byte[] tampered = [.. data, .. data[layout.SealOffset..]];
 
@@ -390,7 +390,7 @@ public sealed class V2IntegrityTests : EncryptionTestBase
             CreateMemoryStream(tampered)
         );
 
-        text.ShouldBe(string.Concat(Messages));
+        text.ShouldBe(string.Concat(_messages));
         result.Sessions[0].SealStatus.ShouldBe(SealStatus.SealInvalid);
     }
 
@@ -401,7 +401,7 @@ public sealed class V2IntegrityTests : EncryptionTestBase
     [Fact]
     public async Task VersionByteTamperedDownToV1_NoPlaintextAccepted()
     {
-        byte[] data = (await CreateEncryptedStreamAsync(Messages)).ToArray();
+        byte[] data = (await CreateEncryptedStreamAsync(_messages)).ToArray();
         byte[] tampered = (byte[])data.Clone();
         tampered[CryptographicUtils.MagicBytes.Length] = EncryptionConstants.FormatVersionV1;
 
@@ -507,7 +507,7 @@ public sealed class V2IntegrityTests : EncryptionTestBase
     [Fact]
     public async Task UnsupportedVersion_SkipMode_NoSessions()
     {
-        byte[] data = (await CreateEncryptedStreamAsync(Messages)).ToArray();
+        byte[] data = (await CreateEncryptedStreamAsync(_messages)).ToArray();
         byte[] tampered = (byte[])data.Clone();
         tampered[CryptographicUtils.MagicBytes.Length] = 3;
 
@@ -523,7 +523,7 @@ public sealed class V2IntegrityTests : EncryptionTestBase
     [Fact]
     public async Task UnsupportedVersion_ThrowMode_Throws()
     {
-        byte[] data = (await CreateEncryptedStreamAsync(Messages)).ToArray();
+        byte[] data = (await CreateEncryptedStreamAsync(_messages)).ToArray();
         byte[] tampered = (byte[])data.Clone();
         tampered[CryptographicUtils.MagicBytes.Length] = 3;
 
@@ -629,7 +629,7 @@ public sealed class V2IntegrityTests : EncryptionTestBase
     }
 
     private static string FixturePath(string fileName) =>
-        Path.Combine(AppContext.BaseDirectory, "Fixtures", "v1", fileName);
+        Path.Join(AppContext.BaseDirectory, "Fixtures", "v1", fileName);
 
     private static LocalKeyProvider CreateFixtureKeyProvider()
     {

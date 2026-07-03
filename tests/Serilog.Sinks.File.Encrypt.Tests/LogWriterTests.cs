@@ -140,29 +140,42 @@ public class LogWriterTests
         MemoryStream fs = new();
 
         // Act: no writes means no session, so dispose must not emit a header or seal
-        using (LogWriter _ = new(fs, TestUtils.GetEncryptionOptions(publicKey))) { }
+        using (new LogWriter(fs, TestUtils.GetEncryptionOptions(publicKey))) { }
 
         // Assert
         fs.ToArray().ShouldBeEmpty();
     }
 
     [Fact]
+    [SuppressMessage(
+        "ReSharper",
+        "DisposeOnUsingVariable",
+        Justification = "We want to test that Dispose can be called multiple times."
+    )]
     public void Dispose_Twice_WritesExactlyOneSeal()
     {
         // Arrange
         (string publicKey, _) = CryptographicUtils.GenerateRsaKeyPair();
         MemoryStream fs = new();
-        LogWriter logWriter = new(fs, TestUtils.GetEncryptionOptions(publicKey));
-        logWriter.Write("Hello"u8);
-        logWriter.Flush();
+        using LogWriter logWriter = new(fs, TestUtils.GetEncryptionOptions(publicKey));
 
-        // Act
-        logWriter.Dispose();
-        int lengthAfterFirstDispose = fs.ToArray().Length;
-        logWriter.Dispose();
+        try
+        {
+            logWriter.Write("Hello"u8);
+            logWriter.Flush();
 
-        // Assert
-        fs.ToArray().Length.ShouldBe(lengthAfterFirstDispose);
+            // Act
+            logWriter.Dispose();
+            int lengthAfterFirstDispose = fs.ToArray().Length;
+            logWriter.Dispose();
+
+            // Assert
+            fs.ToArray().Length.ShouldBe(lengthAfterFirstDispose);
+        }
+        finally
+        {
+            logWriter.Dispose();
+        }
     }
 
     [Fact]
