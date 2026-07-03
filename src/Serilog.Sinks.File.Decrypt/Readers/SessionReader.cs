@@ -1,5 +1,7 @@
+using System.Security.Cryptography;
 using Serilog.Sinks.File.Decrypt.Interfaces;
 using Serilog.Sinks.File.Decrypt.Models;
+using Serilog.Sinks.File.Encrypt;
 using Serilog.Sinks.File.Encrypt.Models;
 
 namespace Serilog.Sinks.File.Decrypt;
@@ -22,6 +24,7 @@ internal class SessionReader : ISessionReader
     public async Task<DecryptionContext> ReadSessionAsync(
         Stream input,
         IKeyProvider keyProvider,
+        byte version,
         CancellationToken cancellationToken
     )
     {
@@ -37,6 +40,19 @@ internal class SessionReader : ISessionReader
         Memory<byte> header = new byte[headerSize];
         await input.ReadExactlyAsync(header, cancellationToken);
 
+        // For v2, hash the exact header bytes as they appear on disk
+        // (magic + version + keyId + RSA payload); every frame's associated data is bound to it.
+        byte[]? headerHash = null;
+        if (version == EncryptionConstants.FormatVersionV2)
+        {
+            using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
+            hash.AppendData(CryptographicUtils.MagicBytes);
+            hash.AppendData([version]);
+            hash.AppendData(keyId.Span);
+            hash.AppendData(header.Span);
+            headerHash = hash.GetHashAndReset();
+        }
+
         // Decrypt the header to get the session key and nonce
         (byte[] aesKey, byte[] nonce) = await _headerReader.Decrypt(
             keyProvider,
@@ -45,6 +61,16 @@ internal class SessionReader : ISessionReader
             cancellationToken
         );
 
-        return new DecryptionContext(nonce, aesKey);
+        // For v2, derive the reserved seal nonce (initial counter − 1) before the rolling nonce
+        // is advanced, so the end-of-log seal can be authenticated no matter how many data
+        // frames are actually present.
+        byte[]? sealNonce = null;
+        if (version == EncryptionConstants.FormatVersionV2)
+        {
+            sealNonce = (byte[])nonce.Clone();
+            sealNonce.DecreaseNonce();
+        }
+
+        return new DecryptionContext(nonce, aesKey, version, headerHash, sealNonce, keyIdStr);
     }
 }

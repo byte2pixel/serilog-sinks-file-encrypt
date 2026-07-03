@@ -2,9 +2,9 @@ namespace Serilog.Sinks.File.Decrypt.Models;
 
 /// <summary>
 /// The result of a decryption operation, containing counts of decrypted sessions, messages, failures, and resync
-/// attempts.
+/// attempts, plus per-session detail (including end-of-log seal verification) in <see cref="Sessions"/>.
 /// </summary>
-public class DecryptionResult
+public sealed class DecryptionResult
 {
     /// <summary>
     /// Number of successfully decrypted sessions.
@@ -46,4 +46,32 @@ public class DecryptionResult
     /// </para>
     /// </summary>
     public int ResyncAttempts { get; init; } = 0;
+
+    /// <summary>
+    /// Per-session results in the order the sessions were encountered in the input, including
+    /// each session's format version and end-of-log seal status. The flat counters above are
+    /// file-level aggregates and additionally cover failures that cannot be attributed to any
+    /// session (e.g. corrupted headers found during resync).
+    /// </summary>
+    public IReadOnlyList<SessionResult> Sessions { get; init; } = [];
+
+    /// <summary>
+    /// Number of sessions whose completeness could not be positively verified: unsealed sessions
+    /// (crash or truncation), seal count mismatches (truncation of a cleanly closed log), and
+    /// invalid seals (tampering). v1 sessions (<see cref="SealStatus.NotApplicable"/>) are not
+    /// counted here; use <see cref="AllSessionsSealed"/> for a strict check.
+    /// </summary>
+    public int UnsealedSessions =>
+        Sessions.Count(s =>
+            s.SealStatus
+                is SealStatus.Unsealed
+                    or SealStatus.SealCountMismatch
+                    or SealStatus.SealInvalid
+        );
+
+    /// <summary>
+    /// True when every session either verified as sealed or predates seal support (v1).
+    /// </summary>
+    public bool AllSessionsSealed =>
+        Sessions.All(s => s.SealStatus is SealStatus.Sealed or SealStatus.NotApplicable);
 }

@@ -1,3 +1,5 @@
+using System.Buffers.Binary;
+
 namespace Serilog.Sinks.File.Decrypt.Tests;
 
 public sealed class SessionAndHeaderReaderTests : IDisposable
@@ -35,12 +37,59 @@ public sealed class SessionAndHeaderReaderTests : IDisposable
         DecryptionContext context = await _sut.ReadSessionAsync(
             _input,
             _keyProvider,
+            EncryptionConstants.FormatVersionV2,
             TestContext.Current.CancellationToken
         );
 
         // Assert
         context.SessionKey.ShouldBe(_aesKey);
         context.Nonce.ShouldBe(_nonce);
+        context.Version.ShouldBe(EncryptionConstants.FormatVersionV2);
+        context.KeyId.ShouldBe(KeyId);
+
+        // The v2 header hash covers the exact on-disk header bytes:
+        // magic + version + keyId + RSA payload. This test's stream omits magic/version
+        // (LogReader consumes those), so reconstruct them for the expectation.
+        byte[] rawHeader =
+        [
+            .. CryptographicUtils.MagicBytes,
+            EncryptionConstants.FormatVersionV2,
+            .. _input.ToArray(),
+        ];
+        context.HeaderHash.ShouldBe(SHA256.HashData(rawHeader));
+
+        // The seal nonce is the initial nonce with its 64-bit little-endian counter decremented.
+        byte[] expectedSealNonce = (byte[])_nonce.Clone();
+        long counter = BinaryPrimitives.ReadInt64LittleEndian(expectedSealNonce.AsSpan(4));
+        BinaryPrimitives.WriteInt64LittleEndian(expectedSealNonce.AsSpan(4), counter - 1);
+        context.SealNonce.ShouldBe(expectedSealNonce);
+    }
+
+    [Fact]
+    public async Task GivenValidHeader_WhenReadSessionAsyncAsV1_ThenNoVerificationState()
+    {
+        // Arrange
+        byte[] sessionData = new byte[_aesKey.Length + _nonce.Length];
+        _aesKey.CopyTo(sessionData, 0);
+        _nonce.CopyTo(sessionData, _aesKey.Length);
+        byte[] validHeader = CreateHeader(sessionData);
+        await _input.WriteAsync(validHeader, TestContext.Current.CancellationToken);
+        _input.Seek(0, SeekOrigin.Begin);
+
+        // Act
+        DecryptionContext context = await _sut.ReadSessionAsync(
+            _input,
+            _keyProvider,
+            EncryptionConstants.FormatVersionV1,
+            TestContext.Current.CancellationToken
+        );
+
+        // Assert
+        context.SessionKey.ShouldBe(_aesKey);
+        context.Nonce.ShouldBe(_nonce);
+        context.Version.ShouldBe(EncryptionConstants.FormatVersionV1);
+        context.HeaderHash.ShouldBeEmpty();
+        context.SealNonce.ShouldBeEmpty();
     }
 
     [Fact]
@@ -56,7 +105,12 @@ public sealed class SessionAndHeaderReaderTests : IDisposable
 
         // Act & Assert
         await Should.ThrowAsync<ArgumentNullException>(async () =>
-            await _sut.ReadSessionAsync(_input, null!, TestContext.Current.CancellationToken)
+            await _sut.ReadSessionAsync(
+                _input,
+                null!,
+                EncryptionConstants.FormatVersionV2,
+                TestContext.Current.CancellationToken
+            )
         );
     }
 
@@ -72,7 +126,12 @@ public sealed class SessionAndHeaderReaderTests : IDisposable
 
         // Act & Assert
         var exception = await Should.ThrowAsync<InvalidDataException>(async () =>
-            await _sut.ReadSessionAsync(_input, _keyProvider, TestContext.Current.CancellationToken)
+            await _sut.ReadSessionAsync(
+                _input,
+                _keyProvider,
+                EncryptionConstants.FormatVersionV2,
+                TestContext.Current.CancellationToken
+            )
         );
         exception.Message.ShouldContain("Decrypted payload is too short to read AES key");
     }
@@ -92,7 +151,12 @@ public sealed class SessionAndHeaderReaderTests : IDisposable
 
         // Act & Assert
         var exception = await Should.ThrowAsync<InvalidDataException>(async () =>
-            await _sut.ReadSessionAsync(_input, _keyProvider, TestContext.Current.CancellationToken)
+            await _sut.ReadSessionAsync(
+                _input,
+                _keyProvider,
+                EncryptionConstants.FormatVersionV2,
+                TestContext.Current.CancellationToken
+            )
         );
         exception.Message.ShouldContain("Decrypted payload is too short to read the nonce");
     }
@@ -115,7 +179,12 @@ public sealed class SessionAndHeaderReaderTests : IDisposable
 
         // Act & Assert
         var exception = await Should.ThrowAsync<CryptographicException>(async () =>
-            await _sut.ReadSessionAsync(_input, _keyProvider, TestContext.Current.CancellationToken)
+            await _sut.ReadSessionAsync(
+                _input,
+                _keyProvider,
+                EncryptionConstants.FormatVersionV2,
+                TestContext.Current.CancellationToken
+            )
         );
         exception.Message.ShouldContain("RSA decryption of header failed");
     }

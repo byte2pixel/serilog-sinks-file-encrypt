@@ -334,6 +334,137 @@ public class DecryptCommandTests : CommandTestBase
 
     #endregion
 
+    #region Seal Status Tests
+
+    [Fact]
+    public async Task ExecuteAsync_SealedFile_ReportsAllSessionsSealed()
+    {
+        // Arrange
+        string decryptedFilePath = Path.Join("logs", "decrypted.log");
+        DecryptCommand command = GetSut();
+        DecryptCommand.Settings settings = new()
+        {
+            InputPath = EncryptedFile,
+            KeyFile = _privateKeyPath,
+            OutputPath = decryptedFilePath,
+        };
+
+        // Act
+        int result = await command.ExecuteAsync(
+            new CommandContext(Arguments, Remaining, "decrypt", null),
+            settings,
+            CancellationToken.None
+        );
+
+        // Assert
+        result.ShouldBe(0);
+        TestConsole.Output.ShouldContain("✓ All 1 session(s) sealed and complete");
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_UnsealedFile_WarnsButSucceedsByDefault()
+    {
+        // Arrange: simulate a crash — writer never disposed, so no seal record
+        string unsealedFile = Path.Join("logs", "crashed.log");
+        FileSystem.AddFile(
+            unsealedFile,
+            new MockFileData(CreateUnsealedEncryptedLogFile(LogContent1, _publicKey))
+        );
+        ConfigureFileResolver(unsealedFile);
+
+        DecryptCommand command = GetSut();
+        DecryptCommand.Settings settings = new()
+        {
+            InputPath = unsealedFile,
+            KeyFile = _privateKeyPath,
+            OutputPath = Path.Join("logs", "decrypted.log"),
+        };
+
+        // Act
+        int result = await command.ExecuteAsync(
+            new CommandContext(Arguments, Remaining, "decrypt", null),
+            settings,
+            CancellationToken.None
+        );
+
+        // Assert: crash tolerance — reported but not fatal
+        result.ShouldBe(0);
+        TestConsole.Output.ShouldContain("UNSEALED");
+        string decryptedContent = await FileSystem.File.ReadAllTextAsync(
+            Path.Join("logs", "decrypted.log"),
+            TestContext.Current.CancellationToken
+        );
+        decryptedContent.ShouldBe(LogContent1);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_UnsealedFile_RequireSealedWithoutStrict_StillSucceeds()
+    {
+        // Arrange
+        string unsealedFile = Path.Join("logs", "crashed.log");
+        FileSystem.AddFile(
+            unsealedFile,
+            new MockFileData(CreateUnsealedEncryptedLogFile(LogContent1, _publicKey))
+        );
+        ConfigureFileResolver(unsealedFile);
+
+        DecryptCommand command = GetSut();
+        DecryptCommand.Settings settings = new()
+        {
+            InputPath = unsealedFile,
+            KeyFile = _privateKeyPath,
+            OutputPath = Path.Join("logs", "decrypted.log"),
+            RequireSealed = true,
+        };
+
+        // Act
+        int result = await command.ExecuteAsync(
+            new CommandContext(Arguments, Remaining, "decrypt", null),
+            settings,
+            CancellationToken.None
+        );
+
+        // Assert: RequireSealed only becomes fatal together with --strict
+        result.ShouldBe(0);
+        TestConsole.Output.ShouldContain("UNSEALED");
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_UnsealedFile_RequireSealedAndStrict_Fails()
+    {
+        // Arrange
+        string unsealedFile = Path.Join("logs", "crashed.log");
+        FileSystem.AddFile(
+            unsealedFile,
+            new MockFileData(CreateUnsealedEncryptedLogFile(LogContent1, _publicKey))
+        );
+        ConfigureFileResolver(unsealedFile);
+
+        DecryptCommand command = GetSut();
+        DecryptCommand.Settings settings = new()
+        {
+            InputPath = unsealedFile,
+            KeyFile = _privateKeyPath,
+            OutputPath = Path.Join("logs", "decrypted.log"),
+            RequireSealed = true,
+            Strict = true,
+        };
+
+        // Act
+        int result = await command.ExecuteAsync(
+            new CommandContext(Arguments, Remaining, "decrypt", null),
+            settings,
+            CancellationToken.None
+        );
+
+        // Assert
+        result.ShouldBe(1);
+        TestConsole.Output.ShouldContain("✗ Decryption failed:");
+        TestConsole.Output.ShouldContain("✗ Failed: 1");
+    }
+
+    #endregion
+
     #region Validation Tests
 
     [Fact]
@@ -487,6 +618,29 @@ public class DecryptCommandTests : CommandTestBase
             logWriter.Write(logBytes, 0, logBytes.Length);
             logWriter.Flush();
         }
+
+        return memoryStream.ToArray();
+    }
+
+    /// <summary>
+    /// Creates an encrypted log file whose writer is deliberately never disposed,
+    /// simulating a crash: frames are flushed but no end-of-log seal is written.
+    /// </summary>
+    private static byte[] CreateUnsealedEncryptedLogFile(
+        string logContent,
+        string rsaPublicKey,
+        string keyId = ""
+    )
+    {
+        using MemoryStream memoryStream = new();
+        using var rsa = RSA.Create();
+        rsa.FromString(rsaPublicKey);
+        EncryptionOptions options = new(rsa, keyId);
+
+        LogWriter logWriter = new(memoryStream, options);
+        byte[] logBytes = Encoding.UTF8.GetBytes(logContent);
+        logWriter.Write(logBytes, 0, logBytes.Length);
+        logWriter.Flush();
 
         return memoryStream.ToArray();
     }

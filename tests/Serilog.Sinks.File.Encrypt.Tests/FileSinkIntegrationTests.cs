@@ -177,6 +177,45 @@ public sealed class FileSinkIntegrationTests : IDisposable
     }
 
     [Fact]
+    public async Task CleanLoggerDispose_ProducesSealedSessions()
+    {
+        // Arrange: two logger lifetimes appending to the same file = two sessions
+        Logger logger = new LoggerConfiguration()
+            .WriteTo.File(path: _logFilePath, hooks: new EncryptHooks(_rsaKeyPair.publicKey))
+            .CreateLogger();
+        logger.Information("first session message");
+        await logger.DisposeAsync();
+
+        logger = new LoggerConfiguration()
+            .WriteTo.File(path: _logFilePath, hooks: new EncryptHooks(_rsaKeyPair.publicKey))
+            .CreateLogger();
+        logger.Information("second session message");
+        await logger.DisposeAsync();
+
+        // Act
+        await using FileStream inputStream = System.IO.File.OpenRead(_logFilePath);
+        using MemoryStream outputStream = new();
+        DecryptionResult result = await DecryptionUtils.DecryptLogFileAsync(
+            inputStream,
+            outputStream,
+            _decryptionOptions,
+            cancellationToken: TestContext.Current.CancellationToken
+        );
+
+        // Assert: every cleanly closed session carries a verified seal
+        result.Sessions.Count.ShouldBe(2);
+        result.AllSessionsSealed.ShouldBeTrue();
+        result.UnsealedSessions.ShouldBe(0);
+        foreach (SessionResult session in result.Sessions)
+        {
+            session.FormatVersion.ShouldBe(EncryptionConstants.FormatVersionV2);
+            session.SealStatus.ShouldBe(SealStatus.Sealed);
+            session.DeclaredFrameCount.ShouldBe(1UL);
+            session.DecryptedMessages.ShouldBe(1);
+        }
+    }
+
+    [Fact]
     public async Task DecryptionFailsWithWrongKey()
     {
         // Arrange
