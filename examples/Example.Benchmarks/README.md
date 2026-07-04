@@ -43,8 +43,8 @@ The fuller the bar the more time overhead compared to baseline.
 │ FASTER ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░  -25 to -45% (buff.)   │
 │ v6.x (AES-GCM + AAD + end-of-log seal):                         │
 │ █░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░  0-13% (unbuffered)   │
-│ FASTER ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░  -29 to -82% (buff.)   │
-│ At 10K entries: AES ~18%, AES-GCM ~9-12%, v6 ~3-13%             │
+│ FASTER ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░  -30 to -83% (buff.)   │
+│ At 10K entries: AES ~18%, AES-GCM ~9-12%, v6 ~7-13%             │
 │ STATUS PASS - Well within target                                │
 └─────────────────────────────────────────────────────────────────┘
 ```
@@ -81,10 +81,10 @@ The fuller the bar the closer to matching baseline.
 │ Earlier hardware - baseline ~174,000 logs/sec:                  │
 │   v2.x (AES):     153,200 unbuffered / 311,400 buffered         │
 │   v3.0.0:         148,200 unbuffered / 311,900 buffered         │
-│ Current hardware - baseline ~141,300 logs/sec:                  │
+│ Current hardware - baseline ~135,900 logs/sec:                  │
 │ v6.x (AES-GCM + AAD + end-of-log seal):                         │
-│ █████████████████████████████████████░░░░  126,600 (unbuffered) │
-│ FASTER ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░  197,800 (buffered)    │
+│ █████████████████████████████████████░░░░  124,700 (unbuffered) │
+│ FASTER ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░  240,400 (buffered)    │
 │ STATUS: PASS - Exceeds 100,000/sec target                       │
 └─────────────────────────────────────────────────────────────────┘
 ```
@@ -95,12 +95,11 @@ The fuller the bar the closer to matching baseline.
 ```
                                      AES-GCM + AAD + seal (v6)
                    Baseline       Unbuffered         Buffered
-Time:              3,976 μs       4,551 μs (+13%)*   1,477 μs (-63%)
-Memory:            652 KB         654 KB   (+0.2%)   656 KB (+0.6%)
-Throughput/sec:    251,500        219,700  (-13%)    677,000 (+169%)
-* medians; this cell's mean was disturbed by one outlier iteration (see Benchmarks.md)
+Time:              3,560 μs       3,937 μs (+11%)    1,323 μs (-63%)
+Memory:            652 KB         653 KB   (+0.1%)   656 KB (+0.6%)
+Throughput/sec:    280,900        254,000  (-10%)    756,000 (+169%)
 Verdict:           ✅ Unbuffered remains the default safe choice
-Summary:           v6: +13% time, ~0% more memory, -13% throughput (unbuffered)
+Summary:           v6: +11% time, ~0% more memory, -10% throughput (unbuffered)
                    Buffered mode: 63% faster than baseline, +169% throughput
 ```
 
@@ -108,37 +107,37 @@ Summary:           v6: +13% time, ~0% more memory, -13% throughput (unbuffered)
 ```
 buffered: true
                         Baseline        v6 (AES-GCM + AAD + seal)
-Time:                   6.97 ms         7.48 ms   (+7%)
+Time:                   6.67 ms         7.12 ms   (+7%)
 Memory:                 4.34 MB         4.34 MB   (+0%)
-Throughput: (logs/sec)  1,434,900       1,336,700 (-7%)
+Throughput: (logs/sec)  1,500,400       1,404,700 (-7%)
 Verdict:                ✅ Fine for batch processing and logging to file
     v6: ~7% time overhead, ~0% more memory, ~7% less throughput
-    Note: unbuffered showed +16-24% this run with high variance (I/O noise;
-    allocations identical to baseline) — 268,900 vs 219,500 logs/sec.
+    Note: unbuffered was a clean +11% this run (329,100 vs 296,800 logs/sec),
+    resolving the +16-24% I/O noise seen in the earlier same-day run.
 ```
 
 **Web API Logging To File.Sink (1,000 requests)**
 ```
 buffered: TRUE
                         Baseline       v6 (AES-GCM + AAD + seal)
-Time:                   1.75 ms        1.85 ms  (+5%)
+Time:                   1.49 ms        1.65 ms  (+11%)
 Memory:                 1,002 KB       1,003 KB (+0.1%)
-Throughput: (req/sec)   570,100        540,800  (-5%)
+Throughput: (req/sec)   673,300        607,100  (-10%)
 Verdict:                ✅ Acceptable for web API logging to file, especially buffered
                         Note: It is probably best to log to OTEL not to a file sink.
-    v6: +5% time overhead, +0.1% more memory, ~5% less throughput
-    Note: unbuffered +10% time, ~0% more memory; 203,500 vs 185,800 req/sec
+    v6: +11% time overhead, +0.1% more memory, ~10% less throughput
+    Note: unbuffered +11% time, ~0% more memory; 234,400 vs 211,100 req/sec
 ```
 
 ### Key Findings
 
 ✅ **Production Ready** - For applications needing encrypted log files.
-✅ **Acceptable Throughput** - Only a ~5-13% loss in logs/sec with unbuffered encryption.
+✅ **Acceptable Throughput** - Only a ~7-13% loss in logs/sec with unbuffered encryption.
 ✅ **Integrity Effectively Free** - The v2 format's AAD binding + end-of-log seal (v6.0.0) add no
 measurable cost: allocations are now ~1.00x baseline (previously up to 1.2x) and the time-overhead
 band is unchanged vs v3.x.
 ✅ **Safe by Default** - Unbuffered mode has no data loss risk (only unflushed data at risk)  
-🚀 **Performance Mode Available** - Buffered mode is up to ~5x *faster* than no-encryption
+🚀 **Performance Mode Available** - Buffered mode is up to ~6x *faster* than no-encryption
 unbuffered at 10K entries (and every cleanly closed file still gets its seal on dispose)
 ⚠️ **Buffering Trade-off** - Better performance but data loss risk on crashes  
 ✅ **Zero Lock Contentions** - Safe for multithreaded applications through `Serilog.File.Sink`
