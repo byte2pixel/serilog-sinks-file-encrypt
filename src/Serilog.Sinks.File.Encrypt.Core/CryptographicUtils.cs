@@ -33,16 +33,34 @@ public static class CryptographicUtils
     public static readonly byte[] MagicBytes = [0xFF, 0x42, 0x32, 0x50, 0xFF, 0xDA, 0x7E, 0x00];
 
     /// <summary>
+    /// Returns true when the given key string is a passphrase-encrypted PKCS#8 PEM
+    /// (an <c>ENCRYPTED PRIVATE KEY</c> block), which requires a passphrase to import.
+    /// </summary>
+    /// <param name="key">The RSA key as a string.</param>
+    public static bool IsEncryptedPem(string key) =>
+        key is not null && key.Contains("ENCRYPTED PRIVATE KEY", StringComparison.Ordinal);
+
+    /// <summary>
     /// Imports an RSA key into an <see cref="RSA"/> instance from a string in either XML or PEM format.
     /// </summary>
     /// <param name="rsa">The <see cref="RSA"/> instance to import the key into.</param>
     /// <param name="key">The RSA key as a string.</param>
-    /// <exception cref="CryptographicException">Unknown or invalid key format.</exception>
+    /// <exception cref="CryptographicException">
+    /// Unknown or invalid key format, or the key is passphrase-encrypted (use the
+    /// passphrase overload).
+    /// </exception>
     /// <exception cref="ArgumentException">Thrown if the key is empty.</exception>
     /// <exception cref="ArgumentNullException">Thrown if the key is null.</exception>
     public static void FromString(this RSA rsa, string key)
     {
         ArgumentException.ThrowIfNullOrEmpty(key);
+
+        if (IsEncryptedPem(key))
+        {
+            throw new CryptographicException(
+                "The RSA private key is passphrase-encrypted; a passphrase is required to import it."
+            );
+        }
 
         try
         {
@@ -59,6 +77,52 @@ public static class CryptographicUtils
                         "Invalid RSA key format. Key must be in XML or PEM format."
                     );
             }
+        }
+        catch (Exception ex)
+            when (ex is FormatException or ArgumentException or ArgumentNullException)
+        {
+            throw new CryptographicException(
+                "Failed to import RSA key. See inner exception for details.",
+                ex
+            );
+        }
+    }
+
+    /// <summary>
+    /// Imports an RSA key into an <see cref="RSA"/> instance from a string, additionally
+    /// supporting passphrase-encrypted PKCS#8 PEM keys (<c>ENCRYPTED PRIVATE KEY</c> blocks,
+    /// as produced by <see cref="GenerateRsaKeyPair(int, KeyFormat, ReadOnlySpan{char})"/>).
+    /// Unencrypted XML/PEM keys import as usual and the passphrase is ignored.
+    /// </summary>
+    /// <param name="rsa">The <see cref="RSA"/> instance to import the key into.</param>
+    /// <param name="key">The RSA key as a string.</param>
+    /// <param name="passphrase">The passphrase for an encrypted key; may be empty for unencrypted keys.</param>
+    /// <exception cref="CryptographicException">
+    /// Unknown or invalid key format, a missing passphrase for an encrypted key, or a wrong
+    /// passphrase.
+    /// </exception>
+    /// <exception cref="ArgumentException">Thrown if the key is empty.</exception>
+    /// <exception cref="ArgumentNullException">Thrown if the key is null.</exception>
+    public static void FromString(this RSA rsa, string key, ReadOnlySpan<char> passphrase)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(key);
+
+        if (!IsEncryptedPem(key))
+        {
+            rsa.FromString(key);
+            return;
+        }
+
+        if (passphrase.IsEmpty)
+        {
+            throw new CryptographicException(
+                "The RSA private key is passphrase-encrypted; a passphrase is required to import it."
+            );
+        }
+
+        try
+        {
+            rsa.ImportFromEncryptedPem(key, passphrase);
         }
         catch (Exception ex)
             when (ex is FormatException or ArgumentException or ArgumentNullException)

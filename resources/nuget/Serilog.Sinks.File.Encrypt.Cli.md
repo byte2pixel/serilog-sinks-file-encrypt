@@ -92,7 +92,8 @@ serilog-encrypt decrypt "logs/*.log" -k private_key.xml -o ./decrypted
 - `<PATH>`: Path to an encrypted log file, or a glob pattern (e.g., `*.log`, `logs/*.txt`). Directories are not accepted directly — append a pattern such as `logs/*.log`.
 
 **Options:**
-- `-k|--key <KEY>`: Path to the RSA private key file (default: `private_key.xml`)
+- `-k|--key <KEY>`: Path to the RSA private key file (default: `private_key.pem`). Passphrase-encrypted PKCS#8 PEM keys are supported.
+- `--passphrase-env <NAME>` / `--passphrase-file <PATH>`: Passphrase source for an encrypted private key; `SERILOG_ENCRYPT_PASSPHRASE` is checked as a fallback, then an interactive hidden prompt. Only consulted when the key file is actually encrypted.
 - `--id <KEY_ID>`: The key ID that was supplied to `EncryptHooks` during encryption (default: `""` — matches files encrypted without a key ID)
 - `-o|--output <OUTPUT>`: Output directory or file path (default: adds `.decrypted` to original filename)
 - `-f|--force`: Overwrite existing output files. Without it, a file whose output already exists is refused (skipped) and the run exits with code 2.

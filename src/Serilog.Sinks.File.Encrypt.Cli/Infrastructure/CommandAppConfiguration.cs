@@ -28,7 +28,7 @@ public static class CommandAppConfiguration
     /// <returns>An action that configures the CommandApp</returns>
     public static Action<IConfigurator> GetConfiguration()
     {
-        const string PrivateKey = "private_key.xml";
+        const string PrivateKey = "private_key.pem";
         const string Decrypt = "decrypt";
         const string Generate = "generate";
 
@@ -60,6 +60,14 @@ public static class CommandAppConfiguration
                 .WithExample(Decrypt, "app.log", "-k", PrivateKey, "-o", "decrypted.log")
                 .WithExample(Decrypt, "app.log", "-k", PrivateKey, "--strict")
                 .WithExample(Decrypt, "app.log", "-k", PrivateKey, "--force")
+                .WithExample(
+                    Decrypt,
+                    "app.log",
+                    "-k",
+                    PrivateKey,
+                    "--passphrase-env",
+                    "MY_PASSPHRASE"
+                )
                 .WithExample(Decrypt, "app.log", "-k", PrivateKey, "--verbose")
                 .WithExample(Decrypt, "./logs/*.log", "-k", PrivateKey, "--audit-log", "audit.log");
             c.ValidateExamples();

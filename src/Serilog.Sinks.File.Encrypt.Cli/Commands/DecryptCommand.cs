@@ -22,7 +22,8 @@ public sealed class DecryptCommand(
     IConsoleWriter writer,
     IFileSystem fileSystem,
     IInputResolver inputResolver,
-    IOutputResolver outputResolver
+    IOutputResolver outputResolver,
+    IPassphraseResolver passphraseResolver
 ) : AsyncCommand<DecryptCommand.Settings>
 {
     /// <summary>
@@ -40,11 +41,35 @@ public sealed class DecryptCommand(
         public string InputPath { get; init; } = string.Empty;
 
         /// <summary>
-        /// The path to the RSA private key file in XML or PEM format.
+        /// The default private key file name looked for when --key is not given.
+        /// </summary>
+        internal const string DefaultKeyFile = "private_key.pem";
+
+        /// <summary>
+        /// The path to the RSA private key file in XML or PEM format. Passphrase-encrypted
+        /// PKCS#8 PEM keys are supported; the passphrase is resolved from
+        /// --passphrase-file/--passphrase-env/SERILOG_ENCRYPT_PASSPHRASE or an interactive
+        /// prompt.
         /// </summary>
         [CommandOption("-k|--key <KEY>")]
-        [Description("The file containing the RSA private key in XML or PEM format")]
-        public string KeyFile { get; init; } = "private_key.xml";
+        [Description(
+            "The file containing the RSA private key in XML or PEM format (encrypted PKCS#8 PEM supported)"
+        )]
+        public string KeyFile { get; init; } = DefaultKeyFile;
+
+        /// <summary>
+        /// Name of an environment variable holding the private-key passphrase.
+        /// </summary>
+        [CommandOption("--passphrase-env <NAME>")]
+        [Description("Read the private-key passphrase from the named environment variable")]
+        public string? PassphraseEnv { get; init; }
+
+        /// <summary>
+        /// Path of a file whose first line is the private-key passphrase.
+        /// </summary>
+        [CommandOption("--passphrase-file <PATH>")]
+        [Description("Read the private-key passphrase from the first line of the given file")]
+        public string? PassphraseFile { get; init; }
 
         /// <summary>
         /// The id of the key to use for decryption. This should match exactly the key id used during encryption.
@@ -123,8 +148,15 @@ public sealed class DecryptCommand(
 
         if (!fileSystem.File.Exists(settings.KeyFile))
         {
+            // 6.0.0 changed the default from private_key.xml to private_key.pem — point
+            // users with an old key at the fix instead of a bare not-found error.
+            string hint =
+                settings.KeyFile == Settings.DefaultKeyFile
+                && fileSystem.File.Exists("private_key.xml")
+                    ? " Found 'private_key.xml' — pass -k private_key.xml to use it."
+                    : string.Empty;
             return ValidationResult.Error(
-                $"✗ Error: Key file '{settings.KeyFile}' does not exist."
+                $"✗ Error: Key file '{settings.KeyFile}' does not exist.{hint}"
             );
         }
 
@@ -170,6 +202,35 @@ public sealed class DecryptCommand(
                 cancellationToken
             );
 
+            string? passphrase = null;
+            if (CryptographicUtils.IsEncryptedPem(rsaPrivateKey))
+            {
+                try
+                {
+                    passphrase = passphraseResolver.Resolve(
+                        settings.PassphraseFile,
+                        settings.PassphraseEnv,
+                        confirm: false
+                    );
+                }
+                catch (PassphraseResolutionException ex)
+                {
+                    writer.Error($"[red]✗ {ex.Message}[/]");
+                    return ExitCodes.UsageError;
+                }
+
+                if (passphrase is null)
+                {
+                    writer.Error(
+                        $"[red]✗ The private key is passphrase-encrypted but no passphrase source is available in a non-interactive session.[/]"
+                    );
+                    writer.Warning(
+                        $"[yellow]Provide --passphrase-env or --passphrase-file, or set {IPassphraseResolver.DefaultEnvironmentVariable}.[/]"
+                    );
+                    return ExitCodes.UsageError;
+                }
+            }
+
             IReadOnlyList<string> filesToDecrypt = inputResolver.ResolveFiles(settings.InputPath);
 
             if (filesToDecrypt.Count == 0)
@@ -203,7 +264,7 @@ public sealed class DecryptCommand(
                 )
                 .CreateLogger();
 
-            LocalKeyProvider keyProvider = new(settings.KeyId, rsaPrivateKey);
+            LocalKeyProvider keyProvider = new(settings.KeyId, rsaPrivateKey, passphrase);
 
             DecryptionOptions decryptionOptions = new()
             {

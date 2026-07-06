@@ -61,6 +61,18 @@ surfaced as `-1`), `3` no input files matched (previously `0`), `4` nothing decr
 `0` — see below). When several apply across a multi-file run, the highest-priority code wins
 (`1` > `2` > `4` > `3`).
 
+#### CLI `decrypt`: encrypted private keys supported; `--key` default is now `private_key.pem` ([#98](https://github.com/byte2pixel/serilog-sinks-file-encrypt/issues/98))
+
+- `decrypt` accepts passphrase-encrypted PKCS#8 PEM private keys. The passphrase is resolved
+  from `--passphrase-file` → `--passphrase-env` → `SERILOG_ENCRYPT_PASSPHRASE` → interactive
+  prompt, and is only requested when the key file is actually encrypted.
+- **Breaking:** the `--key` default changed from `private_key.xml` to `private_key.pem`. When
+  the default is used and only `private_key.xml` exists, the error message points at it.
+- Library (additive, non-breaking): `LocalKeyProvider` gains passphrase constructor overloads,
+  and `CryptographicUtils` gains `FromString(key, passphrase)` plus `IsEncryptedPem(key)`.
+  The parameterless `FromString` now reports a clear "passphrase required" error for
+  encrypted keys.
+
 #### CLI `generate`: passphrase-encrypted keys by default, PEM + 3072-bit defaults ([#97](https://github.com/byte2pixel/serilog-sinks-file-encrypt/issues/97))
 
 - The private key is now written as a **passphrase-encrypted PKCS#8 PEM** by default

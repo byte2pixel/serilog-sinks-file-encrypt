@@ -8,6 +8,8 @@ public class DecryptCommandTests : CommandTestBase
 {
     private readonly IInputResolver _inputResolver = Substitute.For<IInputResolver>();
     private readonly IOutputResolver _outputResolver = Substitute.For<IOutputResolver>();
+    private readonly IPassphraseResolver _passphraseResolver =
+        Substitute.For<IPassphraseResolver>();
     private readonly string _publicKey;
     private readonly string _privateKey;
     private readonly string _privateKeyPath = Path.Join("keys", "private_key.xml");
@@ -726,6 +728,134 @@ public class DecryptCommandTests : CommandTestBase
     }
 
     [Fact]
+    public async Task ExecuteAsync_WithEncryptedKeyAndPassphrase_DecryptsSuccessfully()
+    {
+        // Arrange — full round trip with a passphrase-encrypted private key
+        const string Passphrase = "round-trip-secret";
+        (string publicKey, string encryptedPrivateKey) = CryptographicUtils.GenerateRsaKeyPair(
+            2048,
+            KeyFormat.Pem,
+            Passphrase
+        );
+        string keyPath = Path.Join("keys", "encrypted_key.pem");
+        FileSystem.AddFile(keyPath, new MockFileData(encryptedPrivateKey));
+        FileSystem.AddFile(
+            "enc.log",
+            new MockFileData(CreateEncryptedLogFile(LogContent1, publicKey))
+        );
+        ConfigureFileResolver("enc.log");
+        _passphraseResolver
+            .Resolve(Arg.Any<string?>(), Arg.Any<string?>(), confirm: false)
+            .Returns(Passphrase);
+
+        string decryptedFilePath = Path.Join("logs", "enc-decrypted.log");
+        DecryptCommand command = GetSut();
+        DecryptCommand.Settings settings = new()
+        {
+            InputPath = "enc.log",
+            KeyFile = keyPath,
+            OutputPath = decryptedFilePath,
+        };
+
+        // Act
+        int result = await command.ExecuteAsync(
+            new CommandContext(Arguments, Remaining, "decrypt", null),
+            settings,
+            CancellationToken.None
+        );
+
+        // Assert
+        result.ShouldBe(ExitCodes.Success);
+        (
+            await FileSystem.File.ReadAllTextAsync(
+                decryptedFilePath,
+                TestContext.Current.CancellationToken
+            )
+        ).ShouldBe(LogContent1);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_EncryptedKeyNoPassphraseSource_ExitsUsageError()
+    {
+        // Arrange
+        (_, string encryptedPrivateKey) = CryptographicUtils.GenerateRsaKeyPair(
+            2048,
+            KeyFormat.Pem,
+            "some-passphrase"
+        );
+        string keyPath = Path.Join("keys", "encrypted_key.pem");
+        FileSystem.AddFile(keyPath, new MockFileData(encryptedPrivateKey));
+        _passphraseResolver
+            .Resolve(Arg.Any<string?>(), Arg.Any<string?>(), confirm: false)
+            .Returns((string?)null);
+
+        DecryptCommand command = GetSut();
+        DecryptCommand.Settings settings = new() { InputPath = EncryptedFile, KeyFile = keyPath };
+
+        // Act
+        int result = await command.ExecuteAsync(
+            new CommandContext(Arguments, Remaining, "decrypt", null),
+            settings,
+            CancellationToken.None
+        );
+
+        // Assert
+        result.ShouldBe(ExitCodes.UsageError);
+        TestConsole.Output.ShouldContain("passphrase-encrypted");
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_EncryptedKeyWrongPassphrase_ExitsRuntimeFailure()
+    {
+        // Arrange
+        (_, string encryptedPrivateKey) = CryptographicUtils.GenerateRsaKeyPair(
+            2048,
+            KeyFormat.Pem,
+            "right-passphrase"
+        );
+        string keyPath = Path.Join("keys", "encrypted_key.pem");
+        FileSystem.AddFile(keyPath, new MockFileData(encryptedPrivateKey));
+        _passphraseResolver
+            .Resolve(Arg.Any<string?>(), Arg.Any<string?>(), confirm: false)
+            .Returns("wrong-passphrase");
+
+        DecryptCommand command = GetSut();
+        DecryptCommand.Settings settings = new() { InputPath = EncryptedFile, KeyFile = keyPath };
+
+        // Act
+        int result = await command.ExecuteAsync(
+            new CommandContext(Arguments, Remaining, "decrypt", null),
+            settings,
+            CancellationToken.None
+        );
+
+        // Assert — clear failure, not silent success
+        result.ShouldBe(ExitCodes.RuntimeFailure);
+        TestConsole.Output.ShouldContain("✗ Decryption failed:");
+    }
+
+    [Fact]
+    public void Validate_DefaultKeyMissingButXmlExists_HintsAtOldDefault()
+    {
+        // Arrange — no private_key.pem, but a legacy private_key.xml is present
+        FileSystem.AddFile("private_key.xml", new MockFileData(_privateKey));
+        DecryptCommand command = GetSut();
+        DecryptCommand.Settings settings = new() { InputPath = EncryptedFile };
+
+        // Act
+        ValidationResult result = command.Validate(
+            new CommandContext(Arguments, Remaining, "decrypt", null),
+            settings
+        );
+
+        // Assert
+        result.Successful.ShouldBeFalse();
+        result.Message.ShouldNotBeNull();
+        result.Message.ShouldContain("private_key.xml");
+        result.Message.ShouldContain("-k private_key.xml");
+    }
+
+    [Fact]
     public async Task ExecuteAsync_WithQuiet_SuppressesInfoButKeepsWarnings()
     {
         // Arrange
@@ -813,7 +943,8 @@ public class DecryptCommandTests : CommandTestBase
             Writer,
             fileSystem ?? FileSystem,
             _inputResolver,
-            _outputResolver
+            _outputResolver,
+            _passphraseResolver
         );
     }
 
