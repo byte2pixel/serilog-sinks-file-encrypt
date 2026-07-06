@@ -492,3 +492,6 @@ $RECYCLE.BIN/
 
 # Claude Code personal settings (project skills/rules ARE committed)
 .claude/settings.local.json
+
+# [Rr]elease/ above is for build output; the release skill is source
+!.claude/skills/release/
