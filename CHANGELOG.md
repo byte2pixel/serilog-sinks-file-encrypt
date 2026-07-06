@@ -61,6 +61,22 @@ surfaced as `-1`), `3` no input files matched (previously `0`), `4` nothing decr
 `0` — see below). When several apply across a multi-file run, the highest-priority code wins
 (`1` > `2` > `4` > `3`).
 
+#### CLI `generate`: passphrase-encrypted keys by default, PEM + 3072-bit defaults ([#97](https://github.com/byte2pixel/serilog-sinks-file-encrypt/issues/97))
+
+- The private key is now written as a **passphrase-encrypted PKCS#8 PEM** by default
+  (PBKDF2-SHA256, 600,000 iterations, AES-256-CBC). The passphrase is resolved from
+  `--passphrase-file` → `--passphrase-env` → the `SERILOG_ENCRYPT_PASSPHRASE` environment
+  variable → an interactive hidden prompt with confirmation. There is deliberately no
+  `--passphrase` argv option (shell-history/process-list leakage). An unencrypted key now
+  requires the explicit `--plaintext` flag.
+- Default format is **Pem** (was Xml); Xml remains readable forever but is legacy on the
+  write side and requires `--plaintext`. Default key size is **3072** bits (was 2048).
+- The `-k` short option now belongs exclusively to `decrypt --key`; use `--key-size` on
+  `generate` (was `-k|--key-size`).
+- Library: `CryptographicUtils.GenerateRsaKeyPair` default `format` changed Xml → Pem, and a
+  new passphrase overload `GenerateRsaKeyPair(int, KeyFormat, ReadOnlySpan<char>)` produces
+  encrypted PKCS#8 private keys (PEM only).
+
 #### CLI: overwriting output requires `--force`; output paths are containment-checked ([#85](https://github.com/byte2pixel/serilog-sinks-file-encrypt/issues/85))
 
 - `decrypt` no longer silently overwrites existing output files: without the new `-f|--force`

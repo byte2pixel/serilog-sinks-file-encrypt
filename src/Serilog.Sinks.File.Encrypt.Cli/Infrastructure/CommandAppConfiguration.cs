@@ -36,10 +36,15 @@ public static class CommandAppConfiguration
         {
             c.SetApplicationName("serilog-encrypt");
             c.AddCommand<GenerateCommand>(Generate)
-                .WithDescription("Generate a new RSA key pair for log encryption")
+                .WithDescription(
+                    "Generate a new RSA key pair for log encryption. The private key is "
+                        + "passphrase-encrypted (PKCS#8 PEM) unless --plaintext is passed."
+                )
                 .WithExample(Generate, "--output", "./keys")
-                .WithExample(Generate, "-o", "./keys", "-k", "4096")
-                .WithExample(Generate, "-o", "./keys", "-f", "Pem")
+                .WithExample(Generate, "-o", "./keys", "--key-size", "4096")
+                .WithExample(Generate, "-o", "./keys", "--passphrase-env", "MY_PASSPHRASE")
+                .WithExample(Generate, "-o", "./keys", "--passphrase-file", "passphrase.txt")
+                .WithExample(Generate, "-o", "./keys", "-f", "Xml", "--plaintext")
                 .WithExample(Generate, "-o", "./keys", "--force")
                 .WithExample(Generate, "-o", "./keys", "--quiet");
 

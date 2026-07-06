@@ -42,15 +42,27 @@ serilog-encrypt generate --output ./keys
 
 **Options:**
 - `-o|--output <OUTPUT>` (required): The directory where the key files will be saved
-- `-k|--key-size <KEY_SIZE>` (optional): The size of the RSA key in bits (default: 2048)
-- `-f|--format <FORMAT>` (optional): The encoding format (Xml or Pem) for the RSA keys (default: Xml)
+- `--key-size <KEY_SIZE>` (optional): The size of the RSA key in bits (default: 3072)
+- `-f|--format <FORMAT>` (optional): The encoding format (Pem or Xml) for the RSA keys (default: Pem). Xml is legacy — it has no encrypted representation and requires `--plaintext`.
+- `--passphrase-env <NAME>`: Read the private-key passphrase from the named environment variable
+- `--passphrase-file <PATH>`: Read the private-key passphrase from the first line of the given file
+- `--plaintext`: Write the private key unencrypted (required for Xml format)
 - `--force`: Overwrite existing key files. Without it, generation is refused when a key file already exists — overwriting a private key permanently loses access to all logs encrypted with it.
 - `-q|--quiet`: Suppress informational output (warnings and errors are still shown)
 - `-v|--verbose`: Show additional diagnostic detail
 
 This creates two files:
-- `private_key.xml`: The private key used for decryption (keep secure)
-- `public_key.xml`: The public key used for encryption
+- `private_key.pem`: The private key used for decryption (keep secure)
+- `public_key.pem`: The public key used for encryption
+
+**Passphrase protection (v6.0.0+):** by default the private key is written as a
+passphrase-encrypted PKCS#8 PEM (`ENCRYPTED PRIVATE KEY`, PBKDF2-SHA256 with 600,000
+iterations, AES-256-CBC). The passphrase is resolved in order from `--passphrase-file`,
+`--passphrase-env`, the `SERILOG_ENCRYPT_PASSPHRASE` environment variable, and finally an
+interactive hidden prompt (with confirmation). There is deliberately **no** `--passphrase`
+command-line option — secrets on the command line leak via shell history and process
+listings. In a non-interactive session with no passphrase source, generation fails (exit 2)
+unless `--plaintext` is passed. **There is no recovery if the passphrase is lost.**
 
 ### Decrypt Log Files
 

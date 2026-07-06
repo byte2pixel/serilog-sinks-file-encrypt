@@ -61,6 +61,87 @@ public class CryptographicUtilsTests : EncryptionTestBase
     }
 
     [Fact]
+    public void GenerateRsaKeyPair_DefaultFormat_IsPem()
+    {
+        // Arrange, Act — 6.0.0 flipped the default from Xml to Pem
+        (string publicKey, string privateKey) = CryptographicUtils.GenerateRsaKeyPair();
+
+        // Assert
+        publicKey.ShouldStartWith("-----BEGIN RSA PUBLIC KEY-----");
+        privateKey.ShouldStartWith("-----BEGIN RSA PRIVATE KEY-----");
+    }
+
+    [Fact]
+    public void GenerateRsaKeyPair_WithPassphrase_ProducesEncryptedPkcs8ThatRoundTrips()
+    {
+        // Arrange
+        const string Passphrase = "correct horse battery staple";
+
+        // Act
+        (string publicKey, string privateKey) = CryptographicUtils.GenerateRsaKeyPair(
+            2048,
+            KeyFormat.Pem,
+            Passphrase
+        );
+
+        // Assert — encrypted PKCS#8 private key, plaintext public key
+        privateKey.ShouldStartWith("-----BEGIN ENCRYPTED PRIVATE KEY-----");
+        publicKey.ShouldStartWith("-----BEGIN RSA PUBLIC KEY-----");
+
+        using var rsa = RSA.Create();
+        Should.NotThrow(() => rsa.ImportFromEncryptedPem(privateKey, Passphrase));
+
+        // The imported key pair must actually match the exported public key
+        using var publicRsa = RSA.Create();
+        publicRsa.FromString(publicKey);
+        byte[] cipher = publicRsa.Encrypt([1, 2, 3], RSAEncryptionPadding.OaepSHA256);
+        rsa.Decrypt(cipher, RSAEncryptionPadding.OaepSHA256).ShouldBe([1, 2, 3]);
+    }
+
+    [Fact]
+    public void GenerateRsaKeyPair_WithPassphrase_WrongPassphraseFailsImport()
+    {
+        // Arrange
+        (_, string privateKey) = CryptographicUtils.GenerateRsaKeyPair(
+            2048,
+            KeyFormat.Pem,
+            "right passphrase"
+        );
+
+        // Act & Assert
+        using var rsa = RSA.Create();
+        Should.Throw<CryptographicException>(() =>
+            rsa.ImportFromEncryptedPem(privateKey, "wrong passphrase")
+        );
+    }
+
+    [Fact]
+    public void GenerateRsaKeyPair_XmlWithPassphrase_ThrowsNotSupported()
+    {
+        Should
+            .Throw<NotSupportedException>(() =>
+                CryptographicUtils.GenerateRsaKeyPair(2048, KeyFormat.Xml, "passphrase")
+            )
+            .Message.ShouldContain("Pem");
+    }
+
+    [Fact]
+    public void GenerateRsaKeyPair_EmptyPassphrase_ThrowsArgumentException()
+    {
+        Should.Throw<ArgumentException>(() =>
+            CryptographicUtils.GenerateRsaKeyPair(2048, KeyFormat.Pem, ReadOnlySpan<char>.Empty)
+        );
+    }
+
+    [Fact]
+    public void GenerateRsaKeyPair_WithPassphrase_EnforcesMinimumKeySize()
+    {
+        Should.Throw<CryptographicException>(() =>
+            CryptographicUtils.GenerateRsaKeyPair(1024, KeyFormat.Pem, "passphrase")
+        );
+    }
+
+    [Fact]
     public void InitializeRsa_FromUnknown_ThrowsCryptographicException()
     {
         // Arrange, Act
@@ -284,7 +365,7 @@ public class CryptographicUtilsTests : EncryptionTestBase
         const string OriginalText = "Testing 4096-bit RSA key with encrypted stream!";
 
         using var rsa = RSA.Create();
-        rsa.FromXmlString(publicKey);
+        rsa.FromString(publicKey);
         EncryptionOptions options = new(rsa, "4096");
         LocalKeyProvider keyProvider = new("4096", privateKey);
         DecryptionOptions decryptionOptions = new() { KeyProvider = keyProvider };

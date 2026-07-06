@@ -27,6 +27,7 @@ public static class ServiceCollectionExtensions
         services.TryAddTransient<IOutputResolver, OutputResolver>();
         services.TryAddSingleton(AnsiConsole.Console);
         services.TryAddSingleton<IConsoleWriter, ConsoleWriter>();
+        services.TryAddSingleton<IPassphraseResolver, PassphraseResolver>();
         return services;
     }
 }

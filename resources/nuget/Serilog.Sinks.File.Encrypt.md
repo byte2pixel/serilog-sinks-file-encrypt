@@ -162,12 +162,15 @@ For the decryption side of key rotation, see the [Serilog.Sinks.File.Decrypt doc
 ```csharp
 using Serilog.Sinks.File.Encrypt;
 
-// Generate a new RSA key pair
+// Generate a new RSA key pair (PEM by default in v6.0.0+)
 var (publicKey, privateKey) = CryptographicUtils.GenerateRsaKeyPair();
 
 // Save keys to files
-File.WriteAllText("public_key.xml", publicKey);
-File.WriteAllText("private_key.xml", privateKey);
+File.WriteAllText("public_key.pem", publicKey);
+File.WriteAllText("private_key.pem", privateKey);
+
+// Or generate a passphrase-protected private key (encrypted PKCS#8 PEM)
+var (pub, encryptedPriv) = CryptographicUtils.GenerateRsaKeyPair(3072, KeyFormat.Pem, "my passphrase");
 ```
 
 ### Web Application Example
@@ -195,8 +198,12 @@ app.Run();
 
 ### Key Management
 ```csharp
-// Generates a new RSA key pair with the specified key size and format (XML or PEM).
-(string publicKey, string privateKey) CryptographicUtils.GenerateRsaKeyPair(int keySize = 2048, KeyFormat format = KeyFormat.Xml)
+// Generates a new RSA key pair with the specified key size and format (PEM or XML).
+(string publicKey, string privateKey) CryptographicUtils.GenerateRsaKeyPair(int keySize = 2048, KeyFormat format = KeyFormat.Pem)
+
+// Generates a key pair whose private key is a passphrase-encrypted PKCS#8 PEM
+// (PBKDF2-SHA256, 600,000 iterations, AES-256-CBC). PEM format only.
+(string publicKey, string privateKey) CryptographicUtils.GenerateRsaKeyPair(int keySize, KeyFormat format, ReadOnlySpan<char> passphrase)
 ```
 
 ### Encryption Hook

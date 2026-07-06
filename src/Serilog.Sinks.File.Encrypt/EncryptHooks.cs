@@ -48,7 +48,7 @@ public class EncryptHooks : FileLifecycleHooks
     /// <summary>
     /// Creates a new instance of <see cref="EncryptHooks"/> with the provided RSA public key.
     /// </summary>
-    /// <param name="publicKey">The RSA public key in XML or PEM format. Use <see cref="CryptographicUtils.GenerateRsaKeyPair"/> to generate keys.</param>
+    /// <param name="publicKey">The RSA public key in XML or PEM format. Use <see cref="CryptographicUtils.GenerateRsaKeyPair(int, KeyFormat)"/> to generate keys.</param>
     /// <param name="keyId">Optional key ID to include in the header for key rotation. Default is an empty string. Max 32 bytes.</param>
     /// <exception cref="ArgumentNullException">Thrown when <paramref name="publicKey"/> or <paramref name="keyId"/> is null.</exception>
     /// <exception cref="ArgumentException">Thrown when <paramref name="publicKey"/> is empty or whitespace, or when <paramref name="keyId"/> exceeds 32 bytes when UTF-8 encoded.</exception>
