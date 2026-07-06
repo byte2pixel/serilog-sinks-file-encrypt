@@ -127,7 +127,7 @@ public class DecryptCommandTests : CommandTestBase
     }
 
     [Fact]
-    public async Task GivenNoFilesToDecrypt_ExecuteAsync_ReturnsSuccessWithWarning()
+    public async Task GivenNoFilesToDecrypt_ExecuteAsync_ReturnsNoFilesMatchedWithWarning()
     {
         // Arrange
         string emptyDir = Path.Join("empty");
@@ -150,7 +150,7 @@ public class DecryptCommandTests : CommandTestBase
         );
 
         // Assert
-        result.ShouldBe(0); // Success (no files to process)
+        result.ShouldBe(ExitCodes.NoFilesMatched);
         TestConsole.Output.ShouldContain("⚠ No files found matching the specified path or pattern");
     }
 
@@ -580,10 +580,92 @@ public class DecryptCommandTests : CommandTestBase
 
     #endregion
 
+    [Fact]
+    public async Task ExecuteAsync_WithQuiet_SuppressesInfoButKeepsWarnings()
+    {
+        // Arrange
+        string decryptedFilePath = Path.Join("logs", "decrypted.log");
+        DecryptCommand command = GetSut();
+        DecryptCommand.Settings settings = new()
+        {
+            InputPath = EncryptedFile,
+            KeyFile = _privateKeyPath,
+            OutputPath = decryptedFilePath,
+            Quiet = true,
+        };
+
+        // Act
+        int result = await command.ExecuteAsync(
+            new CommandContext(Arguments, Remaining, "decrypt", null),
+            settings,
+            CancellationToken.None
+        );
+
+        // Assert
+        result.ShouldBe(ExitCodes.Success);
+        FileSystem.File.Exists(decryptedFilePath).ShouldBeTrue();
+        TestConsole.Output.ShouldNotContain("Reading private key from:");
+        TestConsole.Output.ShouldNotContain("✓ Decrypted:");
+        TestConsole.Output.ShouldNotContain("Summary:");
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WithQuiet_StillShowsNoFilesWarning()
+    {
+        // Arrange
+        _inputResolver.ResolveFiles(Arg.Any<string>()).Returns(Enumerable.Empty<string>());
+        DecryptCommand command = GetSut();
+        DecryptCommand.Settings settings = new()
+        {
+            InputPath = "missing/*.log",
+            KeyFile = _privateKeyPath,
+            Quiet = true,
+        };
+
+        // Act
+        int result = await command.ExecuteAsync(
+            new CommandContext(Arguments, Remaining, "decrypt", null),
+            settings,
+            CancellationToken.None
+        );
+
+        // Assert
+        result.ShouldBe(ExitCodes.NoFilesMatched);
+        TestConsole.Output.ShouldContain("⚠ No files found matching the specified path or pattern");
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WithVerbose_ShowsDecryptionDetail()
+    {
+        // Arrange
+        TestConsole.Profile.Width = 260; // keep the long verbose line from wrapping
+        string decryptedFilePath = Path.Join("logs", "decrypted.log");
+        DecryptCommand command = GetSut();
+        DecryptCommand.Settings settings = new()
+        {
+            InputPath = EncryptedFile,
+            KeyFile = _privateKeyPath,
+            OutputPath = decryptedFilePath,
+            Verbose = true,
+        };
+
+        // Act
+        int result = await command.ExecuteAsync(
+            new CommandContext(Arguments, Remaining, "decrypt", null),
+            settings,
+            CancellationToken.None
+        );
+
+        // Assert
+        result.ShouldBe(ExitCodes.Success);
+        TestConsole.Output.ShouldContain("resync attempts:");
+        TestConsole.Output.ShouldContain("sessions: 1");
+    }
+
     private DecryptCommand GetSut(IFileSystem? fileSystem = null)
     {
         return new DecryptCommand(
-            TestConsole,
+            Writer,
             fileSystem ?? FileSystem,
             _inputResolver,
             _outputResolver

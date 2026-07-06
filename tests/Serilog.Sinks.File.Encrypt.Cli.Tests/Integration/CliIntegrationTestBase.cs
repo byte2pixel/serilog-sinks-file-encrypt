@@ -1,4 +1,3 @@
-using Serilog.Sinks.File.Encrypt.Cli.Infrastructure;
 using Spectre.Console.Cli.Testing;
 
 namespace Serilog.Sinks.File.Encrypt.Cli.Tests.Integration;

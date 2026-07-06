@@ -44,6 +44,8 @@ serilog-encrypt generate --output ./keys
 - `-o|--output <OUTPUT>` (required): The directory where the key files will be saved
 - `-k|--key-size <KEY_SIZE>` (optional): The size of the RSA key in bits (default: 2048)
 - `-f|--format <FORMAT>` (optional): The encoding format (Xml or Pem) for the RSA keys (default: Xml)
+- `-q|--quiet`: Suppress informational output (warnings and errors are still shown)
+- `-v|--verbose`: Show additional diagnostic detail
 
 This creates two files:
 - `private_key.xml`: The private key used for decryption (keep secure)
@@ -83,6 +85,21 @@ serilog-encrypt decrypt "logs/*.log" -k private_key.xml -o ./decrypted
 - `-s|--strict`: Fail immediately on first decryption error (default: continues processing all files)
 - `--require-sealed`: Treat sessions without a verified end-of-log seal (crashed, truncated, or v1-format) as errors. Combine with `--strict` to fail the file instead of only warning.
 - `--audit-log <PATH>`: Write detailed audit information to a rolling log file (max 10 MB, 7 retained files). If omitted, a randomly-named file is created in the temp directory.
+- `-q|--quiet`: Suppress informational output (warnings and errors are still shown)
+- `-v|--verbose`: Show additional diagnostic detail (per-file session/message/resync counts)
+
+**Exit codes (v6.0.0+):**
+
+Scripts can rely on the exit code to distinguish failure modes without parsing output:
+
+| Code | Meaning |
+|------|---------|
+| 0 | Success — all matched files were processed |
+| 1 | Runtime failure — at least one file failed (IO, cryptography, access denied) |
+| 2 | Usage error — invalid arguments, missing key file |
+| 3 | No input files matched the path or glob pattern |
+
+When several conditions apply across a multi-file run, the highest-priority code wins: 1 > 3.
 
 **Features:**
 - Memory-optimized for large log files

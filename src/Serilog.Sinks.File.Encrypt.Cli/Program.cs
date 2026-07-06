@@ -6,4 +6,4 @@ CommandApp app = new(registrar);
 
 app.Configure(CommandAppConfiguration.GetConfiguration());
 
-return await app.RunAsync(args);
+return ExitCodes.Normalize(await app.RunAsync(args));

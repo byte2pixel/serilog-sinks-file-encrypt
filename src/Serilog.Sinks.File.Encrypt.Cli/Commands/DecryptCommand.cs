@@ -4,6 +4,7 @@ using System.IO.Abstractions;
 using System.Security.Cryptography;
 using Serilog.Sinks.File.Decrypt;
 using Serilog.Sinks.File.Decrypt.Models;
+using Serilog.Sinks.File.Encrypt.Cli.Infrastructure;
 using Spectre.Console;
 using Spectre.Console.Cli;
 
@@ -12,13 +13,13 @@ namespace Serilog.Sinks.File.Encrypt.Cli.Commands;
 /// <summary>
 /// Command to decrypt an encrypted log file using an RSA private key
 /// </summary>
-/// <param name="console">The ANSI console</param>
+/// <param name="writer">The verbosity-aware console writer</param>
 /// <param name="fileSystem">The file system</param>
 /// <param name="inputResolver">The service that resolves file paths from input (supports files, directories, and glob patterns)</param>
 /// <param name="outputResolver">The service that resolves the output path where the decrypted file will be saved.</param>
 [SuppressMessage("ReSharper", "ClassNeverInstantiated.Global")]
 public sealed class DecryptCommand(
-    IAnsiConsole console,
+    IConsoleWriter writer,
     IFileSystem fileSystem,
     IInputResolver inputResolver,
     IOutputResolver outputResolver
@@ -27,7 +28,7 @@ public sealed class DecryptCommand(
     /// <summary>
     /// The settings for the DecryptCommand
     /// </summary>
-    public sealed class Settings : CommandSettings
+    public sealed class Settings : GlobalCommandSettings
     {
         /// <summary>
         /// The path to an encrypted log file or directory containing encrypted log files.
@@ -151,11 +152,10 @@ public sealed class DecryptCommand(
         CancellationToken cancellationToken
     )
     {
+        writer.Verbosity = settings.Verbosity;
         try
         {
-            console.MarkupLineInterpolated(
-                $"[blue]Reading private key from:[/] {settings.KeyFile}"
-            );
+            writer.Info($"[blue]Reading private key from:[/] {settings.KeyFile}");
             string rsaPrivateKey = await fileSystem.File.ReadAllTextAsync(
                 settings.KeyFile,
                 cancellationToken
@@ -165,15 +165,13 @@ public sealed class DecryptCommand(
 
             if (filesToDecrypt.Count == 0)
             {
-                console.MarkupLineInterpolated(
+                writer.Warning(
                     $"[yellow]⚠ No files found matching the specified path or pattern.[/]"
                 );
-                return 0;
+                return ExitCodes.NoFilesMatched;
             }
 
-            console.MarkupLineInterpolated(
-                $"[blue]Found {filesToDecrypt.Count} file(s) to decrypt[/]"
-            );
+            writer.Info($"[blue]Found {filesToDecrypt.Count} file(s) to decrypt[/]");
 
             // Configure streaming options based on user settings
             ErrorHandlingMode errorMode = settings.Strict
@@ -183,7 +181,7 @@ public sealed class DecryptCommand(
             string auditLog =
                 settings.AuditLogPath
                 ?? Path.Join(Path.GetTempPath(), Path.GetRandomFileName() + ".log");
-            console.MarkupLineInterpolated($"[dim]Audit log:[/] {auditLog}");
+            writer.Info($"[dim]Audit log:[/] {auditLog}");
             _logger = new LoggerConfiguration()
                 .MinimumLevel.Verbose()
                 .WriteTo.File(
@@ -205,7 +203,7 @@ public sealed class DecryptCommand(
                 RequireSealed = settings.RequireSealed,
             };
 
-            console.WriteLine();
+            writer.BlankLine();
 
             (int successCount, int failureCount) = await ProcessFilesAsync(
                 settings,
@@ -215,43 +213,41 @@ public sealed class DecryptCommand(
             );
 
             // Summary
-            console.WriteLine();
-            console.MarkupLine("[bold]Summary:[/]");
-            console.MarkupLineInterpolated($"  [green]✓ Success:[/] {successCount}");
+            writer.BlankLine();
+            writer.Info($"[bold]Summary:[/]");
+            writer.Info($"  [green]✓ Success:[/] {successCount}");
             if (failureCount > 0)
             {
-                console.MarkupLineInterpolated($"  [red]✗ Failed:[/] {failureCount}");
+                writer.Warning($"  [red]✗ Failed:[/] {failureCount}");
             }
 
             await Log.CloseAndFlushAsync();
-            return failureCount > 0 ? 1 : 0;
+            return failureCount > 0 ? ExitCodes.RuntimeFailure : ExitCodes.Success;
         }
         catch (IOException ex)
         {
-            console.MarkupLineInterpolated(
-                $"[red]✗ Error reading or writing files: {ex.Message}[/]"
-            );
-            return 1;
+            writer.Error($"[red]✗ Error reading or writing files: {ex.Message}[/]");
+            return ExitCodes.RuntimeFailure;
         }
         catch (UnauthorizedAccessException ex)
         {
-            console.MarkupLineInterpolated($"[red]✗ Access denied: {ex.Message}[/]");
-            return 1;
+            writer.Error($"[red]✗ Access denied: {ex.Message}[/]");
+            return ExitCodes.RuntimeFailure;
         }
         catch (CryptographicException ex)
         {
-            console.MarkupLineInterpolated($"[red]✗ Decryption failed: {ex.Message}[/]");
-            return 1;
+            writer.Error($"[red]✗ Decryption failed: {ex.Message}[/]");
+            return ExitCodes.RuntimeFailure;
         }
         catch (FormatException ex)
         {
-            console.MarkupLineInterpolated($"[red]✗ Invalid key or file format: {ex.Message}[/]");
-            return 1;
+            writer.Error($"[red]✗ Invalid key or file format: {ex.Message}[/]");
+            return ExitCodes.RuntimeFailure;
         }
         catch (InvalidOperationException ex)
         {
-            console.MarkupLineInterpolated($"[red]✗ Invalid file: {ex.Message}[/]");
-            return 1;
+            writer.Error($"[red]✗ Invalid file: {ex.Message}[/]");
+            return ExitCodes.RuntimeFailure;
         }
     }
 
@@ -282,12 +278,12 @@ public sealed class DecryptCommand(
 
             if (fileSystem.File.Exists(outputFile))
             {
-                console.MarkupLineInterpolated($"[dim]{outputFile} will be overwritten.[/]");
+                writer.Info($"[dim]{outputFile} will be overwritten.[/]");
             }
 
             try
             {
-                console.MarkupLineInterpolated($"[cyan]⧗ Decrypting:[/] {inputFile}");
+                writer.Info($"[cyan]⧗ Decrypting:[/] {inputFile}");
 
                 string? outputDir = fileSystem.Path.GetDirectoryName(outputFile);
                 if (!string.IsNullOrEmpty(outputDir) && !fileSystem.Directory.Exists(outputDir))
@@ -308,30 +304,32 @@ public sealed class DecryptCommand(
 
                 if (result.FailedHeaders > 0 || result.FailedMessages > 0)
                 {
-                    console.MarkupLineInterpolated(
+                    writer.Warning(
                         $"[yellow]⚠ Decryption completed with {result.FailedHeaders} failed headers and {result.FailedMessages} failed messages.\nCheck audit log.[/]"
                     );
                 }
                 else
                 {
-                    console.MarkupLineInterpolated($"[green]✓ Decrypted:[/] {inputFile}");
+                    writer.Info($"[green]✓ Decrypted:[/] {inputFile}");
                 }
+
+                writer.Verbose(
+                    $"  [dim]sessions: {result.DecryptedSessions}, messages: {result.DecryptedMessages}, failed headers: {result.FailedHeaders}, failed messages: {result.FailedMessages}, resync attempts: {result.ResyncAttempts}[/]"
+                );
 
                 ReportSealStatus(result);
 
-                console.MarkupLineInterpolated($"  [dim]→ {outputFile}[/]");
+                writer.Info($"  [dim]→ {outputFile}[/]");
                 successCount++;
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
             {
-                console.MarkupLineInterpolated($"[red]✗ Failed:[/] {inputFile} - {ex.Message}");
+                writer.Error($"[red]✗ Failed:[/] {inputFile} - {ex.Message}");
                 failureCount++;
             }
             catch (CryptographicException ex)
             {
-                console.MarkupLineInterpolated(
-                    $"[red]✗ Decryption failed:[/] {inputFile} - {ex.Message}"
-                );
+                writer.Error($"[red]✗ Decryption failed:[/] {inputFile} - {ex.Message}");
                 failureCount++;
             }
         }
@@ -358,7 +356,7 @@ public sealed class DecryptCommand(
                     );
                     break;
                 case SealStatus.NotApplicable:
-                    console.MarkupLineInterpolated(
+                    writer.Info(
                         $"  [dim]• Session {session.Index} (v1): legacy format, completeness cannot be verified[/]"
                     );
                     _logger?.Information(
@@ -367,7 +365,7 @@ public sealed class DecryptCommand(
                     );
                     break;
                 case SealStatus.Unsealed:
-                    console.MarkupLineInterpolated(
+                    writer.Warning(
                         $"  [yellow]⚠ Session {session.Index}: UNSEALED — the log was truncated or the application did not close cleanly[/]"
                     );
                     _logger?.Warning(
@@ -377,7 +375,7 @@ public sealed class DecryptCommand(
                     );
                     break;
                 case SealStatus.SealCountMismatch:
-                    console.MarkupLineInterpolated(
+                    writer.Error(
                         $"  [red]✗ Session {session.Index}: seal count mismatch — seal declares {session.DeclaredFrameCount} frame(s), {session.DecryptedMessages} decrypted (tail truncated)[/]"
                     );
                     _logger?.Error(
@@ -388,7 +386,7 @@ public sealed class DecryptCommand(
                     );
                     break;
                 case SealStatus.SealInvalid:
-                    console.MarkupLineInterpolated(
+                    writer.Error(
                         $"  [red]✗ Session {session.Index}: invalid seal — the end of the session was tampered with or corrupted[/]"
                     );
                     _logger?.Error(
@@ -406,7 +404,7 @@ public sealed class DecryptCommand(
             && result.Sessions.All(s => s.SealStatus == SealStatus.Sealed)
         )
         {
-            console.MarkupLineInterpolated(
+            writer.Info(
                 $"  [green]✓ All {result.Sessions.Count} session(s) sealed and complete[/]"
             );
         }

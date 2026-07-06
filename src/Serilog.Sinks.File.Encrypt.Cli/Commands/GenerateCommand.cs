@@ -1,8 +1,8 @@
 using System.ComponentModel;
 using System.Diagnostics.CodeAnalysis;
 using System.IO.Abstractions;
+using Serilog.Sinks.File.Encrypt.Cli.Infrastructure;
 using Serilog.Sinks.File.Encrypt.Models;
-using Spectre.Console;
 using Spectre.Console.Cli;
 
 namespace Serilog.Sinks.File.Encrypt.Cli.Commands;
@@ -10,16 +10,16 @@ namespace Serilog.Sinks.File.Encrypt.Cli.Commands;
 /// <summary>
 /// Generates a new RSA public/private key pair and saves them to the specified output path.
 /// </summary>
-/// <param name="console">The ANSI console.</param>
+/// <param name="writer">The verbosity-aware console writer.</param>
 /// <param name="fileSystem">The file system.</param>
 [SuppressMessage("ReSharper", "ClassNeverInstantiated.Global")]
-public sealed class GenerateCommand(IAnsiConsole console, IFileSystem fileSystem)
+public sealed class GenerateCommand(IConsoleWriter writer, IFileSystem fileSystem)
     : Command<GenerateCommand.Settings>
 {
     /// <summary>
     /// The settings for the GenerateCommand.
     /// </summary>
-    public sealed class Settings : CommandSettings
+    public sealed class Settings : GlobalCommandSettings
     {
         /// <summary>
         /// The output path to write the public/private key pair.
@@ -57,15 +57,14 @@ public sealed class GenerateCommand(IAnsiConsole console, IFileSystem fileSystem
         CancellationToken cancellationToken
     )
     {
+        writer.Verbosity = settings.Verbosity;
         try
         {
             // Ensure output directory exists
             if (!fileSystem.Directory.Exists(settings.OutputPath))
             {
                 fileSystem.Directory.CreateDirectory(settings.OutputPath);
-                console.MarkupLineInterpolated(
-                    $"[yellow]Created directory:[/] {settings.OutputPath}"
-                );
+                writer.Info($"[yellow]Created directory:[/] {settings.OutputPath}");
             }
 
             // Generate the RSA key pair
@@ -91,29 +90,29 @@ public sealed class GenerateCommand(IAnsiConsole console, IFileSystem fileSystem
             fileSystem.File.WriteAllText(publicKeyPath, keyPair.publicKey);
 
             // Output success message
-            console.MarkupLine("[green]✓ Successfully generated RSA key pair![/]");
-            console.WriteLine();
-            console.MarkupLineInterpolated($"[red]Private Key:[/] {privateKeyPath}");
-            console.MarkupLineInterpolated($"[yellow]Public Key:[/] {publicKeyPath}");
-            console.WriteLine();
-            console.MarkupLine("[yellow]⚠️  Keep your private key secure and never share it![/]");
+            writer.Info($"[green]✓ Successfully generated RSA key pair![/]");
+            writer.BlankLine();
+            writer.Info($"[red]Private Key:[/] {privateKeyPath}");
+            writer.Info($"[yellow]Public Key:[/] {publicKeyPath}");
+            writer.BlankLine();
+            writer.Warning($"[yellow]⚠️  Keep your private key secure and never share it![/]");
 
-            return 0;
+            return ExitCodes.Success;
         }
         catch (IOException ex)
         {
-            console.MarkupLineInterpolated($"[red]Error writing key files: {ex.Message}[/]");
-            return 1;
+            writer.Error($"[red]Error writing key files: {ex.Message}[/]");
+            return ExitCodes.RuntimeFailure;
         }
         catch (UnauthorizedAccessException ex)
         {
-            console.MarkupLineInterpolated($"[red]Access denied to output path: {ex.Message}[/]");
-            return 1;
+            writer.Error($"[red]Access denied to output path: {ex.Message}[/]");
+            return ExitCodes.RuntimeFailure;
         }
         catch (System.Security.Cryptography.CryptographicException ex)
         {
-            console.MarkupLineInterpolated($"[red]Error generating RSA key pair: {ex.Message}[/]");
-            return 1;
+            writer.Error($"[red]Error generating RSA key pair: {ex.Message}[/]");
+            return ExitCodes.RuntimeFailure;
         }
     }
 }

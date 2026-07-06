@@ -13,6 +13,17 @@ public abstract class CommandTestBase : IDisposable
     protected readonly MockFileSystem FileSystem = new();
     protected readonly IFileSystem FileSystemSub = Substitute.For<IFileSystem>();
 
+    /// <summary>
+    /// A real ConsoleWriter wrapping <see cref="TestConsole"/>, so command output
+    /// assertions keep working against <c>TestConsole.Output</c>.
+    /// </summary>
+    protected ConsoleWriter Writer { get; }
+
+    protected CommandTestBase()
+    {
+        Writer = new ConsoleWriter(TestConsole);
+    }
+
     public void Dispose()
     {
         Dispose(true);
