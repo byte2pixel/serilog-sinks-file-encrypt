@@ -16,11 +16,13 @@ namespace Serilog.Sinks.File.Encrypt.Cli.Commands;
 /// <param name="writer">The verbosity-aware console writer.</param>
 /// <param name="fileSystem">The file system.</param>
 /// <param name="passphraseResolver">Resolves the private-key passphrase from file, environment, or prompt.</param>
+/// <param name="keyFileWriter">Writes key files, restricting the private key to the current user.</param>
 [SuppressMessage("ReSharper", "ClassNeverInstantiated.Global")]
 public sealed class GenerateCommand(
     IConsoleWriter writer,
     IFileSystem fileSystem,
-    IPassphraseResolver passphraseResolver
+    IPassphraseResolver passphraseResolver,
+    IKeyFileWriter keyFileWriter
 ) : Command<GenerateCommand.Settings>
 {
     /// <summary>
@@ -191,9 +193,9 @@ public sealed class GenerateCommand(
                     passphrase
                 );
 
-            // Write keys to files
-            fileSystem.File.WriteAllText(privateKeyPath, keyPair.privateKey);
-            fileSystem.File.WriteAllText(publicKeyPath, keyPair.publicKey);
+            // Write keys to files; the private key is restricted to the current user
+            keyFileWriter.WritePrivateKey(privateKeyPath, keyPair.privateKey);
+            keyFileWriter.WritePublicKey(publicKeyPath, keyPair.publicKey);
 
             // Output success message
             writer.Info($"[green]✓ Successfully generated RSA key pair![/]");
