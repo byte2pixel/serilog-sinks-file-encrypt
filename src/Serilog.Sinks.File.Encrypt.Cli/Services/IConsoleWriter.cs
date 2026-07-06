@@ -58,4 +58,24 @@ public interface IConsoleWriter
     /// Writes a blank spacer line. Dropped when <see cref="Verbosity"/> is Quiet.
     /// </summary>
     void BlankLine();
+
+    /// <summary>
+    /// Writes a renderable (e.g. a table) at informational level. Dropped when
+    /// <see cref="Verbosity"/> is Quiet.
+    /// </summary>
+    /// <param name="renderable">The renderable to write.</param>
+    void Info(Spectre.Console.Rendering.IRenderable renderable);
+
+    /// <summary>
+    /// Routes all subsequent human output (Info/Verbose/Warning/Error/BlankLine) to the
+    /// error channel, keeping standard output clean for machine-readable data (--json).
+    /// </summary>
+    void UseErrorChannel();
+
+    /// <summary>
+    /// Writes raw text to standard output — no markup interpretation, no line wrapping,
+    /// unaffected by verbosity or <see cref="UseErrorChannel"/>. Used for --json payloads.
+    /// </summary>
+    /// <param name="text">The exact text to write.</param>
+    void Raw(string text);
 }

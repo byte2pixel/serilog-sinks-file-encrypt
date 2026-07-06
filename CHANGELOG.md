@@ -58,8 +58,21 @@ new EncryptionOptions(rsa, KeyId: "my-key");
 The `serilog-encrypt` CLI now returns distinct exit codes so scripts can react without parsing
 output: `0` success, `1` runtime failure, `2` usage error (parse/validation failures previously
 surfaced as `-1`), `3` no input files matched (previously `0`), `4` nothing decrypted (previously
-`0` — see below). When several apply across a multi-file run, the highest-priority code wins
-(`1` > `2` > `4` > `3`).
+`0` — see below), `5` `--require-sealed` not met. When several apply across a multi-file run, the
+highest-priority code wins (`1` > `2` > `4` > `5` > `3`).
+
+#### CLI `decrypt`: rich report, `--json`, and `--require-sealed` exit code ([#100](https://github.com/byte2pixel/serilog-sinks-file-encrypt/issues/100))
+
+- Human output now includes a per-file **session table** (Session | Version | KeyId |
+  Messages | Failed | Seal) and a run **summary table** (files, succeeded/failed/refused/
+  nothing-decrypted, total messages, resync attempts).
+- New **`--json`**: a machine-readable report on stdout (`schemaVersion: 1` with per-file
+  outcomes, per-session seal detail, summary, and the process exit code); all human text is
+  redirected to stderr so stdout stays parseable.
+- **Breaking:** `--require-sealed` now has teeth without `--strict` — when any session is not
+  cryptographically verified as sealed (v1 sessions count as unverified, matching the
+  library's `RequireSealed` semantics), the run exits `5` after reporting normally.
+  Exit-code precedence: `1` > `2` > `4` > `5` > `3`.
 
 #### CLI `decrypt`: encrypted private keys supported; `--key` default is now `private_key.pem` ([#98](https://github.com/byte2pixel/serilog-sinks-file-encrypt/issues/98))
 

@@ -29,6 +29,7 @@ public static class ServiceCollectionExtensions
         services.TryAddSingleton<IConsoleWriter, ConsoleWriter>();
         services.TryAddSingleton<IPassphraseResolver, PassphraseResolver>();
         services.TryAddSingleton<IKeyFileWriter, KeyFileWriter>();
+        services.TryAddSingleton<IDecryptReporter, DecryptReporter>();
         return services;
     }
 }
