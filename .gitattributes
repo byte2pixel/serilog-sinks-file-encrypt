@@ -1,3 +1,7 @@
+# Normalize all text files to LF in the repository regardless of each
+# contributor's core.autocrlf setting; working trees stay OS-native.
+* text=auto
+
 # Binary test fixtures pin exact on-disk bytes (including LF line endings inside
 # .expected.txt); they must never be line-ending normalized.
 tests/**/Fixtures/** -text
