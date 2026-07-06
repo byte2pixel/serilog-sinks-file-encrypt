@@ -64,6 +64,10 @@ command-line option — secrets on the command line leak via shell history and p
 listings. In a non-interactive session with no passphrase source, generation fails (exit 2)
 unless `--plaintext` is passed. **There is no recovery if the passphrase is lost.**
 
+**File permissions (v6.0.0+):** the private key file is restricted to the current user —
+mode 600 on Unix (applied at creation, no permissive window) and an owner-only ACL on
+Windows. If the restriction fails, a warning is printed and generation still succeeds.
+
 ### Decrypt Log Files
 
 Decrypt encrypted log files using your RSA private key:

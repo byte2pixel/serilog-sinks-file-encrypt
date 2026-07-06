@@ -17,6 +17,7 @@ namespace Serilog.Sinks.File.Encrypt.Cli.Commands;
 /// <param name="fileSystem">The file system</param>
 /// <param name="inputResolver">The service that resolves file paths from input (supports files, directories, and glob patterns)</param>
 /// <param name="outputResolver">The service that resolves the output path where the decrypted file will be saved.</param>
+/// <param name="passphraseResolver">Resolves the private-key passphrase when the key file is encrypted.</param>
 [SuppressMessage("ReSharper", "ClassNeverInstantiated.Global")]
 public sealed class DecryptCommand(
     IConsoleWriter writer,

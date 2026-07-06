@@ -48,7 +48,7 @@ public class ServiceCollectionExtensionsTests
         services.AddCliServices();
 
         // Assert - Verify no services are accidentally added or removed
-        services.Count.ShouldBe(6);
+        services.Count.ShouldBe(7);
 
         // Verify IFileSystem is registered
         services
@@ -81,6 +81,11 @@ public class ServiceCollectionExtensionsTests
             .FirstOrDefault(s => s.ServiceType == typeof(IPassphraseResolver))
             .ShouldNotBeNull()
             .And(x => x.Lifetime.ShouldBe(ServiceLifetime.Singleton));
+
+        services
+            .FirstOrDefault(s => s.ServiceType == typeof(IKeyFileWriter))
+            .ShouldNotBeNull()
+            .And(x => x.Lifetime.ShouldBe(ServiceLifetime.Singleton));
     }
 
     [Fact]
@@ -94,7 +99,7 @@ public class ServiceCollectionExtensionsTests
         services.AddCliServices();
 
         // Assert
-        services.Count.ShouldBe(6); // Should still only have 6 services, no duplicates
+        services.Count.ShouldBe(7); // Should still only have 7 services, no duplicates
     }
 
     [Fact]

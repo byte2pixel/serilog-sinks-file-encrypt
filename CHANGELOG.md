@@ -111,6 +111,11 @@ new `DecryptionResult.NothingDecrypted` property (additive, non-breaking).
 
 ### New Features
 
+- **CLI `generate` restricts private key file permissions** ([#99](https://github.com/byte2pixel/serilog-sinks-file-encrypt/issues/99)) —
+  the private key file is now owner-only: mode 600 on Unix (applied at creation time, so
+  there is no permissive window) and an owner-only DACL on Windows. The public key keeps
+  default permissions. If restriction fails, a warning is shown and generation still
+  succeeds.
 - **CLI `--quiet` / `--verbose`** — both commands accept `-q|--quiet` (suppress informational
   output; warnings and errors still shown) and `-v|--verbose` (adds per-file
   session/message/resync diagnostic detail).
