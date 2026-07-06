@@ -59,7 +59,19 @@ The `serilog-encrypt` CLI now returns distinct exit codes so scripts can react w
 output: `0` success, `1` runtime failure, `2` usage error (parse/validation failures previously
 surfaced as `-1`), `3` no input files matched (previously `0`), `4` nothing decrypted (previously
 `0` — see below). When several apply across a multi-file run, the highest-priority code wins
-(`1` > `4` > `3`).
+(`1` > `2` > `4` > `3`).
+
+#### CLI: overwriting output requires `--force`; output paths are containment-checked ([#85](https://github.com/byte2pixel/serilog-sinks-file-encrypt/issues/85))
+
+- `decrypt` no longer silently overwrites existing output files: without the new `-f|--force`
+  flag, a file whose output already exists is refused (the rest of the batch still processes)
+  and the run exits `2`.
+- `generate` refuses to overwrite existing `private_key.*`/`public_key.*` without the new
+  `--force` flag — silently clobbering a private key permanently loses access to all logs
+  encrypted with it.
+- Output paths computed from input file names are canonicalized and verified to stay inside
+  the requested output directory (defense-in-depth for automation-driven invocations); an
+  explicit absolute file path for a single-file `-o` remains allowed.
 
 #### CLI: zero-output decryption is no longer silent success ([#84](https://github.com/byte2pixel/serilog-sinks-file-encrypt/issues/84))
 

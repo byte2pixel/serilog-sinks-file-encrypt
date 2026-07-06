@@ -45,6 +45,55 @@ public class GenerateCommandTests : CommandTestBase
     }
 
     [Fact]
+    public void Execute_ExistingKeyFilesWithoutForce_RefusesAndExitsUsageError()
+    {
+        // Arrange — a private key already exists at the target path
+        string outputPath = Path.Join("test-keys");
+        string privateKeyPath = Path.Join(outputPath, "private_key.xml");
+        const string ExistingKey = "irreplaceable key material";
+        FileSystem.AddFile(privateKeyPath, new MockFileData(ExistingKey));
+        GenerateCommand command = new(Writer, FileSystem);
+        GenerateCommand.Settings settings = new() { OutputPath = outputPath };
+
+        // Act
+        int result = command.Execute(
+            new CommandContext(Arguments, Remaining, "generate", null),
+            settings,
+            CancellationToken.None
+        );
+
+        // Assert — refused, existing key untouched
+        result.ShouldBe(ExitCodes.UsageError);
+        FileSystem.File.ReadAllText(privateKeyPath).ShouldBe(ExistingKey);
+        TestConsole.Output.ShouldContain("key file(s) already exist");
+        TestConsole.Output.ShouldContain("--force");
+        TestConsole.Output.ShouldNotContain("Successfully generated RSA key pair!");
+    }
+
+    [Fact]
+    public void Execute_ExistingKeyFilesWithForce_Overwrites()
+    {
+        // Arrange
+        string outputPath = Path.Join("test-keys");
+        string privateKeyPath = Path.Join(outputPath, "private_key.xml");
+        FileSystem.AddFile(privateKeyPath, new MockFileData("old key"));
+        GenerateCommand command = new(Writer, FileSystem);
+        GenerateCommand.Settings settings = new() { OutputPath = outputPath, Force = true };
+
+        // Act
+        int result = command.Execute(
+            new CommandContext(Arguments, Remaining, "generate", null),
+            settings,
+            CancellationToken.None
+        );
+
+        // Assert
+        result.ShouldBe(0);
+        FileSystem.File.ReadAllText(privateKeyPath).ShouldContain("<RSAKeyValue>");
+        TestConsole.Output.ShouldContain("Successfully generated RSA key pair!");
+    }
+
+    [Fact]
     public void Execute_WithXmlFormat_GeneratesKeyPairSuccessfully()
     {
         // Arrange

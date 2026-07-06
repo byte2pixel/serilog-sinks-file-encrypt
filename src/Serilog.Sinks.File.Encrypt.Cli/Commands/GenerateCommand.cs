@@ -42,6 +42,16 @@ public sealed class GenerateCommand(IConsoleWriter writer, IFileSystem fileSyste
         [CommandOption("-f|--format <FORMAT>")]
         [Description("The encoding format (Xml or Pem) for the RSA keys (default: Xml)")]
         public KeyFormat Format { get; init; } = KeyFormat.Xml;
+
+        /// <summary>
+        /// Overwrite existing key files. Without this flag, generation is refused when a
+        /// key file already exists — overwriting a private key permanently loses access to
+        /// all logs encrypted with it.
+        /// </summary>
+        [CommandOption("--force")]
+        [Description("Overwrite existing key files (default: refuse if key files exist)")]
+        [DefaultValue(false)]
+        public bool Force { get; init; }
     }
 
     /// <summary>
@@ -67,12 +77,6 @@ public sealed class GenerateCommand(IConsoleWriter writer, IFileSystem fileSyste
                 writer.Info($"[yellow]Created directory:[/] {settings.OutputPath}");
             }
 
-            // Generate the RSA key pair
-            (string publicKey, string privateKey) keyPair = CryptographicUtils.GenerateRsaKeyPair(
-                settings.KeySize,
-                settings.Format
-            );
-
             string fileExt = settings.Format.ToString().ToLower();
 
             // Define file paths
@@ -83,6 +87,29 @@ public sealed class GenerateCommand(IConsoleWriter writer, IFileSystem fileSyste
             string publicKeyPath = fileSystem.Path.Join(
                 settings.OutputPath,
                 $"public_key.{fileExt}"
+            );
+
+            if (!settings.Force)
+            {
+                string[] existing = new[] { privateKeyPath, publicKeyPath }
+                    .Where(fileSystem.File.Exists)
+                    .ToArray();
+                if (existing.Length > 0)
+                {
+                    writer.Error(
+                        $"[red]✗ Refused: key file(s) already exist: {string.Join(", ", existing)}[/]"
+                    );
+                    writer.Warning(
+                        $"[yellow]Use --force to overwrite. Overwriting a private key permanently loses access to all logs encrypted with it.[/]"
+                    );
+                    return ExitCodes.UsageError;
+                }
+            }
+
+            // Generate the RSA key pair
+            (string publicKey, string privateKey) keyPair = CryptographicUtils.GenerateRsaKeyPair(
+                settings.KeySize,
+                settings.Format
             );
 
             // Write keys to files

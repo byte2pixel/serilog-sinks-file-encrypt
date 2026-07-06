@@ -66,6 +66,15 @@ public sealed class DecryptCommand(
         public string? OutputPath { get; init; }
 
         /// <summary>
+        /// Overwrite existing output files. Without this flag, a file whose output already
+        /// exists is refused (and the run exits with the usage-error code).
+        /// </summary>
+        [CommandOption("-f|--force")]
+        [Description("Overwrite existing output files (default: refuse existing outputs)")]
+        [DefaultValue(false)]
+        public bool Force { get; init; }
+
+        /// <summary>
         /// Fail immediately on first decryption error instead of continuing with remaining files.
         /// </summary>
         [CommandOption("-s|--strict")]
@@ -205,12 +214,13 @@ public sealed class DecryptCommand(
 
             writer.BlankLine();
 
-            (int successCount, int failureCount, int zeroOutputCount) = await ProcessFilesAsync(
-                settings,
-                filesToDecrypt,
-                decryptionOptions,
-                cancellationToken
-            );
+            (int successCount, int failureCount, int zeroOutputCount, int refusedCount) =
+                await ProcessFilesAsync(
+                    settings,
+                    filesToDecrypt,
+                    decryptionOptions,
+                    cancellationToken
+                );
 
             // Summary
             writer.BlankLine();
@@ -219,6 +229,10 @@ public sealed class DecryptCommand(
             if (failureCount > 0)
             {
                 writer.Warning($"  [red]✗ Failed:[/] {failureCount}");
+            }
+            if (refusedCount > 0)
+            {
+                writer.Warning($"  [yellow]⚠ Refused:[/] {refusedCount}");
             }
             if (zeroOutputCount > 0)
             {
@@ -229,6 +243,10 @@ public sealed class DecryptCommand(
             if (failureCount > 0)
             {
                 return ExitCodes.RuntimeFailure;
+            }
+            if (refusedCount > 0)
+            {
+                return ExitCodes.UsageError;
             }
             return zeroOutputCount > 0 ? ExitCodes.NothingDecrypted : ExitCodes.Success;
         }
@@ -267,7 +285,12 @@ public sealed class DecryptCommand(
     /// <param name="decryptionOptions">The decryption options.</param>
     /// <param name="cancellationToken">The cancellation token.</param>
     /// <returns></returns>
-    private async Task<(int successCount, int failureCount, int zeroOutputCount)> ProcessFilesAsync(
+    private async Task<(
+        int successCount,
+        int failureCount,
+        int zeroOutputCount,
+        int refusedCount
+    )> ProcessFilesAsync(
         Settings settings,
         IReadOnlyList<string> filesToDecrypt,
         DecryptionOptions decryptionOptions,
@@ -277,16 +300,42 @@ public sealed class DecryptCommand(
         int successCount = 0;
         int failureCount = 0;
         int zeroOutputCount = 0;
+        int refusedCount = 0;
         foreach (string inputFile in filesToDecrypt)
         {
-            string outputFile = outputResolver.ResolveOutputPath(
-                inputFile,
-                settings.InputPath,
-                settings.OutputPath
-            );
+            string outputFile;
+            try
+            {
+                outputFile = outputResolver.ResolveOutputPath(
+                    inputFile,
+                    settings.InputPath,
+                    settings.OutputPath
+                );
+            }
+            catch (InvalidOperationException ex)
+            {
+                // Path containment violation — refuse this file, keep processing the rest
+                writer.Error($"[red]✗ Refused:[/] {inputFile} - {ex.Message}");
+                _logger?.Error("Refused {InputFile}: {Reason}", inputFile, ex.Message);
+                refusedCount++;
+                continue;
+            }
 
             if (fileSystem.File.Exists(outputFile))
             {
+                if (!settings.Force)
+                {
+                    writer.Warning(
+                        $"[yellow]⚠ Refused:[/] {outputFile} already exists (use --force to overwrite)"
+                    );
+                    _logger?.Warning(
+                        "Refused to overwrite existing output {OutputFile} without --force.",
+                        outputFile
+                    );
+                    refusedCount++;
+                    continue;
+                }
+
                 writer.Info($"[dim]{outputFile} will be overwritten.[/]");
             }
 
@@ -363,7 +412,7 @@ public sealed class DecryptCommand(
             }
         }
 
-        return (successCount, failureCount, zeroOutputCount);
+        return (successCount, failureCount, zeroOutputCount, refusedCount);
     }
 
     /// <summary>

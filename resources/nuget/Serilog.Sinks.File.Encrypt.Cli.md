@@ -44,6 +44,7 @@ serilog-encrypt generate --output ./keys
 - `-o|--output <OUTPUT>` (required): The directory where the key files will be saved
 - `-k|--key-size <KEY_SIZE>` (optional): The size of the RSA key in bits (default: 2048)
 - `-f|--format <FORMAT>` (optional): The encoding format (Xml or Pem) for the RSA keys (default: Xml)
+- `--force`: Overwrite existing key files. Without it, generation is refused when a key file already exists — overwriting a private key permanently loses access to all logs encrypted with it.
 - `-q|--quiet`: Suppress informational output (warnings and errors are still shown)
 - `-v|--verbose`: Show additional diagnostic detail
 
@@ -82,6 +83,7 @@ serilog-encrypt decrypt "logs/*.log" -k private_key.xml -o ./decrypted
 - `-k|--key <KEY>`: Path to the RSA private key file (default: `private_key.xml`)
 - `--id <KEY_ID>`: The key ID that was supplied to `EncryptHooks` during encryption (default: `""` — matches files encrypted without a key ID)
 - `-o|--output <OUTPUT>`: Output directory or file path (default: adds `.decrypted` to original filename)
+- `-f|--force`: Overwrite existing output files. Without it, a file whose output already exists is refused (skipped) and the run exits with code 2.
 - `-s|--strict`: Fail immediately on first decryption error (default: continues processing all files)
 - `--require-sealed`: Treat sessions without a verified end-of-log seal (crashed, truncated, or v1-format) as errors. Combine with `--strict` to fail the file instead of only warning.
 - `--audit-log <PATH>`: Write detailed audit information to a rolling log file (max 10 MB, 7 retained files). If omitted, a randomly-named file is created in the temp directory.
@@ -96,11 +98,11 @@ Scripts can rely on the exit code to distinguish failure modes without parsing o
 |------|---------|
 | 0 | Success — all matched files were processed |
 | 1 | Runtime failure — at least one file failed (IO, cryptography, access denied) |
-| 2 | Usage error — invalid arguments, missing key file |
+| 2 | Usage error — invalid arguments, missing key file, or an existing output file refused without `--force` |
 | 3 | No input files matched the path or glob pattern |
 | 4 | Nothing decrypted — a file produced no sessions and no messages (wrong key, wrong `--id`, or not an encrypted log); the empty output file is removed |
 
-When several conditions apply across a multi-file run, the highest-priority code wins: 1 > 4 > 3.
+When several conditions apply across a multi-file run, the highest-priority code wins: 1 > 2 > 4 > 3.
 
 **Features:**
 - Memory-optimized for large log files
@@ -213,9 +215,10 @@ The tool automatically skips files with `.decrypted.` in the filename to prevent
 serilog-encrypt decrypt "logs/*.log" -k key.xml --id my-app-key-2026
 
 # Later, after new logs are added
-# Second run: only processes app.log and overwrites app.decrypted.log
-# skips trying to decrypt app.decrypted.log
-serilog-encrypt decrypt "logs/*.log" -k key.xml --id my-app-key-2026
+# Second run: only processes app.log; skips trying to decrypt app.decrypted.log.
+# --force is required to overwrite the existing app.decrypted.log (without it the
+# file is refused and the run exits with code 2)
+serilog-encrypt decrypt "logs/*.log" -k key.xml --id my-app-key-2026 --force
 ```
 
 ## Integration with Serilog

@@ -155,7 +155,7 @@ public class DecryptCommandTests : CommandTestBase
     }
 
     [Fact]
-    public async Task ExecuteAsync_OverwritesExistingFiles()
+    public async Task ExecuteAsync_WithForce_OverwritesExistingFiles()
     {
         // Arrange
         const string OldContent = "Old content";
@@ -169,6 +169,7 @@ public class DecryptCommandTests : CommandTestBase
         {
             InputPath = EncryptedFile,
             KeyFile = _privateKeyPath,
+            Force = true,
         };
 
         // Act
@@ -187,6 +188,69 @@ public class DecryptCommandTests : CommandTestBase
         content.ShouldBe(LogContent1); // Should be new content, not old
         TestConsole.Output.ShouldContain("will be overwritten");
         TestConsole.Output.ShouldContain("✓ Decrypted:");
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WithoutForce_RefusesExistingOutputAndExitsUsageError()
+    {
+        // Arrange
+        const string OldContent = "Old content";
+        string decryptedFile = Path.Join("logs", "app1.decrypted.log");
+        FileSystem.AddFile(decryptedFile, new MockFileData(OldContent));
+
+        DecryptCommand command = GetSut();
+        DecryptCommand.Settings settings = new()
+        {
+            InputPath = EncryptedFile,
+            KeyFile = _privateKeyPath,
+        };
+
+        // Act
+        int result = await command.ExecuteAsync(
+            new CommandContext(Arguments, Remaining, "decrypt", null),
+            settings,
+            CancellationToken.None
+        );
+
+        // Assert — refused, original content untouched
+        result.ShouldBe(ExitCodes.UsageError);
+        string content = await FileSystem.File.ReadAllTextAsync(
+            decryptedFile,
+            TestContext.Current.CancellationToken
+        );
+        content.ShouldBe(OldContent);
+        TestConsole.Output.ShouldContain("already exists (use --force to overwrite)");
+        TestConsole.Output.ShouldNotContain("✓ Decrypted:");
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_RefusedAndSuccessMixed_ContinuesAndExitsUsageError()
+    {
+        // Arrange — two inputs: one with an existing output (refused), one fresh (succeeds)
+        AddMockEncryptedFile(Path.Join("logs", "app2.log"), LogContent1);
+        string existingOutput = Path.Join("logs", "app1.decrypted.log");
+        FileSystem.AddFile(existingOutput, new MockFileData("Old content"));
+        ConfigureFileResolver(EncryptedFile, Path.Join("logs", "app2.log"));
+
+        DecryptCommand command = GetSut();
+        DecryptCommand.Settings settings = new()
+        {
+            InputPath = Path.Join("logs", "*.log"),
+            KeyFile = _privateKeyPath,
+        };
+
+        // Act
+        int result = await command.ExecuteAsync(
+            new CommandContext(Arguments, Remaining, "decrypt", null),
+            settings,
+            CancellationToken.None
+        );
+
+        // Assert — the fresh file decrypted, the refused one left intact, exit 2 overall
+        result.ShouldBe(ExitCodes.UsageError);
+        TestConsole.Output.ShouldContain("already exists (use --force to overwrite)");
+        TestConsole.Output.ShouldContain("✓ Decrypted:");
+        FileSystem.File.ReadAllText(Path.Join("logs", "app2.decrypted.log")).ShouldBe(LogContent1);
     }
 
     [Fact]
