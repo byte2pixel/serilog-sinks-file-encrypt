@@ -581,6 +581,87 @@ public class DecryptCommandTests : CommandTestBase
     #endregion
 
     [Fact]
+    public async Task ExecuteAsync_WithWrongKey_ReturnsNothingDecryptedAndRemovesEmptyOutput()
+    {
+        // Arrange — file encrypted with a different key pair than the one we decrypt with
+        (string otherPublicKey, _) = CryptographicUtils.GenerateRsaKeyPair(format: KeyFormat.Pem);
+        string decryptedFilePath = Path.Join("logs", "decrypted.log");
+        FileSystem.AddFile(
+            "foreign.log",
+            new MockFileData(CreateEncryptedLogFile(LogContent1, otherPublicKey))
+        );
+        ConfigureFileResolver("foreign.log");
+        DecryptCommand command = GetSut();
+        DecryptCommand.Settings settings = new()
+        {
+            InputPath = "foreign.log",
+            KeyFile = _privateKeyPath,
+            OutputPath = decryptedFilePath,
+        };
+
+        // Act
+        int result = await command.ExecuteAsync(
+            new CommandContext(Arguments, Remaining, "decrypt", null),
+            settings,
+            CancellationToken.None
+        );
+
+        // Assert
+        result.ShouldBe(ExitCodes.NothingDecrypted);
+        TestConsole.Output.ShouldContain("⚠ Nothing decrypted:");
+        TestConsole.Output.ShouldNotContain("✓ Decrypted:");
+        FileSystem.File.Exists(decryptedFilePath).ShouldBeFalse(); // empty output removed
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WithEmptyInputFile_ReturnsNothingDecrypted()
+    {
+        // Arrange — a zero-byte input file yields no sessions and no messages
+        FileSystem.AddFile("empty.log", new MockFileData(Array.Empty<byte>()));
+        ConfigureFileResolver("empty.log");
+        DecryptCommand command = GetSut();
+        DecryptCommand.Settings settings = new()
+        {
+            InputPath = "empty.log",
+            KeyFile = _privateKeyPath,
+            OutputPath = Path.Join("logs", "empty-decrypted.log"),
+        };
+
+        // Act
+        int result = await command.ExecuteAsync(
+            new CommandContext(Arguments, Remaining, "decrypt", null),
+            settings,
+            CancellationToken.None
+        );
+
+        // Assert
+        result.ShouldBe(ExitCodes.NothingDecrypted);
+        TestConsole.Output.ShouldContain("⚠ Nothing decrypted:");
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_MixedZeroOutputAndSuccess_StillReturnsNothingDecrypted()
+    {
+        // Arrange — one good file, one empty file; runtime failure absent so 4 wins over 0
+        FileSystem.AddFile("empty.log", new MockFileData(Array.Empty<byte>()));
+        ConfigureFileResolver(EncryptedFile, "empty.log");
+        DecryptCommand command = GetSut();
+        DecryptCommand.Settings settings = new() { InputPath = "*.log", KeyFile = _privateKeyPath };
+
+        // Act
+        int result = await command.ExecuteAsync(
+            new CommandContext(Arguments, Remaining, "decrypt", null),
+            settings,
+            CancellationToken.None
+        );
+
+        // Assert
+        result.ShouldBe(ExitCodes.NothingDecrypted);
+        TestConsole.Output.ShouldContain("✓ Decrypted:");
+        TestConsole.Output.ShouldContain("⚠ Nothing decrypted:");
+    }
+
+    [Fact]
     public async Task ExecuteAsync_WithQuiet_SuppressesInfoButKeepsWarnings()
     {
         // Arrange

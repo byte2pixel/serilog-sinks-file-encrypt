@@ -74,4 +74,19 @@ public sealed class DecryptionResult
     /// </summary>
     public bool AllSessionsSealed =>
         Sessions.All(s => s.SealStatus is SealStatus.Sealed or SealStatus.NotApplicable);
+
+    /// <summary>
+    /// <para>
+    /// True when the operation produced no output at all: zero decrypted sessions and zero
+    /// decrypted messages. In <see cref="ErrorHandlingMode.Skip"/> mode this is the signal
+    /// that nothing in the input could be read — the output stream is empty.
+    /// </para>
+    /// <para>
+    /// Combined with <see cref="FailedHeaders"/> &gt; 0 this strongly indicates a wrong
+    /// decryption key, a wrong key id, or a file that is not an encrypted log; with zero
+    /// recorded failures it typically means the input contained no recognizable session at
+    /// all (e.g. an empty or foreign file).
+    /// </para>
+    /// </summary>
+    public bool NothingDecrypted => DecryptedSessions == 0 && DecryptedMessages == 0;
 }

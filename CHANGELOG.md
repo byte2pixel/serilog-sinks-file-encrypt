@@ -57,8 +57,17 @@ new EncryptionOptions(rsa, KeyId: "my-key");
 
 The `serilog-encrypt` CLI now returns distinct exit codes so scripts can react without parsing
 output: `0` success, `1` runtime failure, `2` usage error (parse/validation failures previously
-surfaced as `-1`), `3` no input files matched (previously `0`). When several apply across a
-multi-file run, the highest-priority code wins (`1` > `3`).
+surfaced as `-1`), `3` no input files matched (previously `0`), `4` nothing decrypted (previously
+`0` — see below). When several apply across a multi-file run, the highest-priority code wins
+(`1` > `4` > `3`).
+
+#### CLI: zero-output decryption is no longer silent success ([#84](https://github.com/byte2pixel/serilog-sinks-file-encrypt/issues/84))
+
+In the default (non-strict) mode, a file that decrypts to zero sessions and zero messages —
+typically a wrong key, a wrong `--id`, or a file that is not an encrypted log — previously
+produced an empty `.decrypted` output, a green success message, and exit code `0`. The CLI now
+warns, removes the empty output file, and exits `4`. Library callers get the same signal via the
+new `DecryptionResult.NothingDecrypted` property (additive, non-breaking).
 
 ### New Features
 

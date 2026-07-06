@@ -98,8 +98,9 @@ Scripts can rely on the exit code to distinguish failure modes without parsing o
 | 1 | Runtime failure — at least one file failed (IO, cryptography, access denied) |
 | 2 | Usage error — invalid arguments, missing key file |
 | 3 | No input files matched the path or glob pattern |
+| 4 | Nothing decrypted — a file produced no sessions and no messages (wrong key, wrong `--id`, or not an encrypted log); the empty output file is removed |
 
-When several conditions apply across a multi-file run, the highest-priority code wins: 1 > 3.
+When several conditions apply across a multi-file run, the highest-priority code wins: 1 > 4 > 3.
 
 **Features:**
 - Memory-optimized for large log files

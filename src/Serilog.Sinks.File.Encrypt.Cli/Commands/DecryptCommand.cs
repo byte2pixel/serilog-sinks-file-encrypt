@@ -205,7 +205,7 @@ public sealed class DecryptCommand(
 
             writer.BlankLine();
 
-            (int successCount, int failureCount) = await ProcessFilesAsync(
+            (int successCount, int failureCount, int zeroOutputCount) = await ProcessFilesAsync(
                 settings,
                 filesToDecrypt,
                 decryptionOptions,
@@ -220,9 +220,17 @@ public sealed class DecryptCommand(
             {
                 writer.Warning($"  [red]✗ Failed:[/] {failureCount}");
             }
+            if (zeroOutputCount > 0)
+            {
+                writer.Warning($"  [yellow]⚠ Nothing decrypted:[/] {zeroOutputCount}");
+            }
 
             await Log.CloseAndFlushAsync();
-            return failureCount > 0 ? ExitCodes.RuntimeFailure : ExitCodes.Success;
+            if (failureCount > 0)
+            {
+                return ExitCodes.RuntimeFailure;
+            }
+            return zeroOutputCount > 0 ? ExitCodes.NothingDecrypted : ExitCodes.Success;
         }
         catch (IOException ex)
         {
@@ -259,7 +267,7 @@ public sealed class DecryptCommand(
     /// <param name="decryptionOptions">The decryption options.</param>
     /// <param name="cancellationToken">The cancellation token.</param>
     /// <returns></returns>
-    private async Task<(int successCount, int failureCount)> ProcessFilesAsync(
+    private async Task<(int successCount, int failureCount, int zeroOutputCount)> ProcessFilesAsync(
         Settings settings,
         IReadOnlyList<string> filesToDecrypt,
         DecryptionOptions decryptionOptions,
@@ -268,6 +276,7 @@ public sealed class DecryptCommand(
     {
         int successCount = 0;
         int failureCount = 0;
+        int zeroOutputCount = 0;
         foreach (string inputFile in filesToDecrypt)
         {
             string outputFile = outputResolver.ResolveOutputPath(
@@ -292,15 +301,35 @@ public sealed class DecryptCommand(
                 }
 
                 // Perform the decryption using streaming API
-                await using FileSystemStream inputStream = fileSystem.File.OpenRead(inputFile);
-                await using FileSystemStream outputStream = fileSystem.File.Create(outputFile);
-                DecryptionResult result = await DecryptionUtils.DecryptLogFileAsync(
-                    inputStream,
-                    outputStream,
-                    decryptionOptions,
-                    _logger,
-                    cancellationToken: cancellationToken
-                );
+                DecryptionResult result;
+                await using (FileSystemStream inputStream = fileSystem.File.OpenRead(inputFile))
+                await using (FileSystemStream outputStream = fileSystem.File.Create(outputFile))
+                {
+                    result = await DecryptionUtils.DecryptLogFileAsync(
+                        inputStream,
+                        outputStream,
+                        decryptionOptions,
+                        _logger,
+                        cancellationToken: cancellationToken
+                    );
+                }
+
+                if (result.NothingDecrypted)
+                {
+                    writer.Warning(
+                        $"[yellow]⚠ Nothing decrypted:[/] {inputFile} — no sessions could be decrypted (wrong key, wrong --id, or not an encrypted log)"
+                    );
+                    _logger?.Warning(
+                        "Nothing decrypted from {InputFile}: {FailedHeaders} failed header(s), {FailedMessages} failed message(s). Wrong key, wrong key id, or unrecognized file format.",
+                        inputFile,
+                        result.FailedHeaders,
+                        result.FailedMessages
+                    );
+                    fileSystem.File.Delete(outputFile);
+                    writer.Info($"  [dim]Removed empty output file {outputFile}[/]");
+                    zeroOutputCount++;
+                    continue;
+                }
 
                 if (result.FailedHeaders > 0 || result.FailedMessages > 0)
                 {
@@ -334,7 +363,7 @@ public sealed class DecryptCommand(
             }
         }
 
-        return (successCount, failureCount);
+        return (successCount, failureCount, zeroOutputCount);
     }
 
     /// <summary>
