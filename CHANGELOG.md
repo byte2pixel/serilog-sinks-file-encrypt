@@ -53,8 +53,18 @@ new EncryptionOptions(rsa, KeyId: "my-key");
 - Internal writer/reader interfaces (`IFrameWriter`, `ISessionWriter`, `ISessionReader`) changed
   signatures.
 
+#### CLI exit-code contract ([#96](https://github.com/byte2pixel/serilog-sinks-file-encrypt/issues/96))
+
+The `serilog-encrypt` CLI now returns distinct exit codes so scripts can react without parsing
+output: `0` success, `1` runtime failure, `2` usage error (parse/validation failures previously
+surfaced as `-1`), `3` no input files matched (previously `0`). When several apply across a
+multi-file run, the highest-priority code wins (`1` > `3`).
+
 ### New Features
 
+- **CLI `--quiet` / `--verbose`** — both commands accept `-q|--quiet` (suppress informational
+  output; warnings and errors still shown) and `-v|--verbose` (adds per-file
+  session/message/resync diagnostic detail).
 - **Per-session seal verification** — `DecryptionResult.Sessions` reports each session's
   `SealStatus`: `Sealed`, `Unsealed` (crash *or* truncation — indistinguishable by design),
   `SealCountMismatch` (tail truncation of a sealed log), `SealInvalid` (tampering), or

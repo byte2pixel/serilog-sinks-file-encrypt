@@ -8,7 +8,7 @@ public class GenerateCommandTests : CommandTestBase
     public void Execute_WithDefaultSettings_GeneratesKeyPairSuccessfully()
     {
         // Arrange
-        GenerateCommand command = new(TestConsole, FileSystem);
+        GenerateCommand command = new(Writer, FileSystem);
         string outputPath = Path.Join("test-keys");
         GenerateCommand.Settings settings = new() { OutputPath = outputPath, KeySize = 2048 };
 
@@ -48,7 +48,7 @@ public class GenerateCommandTests : CommandTestBase
     public void Execute_WithXmlFormat_GeneratesKeyPairSuccessfully()
     {
         // Arrange
-        GenerateCommand command = new(TestConsole, FileSystem);
+        GenerateCommand command = new(Writer, FileSystem);
         string outputPath = Path.Join("test-keys");
         GenerateCommand.Settings settings = new()
         {
@@ -93,7 +93,7 @@ public class GenerateCommandTests : CommandTestBase
     public void Execute_WithPemFormat_GeneratesKeyPairSuccessfully()
     {
         // Arrange
-        GenerateCommand command = new(TestConsole, FileSystem);
+        GenerateCommand command = new(Writer, FileSystem);
         string outputPath = Path.Join("test-keys");
         GenerateCommand.Settings settings = new()
         {
@@ -146,7 +146,7 @@ public class GenerateCommandTests : CommandTestBase
             .Directory.When(d => d.CreateDirectory(Arg.Any<string>()))
             .Do(_ => throw new UnauthorizedAccessException("Access denied to create directory"));
 
-        GenerateCommand command = new(TestConsole, mockFs);
+        GenerateCommand command = new(Writer, mockFs);
         GenerateCommand.Settings settings = new() { OutputPath = outputPath, KeySize = 2048 };
 
         // Act
@@ -181,7 +181,7 @@ public class GenerateCommandTests : CommandTestBase
             .File.When(f => f.WriteAllText(privateKeyPath, Arg.Any<string>()))
             .Do(_ => throw new IOException("Disk full or write error"));
 
-        GenerateCommand command = new(TestConsole, mockFs);
+        GenerateCommand command = new(Writer, mockFs);
         GenerateCommand.Settings settings = new() { OutputPath = outputPath, KeySize = 2048 };
 
         // Act
@@ -204,7 +204,7 @@ public class GenerateCommandTests : CommandTestBase
         string outputPath = Path.Join("test-keys");
 
         // Use a real file system but an invalid key size that will cause CryptographicException
-        GenerateCommand command = new(TestConsole, FileSystem);
+        GenerateCommand command = new(Writer, FileSystem);
         GenerateCommand.Settings settings = new()
         {
             OutputPath = outputPath,
@@ -229,7 +229,7 @@ public class GenerateCommandTests : CommandTestBase
         // Arrange
         string outputPath = Path.Join("new-test-keys");
 
-        GenerateCommand command = new(TestConsole, FileSystem);
+        GenerateCommand command = new(Writer, FileSystem);
         GenerateCommand.Settings settings = new() { OutputPath = outputPath, KeySize = 2048 };
 
         FileSystem.Directory.Exists(outputPath).ShouldBeFalse();

@@ -39,15 +39,20 @@ public static class CommandAppConfiguration
                 .WithDescription("Generate a new RSA key pair for log encryption")
                 .WithExample(Generate, "--output", "./keys")
                 .WithExample(Generate, "-o", "./keys", "-k", "4096")
-                .WithExample(Generate, "-o", "./keys", "-f", "Pem");
+                .WithExample(Generate, "-o", "./keys", "-f", "Pem")
+                .WithExample(Generate, "-o", "./keys", "--quiet");
 
             c.AddCommand<DecryptCommand>(Decrypt)
-                .WithDescription("Decrypt encrypted log files using an RSA private key")
+                .WithDescription(
+                    "Decrypt encrypted log files using an RSA private key. "
+                        + "Exit codes: 0 success, 1 runtime failure, 2 usage error, 3 no files matched."
+                )
                 .WithExample(Decrypt, "app.log", "-k", PrivateKey)
                 .WithExample(Decrypt, "*.log", "-k", PrivateKey)
                 .WithExample(Decrypt, "logs/*.txt", "-k", PrivateKey, "--id", "")
                 .WithExample(Decrypt, "app.log", "-k", PrivateKey, "-o", "decrypted.log")
                 .WithExample(Decrypt, "app.log", "-k", PrivateKey, "--strict")
+                .WithExample(Decrypt, "app.log", "-k", PrivateKey, "--verbose")
                 .WithExample(Decrypt, "./logs/*.log", "-k", PrivateKey, "--audit-log", "audit.log");
             c.ValidateExamples();
         };
