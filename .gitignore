@@ -489,3 +489,6 @@ $RECYCLE.BIN/
 **/public_key.xml
 
 *.dotsettings.user
+
+# Claude Code personal settings (project skills/rules ARE committed)
+.claude/settings.local.json
