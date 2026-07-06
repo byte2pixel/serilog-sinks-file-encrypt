@@ -52,7 +52,7 @@ public static class CommandAppConfiguration
                 .WithDescription(
                     "Decrypt encrypted log files using an RSA private key. "
                         + "Exit codes: 0 success, 1 runtime failure, 2 usage error or refused overwrite, "
-                        + "3 no files matched, 4 nothing decrypted."
+                        + "3 no files matched, 4 nothing decrypted, 5 --require-sealed not met."
                 )
                 .WithExample(Decrypt, "app.log", "-k", PrivateKey)
                 .WithExample(Decrypt, "*.log", "-k", PrivateKey)
@@ -68,6 +68,8 @@ public static class CommandAppConfiguration
                     "--passphrase-env",
                     "MY_PASSPHRASE"
                 )
+                .WithExample(Decrypt, "app.log", "-k", PrivateKey, "--json")
+                .WithExample(Decrypt, "app.log", "-k", PrivateKey, "--require-sealed")
                 .WithExample(Decrypt, "app.log", "-k", PrivateKey, "--verbose")
                 .WithExample(Decrypt, "./logs/*.log", "-k", PrivateKey, "--audit-log", "audit.log");
             c.ValidateExamples();
