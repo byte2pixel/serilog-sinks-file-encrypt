@@ -18,8 +18,19 @@ public class GenerateCommandTests : CommandTestBase
             .Returns(TestPassphrase);
     }
 
-    private GenerateCommand GetSut(IFileSystem? fileSystem = null) =>
-        new(Writer, fileSystem ?? FileSystem, _passphraseResolver);
+    private GenerateCommand GetSut(
+        IFileSystem? fileSystem = null,
+        IKeyFileWriter? keyFileWriter = null
+    )
+    {
+        IFileSystem fs = fileSystem ?? FileSystem;
+        return new GenerateCommand(
+            Writer,
+            fs,
+            _passphraseResolver,
+            keyFileWriter ?? new KeyFileWriter(fs, Writer)
+        );
+    }
 
     [Fact]
     public void Execute_WithDefaultSettings_GeneratesEncryptedPemKeyPair()
@@ -326,23 +337,14 @@ public class GenerateCommandTests : CommandTestBase
     [Fact]
     public void Execute_WhenWritingPrivateKeyFails_ReturnsErrorAndDisplaysMessage()
     {
-        // Arrange
+        // Arrange — the key file writer fails regardless of OS-specific write plumbing
         string outputPath = Path.Join("test-keys");
-
-        // Use NSubstitute to create a mock that throws IOException when writing private key
-        IFileSystem mockFs = Substitute.For<IFileSystem>();
-        mockFs.Directory.Exists(Arg.Any<string>()).Returns(true);
-        mockFs
-            .Path.Join(Arg.Any<string>(), Arg.Any<string>())
-            .Returns(x => Path.Join((string)x[0], (string)x[1]));
-
-        string privateKeyPath = Path.Join(outputPath, "private_key.pem");
-
-        mockFs
-            .File.When(f => f.WriteAllText(privateKeyPath, Arg.Any<string>()))
+        IKeyFileWriter failingWriter = Substitute.For<IKeyFileWriter>();
+        failingWriter
+            .When(w => w.WritePrivateKey(Arg.Any<string>(), Arg.Any<string>()))
             .Do(_ => throw new IOException("Disk full or write error"));
 
-        GenerateCommand command = GetSut(mockFs);
+        GenerateCommand command = GetSut(keyFileWriter: failingWriter);
         GenerateCommand.Settings settings = new() { OutputPath = outputPath, KeySize = 2048 };
 
         // Act

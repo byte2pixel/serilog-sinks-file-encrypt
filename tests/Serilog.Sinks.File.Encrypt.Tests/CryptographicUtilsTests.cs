@@ -142,6 +142,90 @@ public class CryptographicUtilsTests : EncryptionTestBase
     }
 
     [Fact]
+    public void FromString_EncryptedPemWithoutPassphrase_ThrowsWithClearMessage()
+    {
+        (_, string encryptedKey) = CryptographicUtils.GenerateRsaKeyPair(
+            2048,
+            KeyFormat.Pem,
+            "passphrase"
+        );
+        using var rsa = RSA.Create();
+
+        Should
+            .Throw<CryptographicException>(() => rsa.FromString(encryptedKey))
+            .Message.ShouldContain("passphrase-encrypted");
+    }
+
+    [Fact]
+    public void FromString_EncryptedPemWithPassphrase_Imports()
+    {
+        (_, string encryptedKey) = CryptographicUtils.GenerateRsaKeyPair(
+            2048,
+            KeyFormat.Pem,
+            "passphrase"
+        );
+        using var rsa = RSA.Create();
+
+        Should.NotThrow(() => rsa.FromString(encryptedKey, "passphrase"));
+        rsa.KeySize.ShouldBe(2048);
+    }
+
+    [Fact]
+    public void FromString_EncryptedPemWithWrongPassphrase_Throws()
+    {
+        (_, string encryptedKey) = CryptographicUtils.GenerateRsaKeyPair(
+            2048,
+            KeyFormat.Pem,
+            "right"
+        );
+        using var rsa = RSA.Create();
+
+        Should.Throw<CryptographicException>(() => rsa.FromString(encryptedKey, "wrong"));
+    }
+
+    [Fact]
+    public void FromString_EncryptedPemWithEmptyPassphrase_ThrowsWithClearMessage()
+    {
+        (_, string encryptedKey) = CryptographicUtils.GenerateRsaKeyPair(
+            2048,
+            KeyFormat.Pem,
+            "passphrase"
+        );
+        using var rsa = RSA.Create();
+
+        Should
+            .Throw<CryptographicException>(() =>
+                rsa.FromString(encryptedKey, ReadOnlySpan<char>.Empty)
+            )
+            .Message.ShouldContain("passphrase-encrypted");
+    }
+
+    [Fact]
+    public void FromString_PassphraseOverloadWithUnencryptedKey_IgnoresPassphrase()
+    {
+        (_, string plainKey) = CryptographicUtils.GenerateRsaKeyPair(format: KeyFormat.Pem);
+        using var rsa = RSA.Create();
+
+        Should.NotThrow(() => rsa.FromString(plainKey, "irrelevant"));
+    }
+
+    [Fact]
+    public void IsEncryptedPem_DistinguishesKeyKinds()
+    {
+        (_, string encryptedKey) = CryptographicUtils.GenerateRsaKeyPair(
+            2048,
+            KeyFormat.Pem,
+            "passphrase"
+        );
+        (_, string plainPem) = CryptographicUtils.GenerateRsaKeyPair(format: KeyFormat.Pem);
+        (_, string plainXml) = CryptographicUtils.GenerateRsaKeyPair(format: KeyFormat.Xml);
+
+        CryptographicUtils.IsEncryptedPem(encryptedKey).ShouldBeTrue();
+        CryptographicUtils.IsEncryptedPem(plainPem).ShouldBeFalse();
+        CryptographicUtils.IsEncryptedPem(plainXml).ShouldBeFalse();
+    }
+
+    [Fact]
     public void InitializeRsa_FromUnknown_ThrowsCryptographicException()
     {
         // Arrange, Act
