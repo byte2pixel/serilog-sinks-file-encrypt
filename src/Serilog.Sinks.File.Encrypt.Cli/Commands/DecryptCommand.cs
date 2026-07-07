@@ -17,12 +17,16 @@ namespace Serilog.Sinks.File.Encrypt.Cli.Commands;
 /// <param name="fileSystem">The file system</param>
 /// <param name="inputResolver">The service that resolves file paths from input (supports files, directories, and glob patterns)</param>
 /// <param name="outputResolver">The service that resolves the output path where the decrypted file will be saved.</param>
+/// <param name="passphraseResolver">Resolves the private-key passphrase when the key file is encrypted.</param>
+/// <param name="reporter">Renders the per-file/session report tables and the --json payload.</param>
 [SuppressMessage("ReSharper", "ClassNeverInstantiated.Global")]
 public sealed class DecryptCommand(
     IConsoleWriter writer,
     IFileSystem fileSystem,
     IInputResolver inputResolver,
-    IOutputResolver outputResolver
+    IOutputResolver outputResolver,
+    IPassphraseResolver passphraseResolver,
+    IDecryptReporter reporter
 ) : AsyncCommand<DecryptCommand.Settings>
 {
     /// <summary>
@@ -40,11 +44,35 @@ public sealed class DecryptCommand(
         public string InputPath { get; init; } = string.Empty;
 
         /// <summary>
-        /// The path to the RSA private key file in XML or PEM format.
+        /// The default private key file name looked for when --key is not given.
+        /// </summary>
+        internal const string DefaultKeyFile = "private_key.pem";
+
+        /// <summary>
+        /// The path to the RSA private key file in XML or PEM format. Passphrase-encrypted
+        /// PKCS#8 PEM keys are supported; the passphrase is resolved from
+        /// --passphrase-file/--passphrase-env/SERILOG_ENCRYPT_PASSPHRASE or an interactive
+        /// prompt.
         /// </summary>
         [CommandOption("-k|--key <KEY>")]
-        [Description("The file containing the RSA private key in XML or PEM format")]
-        public string KeyFile { get; init; } = "private_key.xml";
+        [Description(
+            "The file containing the RSA private key in XML or PEM format (encrypted PKCS#8 PEM supported)"
+        )]
+        public string KeyFile { get; init; } = DefaultKeyFile;
+
+        /// <summary>
+        /// Name of an environment variable holding the private-key passphrase.
+        /// </summary>
+        [CommandOption("--passphrase-env <NAME>")]
+        [Description("Read the private-key passphrase from the named environment variable")]
+        public string? PassphraseEnv { get; init; }
+
+        /// <summary>
+        /// Path of a file whose first line is the private-key passphrase.
+        /// </summary>
+        [CommandOption("--passphrase-file <PATH>")]
+        [Description("Read the private-key passphrase from the first line of the given file")]
+        public string? PassphraseFile { get; init; }
 
         /// <summary>
         /// The id of the key to use for decryption. This should match exactly the key id used during encryption.
@@ -66,6 +94,15 @@ public sealed class DecryptCommand(
         public string? OutputPath { get; init; }
 
         /// <summary>
+        /// Overwrite existing output files. Without this flag, a file whose output already
+        /// exists is refused (and the run exits with the usage-error code).
+        /// </summary>
+        [CommandOption("-f|--force")]
+        [Description("Overwrite existing output files (default: refuse existing outputs)")]
+        [DefaultValue(false)]
+        public bool Force { get; init; }
+
+        /// <summary>
         /// Fail immediately on first decryption error instead of continuing with remaining files.
         /// </summary>
         [CommandOption("-s|--strict")]
@@ -77,15 +114,27 @@ public sealed class DecryptCommand(
 
         /// <summary>
         /// Treat any session that is not cryptographically verified as sealed as an error.
-        /// Combined with --strict, an unsealed (crashed or truncated) or v1-format session
-        /// fails the file instead of only being reported.
+        /// On its own, an unsealed (crashed or truncated) or v1-format session makes the
+        /// run exit with code 5 after reporting normally; combined with --strict it fails
+        /// the file immediately.
         /// </summary>
         [CommandOption("--require-sealed")]
         [Description(
-            "Treat sessions without a verified end-of-log seal (crashed, truncated, or v1-format) as errors. Combine with --strict to fail the file."
+            "Treat sessions without a verified end-of-log seal (crashed, truncated, or v1-format) as errors: exit code 5, or an immediate failure with --strict."
         )]
         [DefaultValue(false)]
         public bool RequireSealed { get; init; }
+
+        /// <summary>
+        /// Emit a machine-readable JSON report on standard output; all human-facing text is
+        /// redirected to standard error.
+        /// </summary>
+        [CommandOption("--json")]
+        [Description(
+            "Write a machine-readable JSON report to stdout (schemaVersion 1); human output goes to stderr"
+        )]
+        [DefaultValue(false)]
+        public bool Json { get; init; }
 
         /// <summary>
         /// Path to write detailed audit information. If not specified, a temporary file will be used.
@@ -114,8 +163,15 @@ public sealed class DecryptCommand(
 
         if (!fileSystem.File.Exists(settings.KeyFile))
         {
+            // 6.0.0 changed the default from private_key.xml to private_key.pem — point
+            // users with an old key at the fix instead of a bare not-found error.
+            string hint =
+                settings.KeyFile == Settings.DefaultKeyFile
+                && fileSystem.File.Exists("private_key.xml")
+                    ? " Found 'private_key.xml' — pass -k private_key.xml to use it."
+                    : string.Empty;
             return ValidationResult.Error(
-                $"✗ Error: Key file '{settings.KeyFile}' does not exist."
+                $"✗ Error: Key file '{settings.KeyFile}' does not exist.{hint}"
             );
         }
 
@@ -153,6 +209,12 @@ public sealed class DecryptCommand(
     )
     {
         writer.Verbosity = settings.Verbosity;
+        if (settings.Json)
+        {
+            // Keep stdout clean for the JSON payload; humans read stderr.
+            writer.UseErrorChannel();
+        }
+
         try
         {
             writer.Info($"[blue]Reading private key from:[/] {settings.KeyFile}");
@@ -160,6 +222,35 @@ public sealed class DecryptCommand(
                 settings.KeyFile,
                 cancellationToken
             );
+
+            string? passphrase = null;
+            if (CryptographicUtils.IsEncryptedPem(rsaPrivateKey))
+            {
+                try
+                {
+                    passphrase = passphraseResolver.Resolve(
+                        settings.PassphraseFile,
+                        settings.PassphraseEnv,
+                        confirm: false
+                    );
+                }
+                catch (PassphraseResolutionException ex)
+                {
+                    writer.Error($"[red]✗ {ex.Message}[/]");
+                    return ExitCodes.UsageError;
+                }
+
+                if (passphrase is null)
+                {
+                    writer.Error(
+                        $"[red]✗ The private key is passphrase-encrypted but no passphrase source is available in a non-interactive session.[/]"
+                    );
+                    writer.Warning(
+                        $"[yellow]Provide --passphrase-env or --passphrase-file, or set {IPassphraseResolver.DefaultEnvironmentVariable}.[/]"
+                    );
+                    return ExitCodes.UsageError;
+                }
+            }
 
             IReadOnlyList<string> filesToDecrypt = inputResolver.ResolveFiles(settings.InputPath);
 
@@ -194,7 +285,7 @@ public sealed class DecryptCommand(
                 )
                 .CreateLogger();
 
-            LocalKeyProvider keyProvider = new(settings.KeyId, rsaPrivateKey);
+            LocalKeyProvider keyProvider = new(settings.KeyId, rsaPrivateKey, passphrase);
 
             DecryptionOptions decryptionOptions = new()
             {
@@ -205,32 +296,39 @@ public sealed class DecryptCommand(
 
             writer.BlankLine();
 
-            (int successCount, int failureCount, int zeroOutputCount) = await ProcessFilesAsync(
+            List<FileReport> fileReports = await ProcessFilesAsync(
                 settings,
                 filesToDecrypt,
                 decryptionOptions,
                 cancellationToken
             );
 
+            RunSummary summary = BuildSummary(fileReports);
+            int exitCode = DetermineExitCode(settings, summary);
+
             // Summary
             writer.BlankLine();
-            writer.Info($"[bold]Summary:[/]");
-            writer.Info($"  [green]✓ Success:[/] {successCount}");
-            if (failureCount > 0)
+            reporter.ReportSummary(summary);
+            if (settings.RequireSealed && !summary.AllSessionsSealed)
             {
-                writer.Warning($"  [red]✗ Failed:[/] {failureCount}");
+                writer.Warning(
+                    $"[yellow]⚠ --require-sealed: at least one session is not cryptographically verified as sealed.[/]"
+                );
             }
-            if (zeroOutputCount > 0)
+
+            if (settings.Json)
             {
-                writer.Warning($"  [yellow]⚠ Nothing decrypted:[/] {zeroOutputCount}");
+                DecryptRunReport report = new(
+                    DecryptRunReport.CurrentSchemaVersion,
+                    fileReports,
+                    summary,
+                    exitCode
+                );
+                writer.Raw(reporter.ToJson(report) + Environment.NewLine);
             }
 
             await Log.CloseAndFlushAsync();
-            if (failureCount > 0)
-            {
-                return ExitCodes.RuntimeFailure;
-            }
-            return zeroOutputCount > 0 ? ExitCodes.NothingDecrypted : ExitCodes.Success;
+            return exitCode;
         }
         catch (IOException ex)
         {
@@ -267,26 +365,56 @@ public sealed class DecryptCommand(
     /// <param name="decryptionOptions">The decryption options.</param>
     /// <param name="cancellationToken">The cancellation token.</param>
     /// <returns></returns>
-    private async Task<(int successCount, int failureCount, int zeroOutputCount)> ProcessFilesAsync(
+    private async Task<List<FileReport>> ProcessFilesAsync(
         Settings settings,
         IReadOnlyList<string> filesToDecrypt,
         DecryptionOptions decryptionOptions,
         CancellationToken cancellationToken
     )
     {
-        int successCount = 0;
-        int failureCount = 0;
-        int zeroOutputCount = 0;
+        List<FileReport> reports = [];
         foreach (string inputFile in filesToDecrypt)
         {
-            string outputFile = outputResolver.ResolveOutputPath(
-                inputFile,
-                settings.InputPath,
-                settings.OutputPath
-            );
+            string outputFile;
+            try
+            {
+                outputFile = outputResolver.ResolveOutputPath(
+                    inputFile,
+                    settings.InputPath,
+                    settings.OutputPath
+                );
+            }
+            catch (InvalidOperationException ex)
+            {
+                // Path containment violation — refuse this file, keep processing the rest
+                writer.Error($"[red]✗ Refused:[/] {inputFile} - {ex.Message}");
+                _logger?.Error("Refused {InputFile}: {Reason}", inputFile, ex.Message);
+                reports.Add(EmptyReport(inputFile, null, FileOutcome.Refused, ex.Message));
+                continue;
+            }
 
             if (fileSystem.File.Exists(outputFile))
             {
+                if (!settings.Force)
+                {
+                    writer.Warning(
+                        $"[yellow]⚠ Refused:[/] {outputFile} already exists (use --force to overwrite)"
+                    );
+                    _logger?.Warning(
+                        "Refused to overwrite existing output {OutputFile} without --force.",
+                        outputFile
+                    );
+                    reports.Add(
+                        EmptyReport(
+                            inputFile,
+                            outputFile,
+                            FileOutcome.Refused,
+                            "Output file already exists (use --force to overwrite)."
+                        )
+                    );
+                    continue;
+                }
+
                 writer.Info($"[dim]{outputFile} will be overwritten.[/]");
             }
 
@@ -327,7 +455,7 @@ public sealed class DecryptCommand(
                     );
                     fileSystem.File.Delete(outputFile);
                     writer.Info($"  [dim]Removed empty output file {outputFile}[/]");
-                    zeroOutputCount++;
+                    reports.Add(MapReport(inputFile, null, FileOutcome.NothingDecrypted, result));
                     continue;
                 }
 
@@ -346,24 +474,119 @@ public sealed class DecryptCommand(
                     $"  [dim]sessions: {result.DecryptedSessions}, messages: {result.DecryptedMessages}, failed headers: {result.FailedHeaders}, failed messages: {result.FailedMessages}, resync attempts: {result.ResyncAttempts}[/]"
                 );
 
+                FileReport report = MapReport(inputFile, outputFile, FileOutcome.Success, result);
+                reporter.ReportSessions(report);
                 ReportSealStatus(result);
 
                 writer.Info($"  [dim]→ {outputFile}[/]");
-                successCount++;
+                reports.Add(report);
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
             {
                 writer.Error($"[red]✗ Failed:[/] {inputFile} - {ex.Message}");
-                failureCount++;
+                reports.Add(EmptyReport(inputFile, outputFile, FileOutcome.Failed, ex.Message));
             }
             catch (CryptographicException ex)
             {
                 writer.Error($"[red]✗ Decryption failed:[/] {inputFile} - {ex.Message}");
-                failureCount++;
+                reports.Add(EmptyReport(inputFile, outputFile, FileOutcome.Failed, ex.Message));
             }
         }
 
-        return (successCount, failureCount, zeroOutputCount);
+        return reports;
+    }
+
+    private static FileReport MapReport(
+        string inputFile,
+        string? outputFile,
+        FileOutcome outcome,
+        DecryptionResult result
+    )
+    {
+        return new FileReport(
+            inputFile,
+            outputFile,
+            outcome,
+            result.DecryptedSessions,
+            result.DecryptedMessages,
+            result.FailedHeaders,
+            result.FailedMessages,
+            result.ResyncAttempts,
+            result.AllSessionsSealed,
+            result
+                .Sessions.Select(s => new SessionReport(
+                    s.Index,
+                    s.FormatVersion,
+                    s.KeyId,
+                    s.SealStatus.ToString(),
+                    s.DeclaredFrameCount,
+                    s.DecryptedMessages,
+                    s.FailedMessages
+                ))
+                .ToList(),
+            Error: null
+        );
+    }
+
+    private static FileReport EmptyReport(
+        string inputFile,
+        string? outputFile,
+        FileOutcome outcome,
+        string error
+    )
+    {
+        return new FileReport(
+            inputFile,
+            outputFile,
+            outcome,
+            DecryptedSessions: 0,
+            DecryptedMessages: 0,
+            FailedHeaders: 0,
+            FailedMessages: 0,
+            ResyncAttempts: 0,
+            AllSessionsSealed: true,
+            Sessions: [],
+            Error: error
+        );
+    }
+
+    private static RunSummary BuildSummary(List<FileReport> reports)
+    {
+        return new RunSummary(
+            reports.Count,
+            reports.Count(r => r.Outcome == FileOutcome.Success),
+            reports.Count(r => r.Outcome == FileOutcome.Failed),
+            reports.Count(r => r.Outcome == FileOutcome.Refused),
+            reports.Count(r => r.Outcome == FileOutcome.NothingDecrypted),
+            reports.Sum(r => r.DecryptedMessages),
+            reports.Sum(r => r.ResyncAttempts),
+            // Strict, matching the library's RequireSealed semantics: a v1 session
+            // (NotApplicable) cannot be verified and therefore counts as not sealed.
+            reports
+                .Where(r => r.Outcome == FileOutcome.Success)
+                .All(r => r.Sessions.All(s => s.SealStatus == nameof(SealStatus.Sealed)))
+        );
+    }
+
+    private static int DetermineExitCode(Settings settings, RunSummary summary)
+    {
+        if (summary.Failed > 0)
+        {
+            return ExitCodes.RuntimeFailure;
+        }
+        if (summary.Refused > 0)
+        {
+            return ExitCodes.UsageError;
+        }
+        if (summary.NothingDecrypted > 0)
+        {
+            return ExitCodes.NothingDecrypted;
+        }
+        if (settings.RequireSealed && !summary.AllSessionsSealed)
+        {
+            return ExitCodes.NotSealed;
+        }
+        return ExitCodes.Success;
     }
 
     /// <summary>
