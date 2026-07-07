@@ -40,5 +40,5 @@ public sealed record DecryptionOptions
     /// Leave this off (default) for crash-tolerant reading: a log whose writer crashed is
     /// indistinguishable from a truncated one and still decrypts fully.
     /// </remarks>
-    public bool RequireSealed { get; init; } = false;
+    public bool RequireSealed { get; init; }
 };

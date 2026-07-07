@@ -87,13 +87,12 @@ public sealed class DecryptReporter(IConsoleWriter writer) : IDecryptReporter
     private static string FormatSeal(SessionReport session) =>
         session.SealStatus switch
         {
-            nameof(Serilog.Sinks.File.Decrypt.Models.SealStatus.Sealed) => "[green]Sealed[/]",
-            nameof(Serilog.Sinks.File.Decrypt.Models.SealStatus.NotApplicable) =>
-                "[dim]v1 (n/a)[/]",
-            nameof(Serilog.Sinks.File.Decrypt.Models.SealStatus.Unsealed) => "[yellow]Unsealed[/]",
-            nameof(Serilog.Sinks.File.Decrypt.Models.SealStatus.SealCountMismatch) =>
+            nameof(Decrypt.Models.SealStatus.Sealed) => "[green]Sealed[/]",
+            nameof(Decrypt.Models.SealStatus.NotApplicable) => "[dim]v1 (n/a)[/]",
+            nameof(Decrypt.Models.SealStatus.Unsealed) => "[yellow]Unsealed[/]",
+            nameof(Decrypt.Models.SealStatus.SealCountMismatch) =>
                 $"[red]Count mismatch (declared {session.DeclaredFrameCount})[/]",
-            nameof(Serilog.Sinks.File.Decrypt.Models.SealStatus.SealInvalid) => "[red]Invalid[/]",
+            nameof(Decrypt.Models.SealStatus.SealInvalid) => "[red]Invalid[/]",
             _ => Markup.Escape(session.SealStatus),
         };
 }

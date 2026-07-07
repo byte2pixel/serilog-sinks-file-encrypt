@@ -10,13 +10,13 @@ public sealed class DecryptionResult
     /// Number of successfully decrypted sessions.
     /// A session is defined as a complete set of log messages that were encrypted together.
     /// </summary>
-    public int DecryptedSessions { get; init; } = 0;
+    public int DecryptedSessions { get; init; }
 
     /// <summary>
     /// Number of successfully decrypted messages.
     /// This counts individual log messages that were successfully decrypted, regardless of session boundaries.
     /// </summary>
-    public int DecryptedMessages { get; init; } = 0;
+    public int DecryptedMessages { get; init; }
 
     /// <summary>
     /// The number of decryption errors encountered while processing what appears
@@ -24,7 +24,7 @@ public sealed class DecryptionResult
     /// such as missing or corrupted headers that prevent identifying the session's
     /// decryption parameters.
     /// </summary>
-    public int FailedHeaders { get; init; } = 0;
+    public int FailedHeaders { get; init; }
 
     /// <summary>
     /// The number of decryption errors encountered while processing individual log messages.
@@ -32,7 +32,7 @@ public sealed class DecryptionResult
     /// that occur after successfully identifying the session. These errors may be due to data corruption,
     /// incorrect decryption keys, or other issues that prevent successful decryption of the message content
     /// </summary>
-    public int FailedMessages { get; init; } = 0;
+    public int FailedMessages { get; init; }
 
     /// <summary>
     /// <para>
@@ -45,7 +45,7 @@ public sealed class DecryptionResult
     /// while a low number suggests that most of the file was successfully decrypted with minimal issues.
     /// </para>
     /// </summary>
-    public int ResyncAttempts { get; init; } = 0;
+    public int ResyncAttempts { get; init; }
 
     /// <summary>
     /// Per-session results in the order the sessions were encountered in the input, including
