@@ -64,16 +64,48 @@ public class OutputResolver(IFileSystem fileSystem) : IOutputResolver
                 string decryptedName = GenerateDecryptedFileName(
                     fileSystem.Path.GetFileName(inputFile)
                 );
-                return fileSystem.Path.Join(outputPath, decryptedName);
+                return JoinWithinRoot(outputPath, decryptedName);
             }
 
-            // Has a file extension — treat as an explicit file path
+            // Has a file extension — treat as an explicit file path (explicit user intent,
+            // absolute paths allowed)
             return outputPath;
         }
 
         // Multi-file mode (directory or glob): output path is always a directory
         string outputFileName = GenerateDecryptedFileName(fileSystem.Path.GetFileName(inputFile));
-        return fileSystem.Path.Join(outputPath, outputFileName);
+        return JoinWithinRoot(outputPath, outputFileName);
+    }
+
+    /// <summary>
+    /// Joins a computed file name onto the user-supplied output directory and verifies the
+    /// canonicalized result still lives directly under that directory. Guards against
+    /// hostile input file names (e.g. containing <c>..</c>) escaping the output root when
+    /// the CLI is driven by automation.
+    /// </summary>
+    /// <exception cref="InvalidOperationException">
+    /// The resolved path escapes the output directory.
+    /// </exception>
+    private string JoinWithinRoot(string outputDirectory, string fileName)
+    {
+        string joined = fileSystem.Path.Join(outputDirectory, fileName);
+        string canonicalRoot = fileSystem.Path.TrimEndingDirectorySeparator(
+            fileSystem.Path.GetFullPath(outputDirectory)
+        );
+        string canonicalJoined = fileSystem.Path.GetFullPath(joined);
+
+        string? parent = fileSystem.Path.GetDirectoryName(canonicalJoined);
+        // Both paths canonicalize from the same outputDirectory string, so a compliant
+        // file name yields an exactly equal parent; ordinal comparison avoids
+        // case-sensitivity surprises across filesystems.
+        if (!string.Equals(parent, canonicalRoot, StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException(
+                $"Resolved output path '{canonicalJoined}' escapes the output directory '{canonicalRoot}'."
+            );
+        }
+
+        return joined;
     }
 
     /// <summary>
