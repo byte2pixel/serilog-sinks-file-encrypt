@@ -42,15 +42,31 @@ serilog-encrypt generate --output ./keys
 
 **Options:**
 - `-o|--output <OUTPUT>` (required): The directory where the key files will be saved
-- `-k|--key-size <KEY_SIZE>` (optional): The size of the RSA key in bits (default: 2048)
-- `-f|--format <FORMAT>` (optional): The encoding format (Xml or Pem) for the RSA keys (default: Xml)
+- `--key-size <KEY_SIZE>` (optional): The size of the RSA key in bits (default: 3072)
+- `-f|--format <FORMAT>` (optional): The encoding format (Pem or Xml) for the RSA keys (default: Pem). Xml is legacy — it has no encrypted representation and requires `--plaintext`.
+- `--passphrase-env <NAME>`: Read the private-key passphrase from the named environment variable
+- `--passphrase-file <PATH>`: Read the private-key passphrase from the first line of the given file
+- `--plaintext`: Write the private key unencrypted (required for Xml format)
 - `--force`: Overwrite existing key files. Without it, generation is refused when a key file already exists — overwriting a private key permanently loses access to all logs encrypted with it.
 - `-q|--quiet`: Suppress informational output (warnings and errors are still shown)
 - `-v|--verbose`: Show additional diagnostic detail
 
 This creates two files:
-- `private_key.xml`: The private key used for decryption (keep secure)
-- `public_key.xml`: The public key used for encryption
+- `private_key.pem`: The private key used for decryption (keep secure)
+- `public_key.pem`: The public key used for encryption
+
+**Passphrase protection (v6.0.0+):** by default the private key is written as a
+passphrase-encrypted PKCS#8 PEM (`ENCRYPTED PRIVATE KEY`, PBKDF2-SHA256 with 600,000
+iterations, AES-256-CBC). The passphrase is resolved in order from `--passphrase-file`,
+`--passphrase-env`, the `SERILOG_ENCRYPT_PASSPHRASE` environment variable, and finally an
+interactive hidden prompt (with confirmation). There is deliberately **no** `--passphrase`
+command-line option — secrets on the command line leak via shell history and process
+listings. In a non-interactive session with no passphrase source, generation fails (exit 2)
+unless `--plaintext` is passed. **There is no recovery if the passphrase is lost.**
+
+**File permissions (v6.0.0+):** the private key file is restricted to the current user —
+mode 600 on Unix (applied at creation, no permissive window) and an owner-only ACL on
+Windows. If the restriction fails, a warning is printed and generation still succeeds.
 
 ### Decrypt Log Files
 
@@ -80,12 +96,14 @@ serilog-encrypt decrypt "logs/*.log" -k private_key.xml -o ./decrypted
 - `<PATH>`: Path to an encrypted log file, or a glob pattern (e.g., `*.log`, `logs/*.txt`). Directories are not accepted directly — append a pattern such as `logs/*.log`.
 
 **Options:**
-- `-k|--key <KEY>`: Path to the RSA private key file (default: `private_key.xml`)
+- `-k|--key <KEY>`: Path to the RSA private key file (default: `private_key.pem`). Passphrase-encrypted PKCS#8 PEM keys are supported.
+- `--passphrase-env <NAME>` / `--passphrase-file <PATH>`: Passphrase source for an encrypted private key; `SERILOG_ENCRYPT_PASSPHRASE` is checked as a fallback, then an interactive hidden prompt. Only consulted when the key file is actually encrypted.
 - `--id <KEY_ID>`: The key ID that was supplied to `EncryptHooks` during encryption (default: `""` — matches files encrypted without a key ID)
 - `-o|--output <OUTPUT>`: Output directory or file path (default: adds `.decrypted` to original filename)
 - `-f|--force`: Overwrite existing output files. Without it, a file whose output already exists is refused (skipped) and the run exits with code 2.
 - `-s|--strict`: Fail immediately on first decryption error (default: continues processing all files)
-- `--require-sealed`: Treat sessions without a verified end-of-log seal (crashed, truncated, or v1-format) as errors. Combine with `--strict` to fail the file instead of only warning.
+- `--require-sealed`: Treat sessions without a verified end-of-log seal (crashed, truncated, or v1-format) as errors: the run exits with code 5, or fails the file immediately when combined with `--strict`.
+- `--json`: Write a machine-readable JSON report to stdout (`schemaVersion: 1` — per-file outcomes, per-session seal status, run summary, exit code); all human-facing text goes to stderr so stdout stays parseable.
 - `--audit-log <PATH>`: Write detailed audit information to a rolling log file (max 10 MB, 7 retained files). If omitted, a randomly-named file is created in the temp directory.
 - `-q|--quiet`: Suppress informational output (warnings and errors are still shown)
 - `-v|--verbose`: Show additional diagnostic detail (per-file session/message/resync counts)
@@ -101,8 +119,9 @@ Scripts can rely on the exit code to distinguish failure modes without parsing o
 | 2 | Usage error — invalid arguments, missing key file, or an existing output file refused without `--force` |
 | 3 | No input files matched the path or glob pattern |
 | 4 | Nothing decrypted — a file produced no sessions and no messages (wrong key, wrong `--id`, or not an encrypted log); the empty output file is removed |
+| 5 | `--require-sealed` was set and at least one session is not cryptographically verified as sealed (v1 sessions count as unverified) |
 
-When several conditions apply across a multi-file run, the highest-priority code wins: 1 > 2 > 4 > 3.
+When several conditions apply across a multi-file run, the highest-priority code wins: 1 > 2 > 4 > 5 > 3.
 
 **Features:**
 - Memory-optimized for large log files

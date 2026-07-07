@@ -28,7 +28,7 @@ public static class CommandAppConfiguration
     /// <returns>An action that configures the CommandApp</returns>
     public static Action<IConfigurator> GetConfiguration()
     {
-        const string PrivateKey = "private_key.xml";
+        const string PrivateKey = "private_key.pem";
         const string Decrypt = "decrypt";
         const string Generate = "generate";
 
@@ -36,10 +36,15 @@ public static class CommandAppConfiguration
         {
             c.SetApplicationName("serilog-encrypt");
             c.AddCommand<GenerateCommand>(Generate)
-                .WithDescription("Generate a new RSA key pair for log encryption")
+                .WithDescription(
+                    "Generate a new RSA key pair for log encryption. The private key is "
+                        + "passphrase-encrypted (PKCS#8 PEM) unless --plaintext is passed."
+                )
                 .WithExample(Generate, "--output", "./keys")
-                .WithExample(Generate, "-o", "./keys", "-k", "4096")
-                .WithExample(Generate, "-o", "./keys", "-f", "Pem")
+                .WithExample(Generate, "-o", "./keys", "--key-size", "4096")
+                .WithExample(Generate, "-o", "./keys", "--passphrase-env", "MY_PASSPHRASE")
+                .WithExample(Generate, "-o", "./keys", "--passphrase-file", "passphrase.txt")
+                .WithExample(Generate, "-o", "./keys", "-f", "Xml", "--plaintext")
                 .WithExample(Generate, "-o", "./keys", "--force")
                 .WithExample(Generate, "-o", "./keys", "--quiet");
 
@@ -47,7 +52,7 @@ public static class CommandAppConfiguration
                 .WithDescription(
                     "Decrypt encrypted log files using an RSA private key. "
                         + "Exit codes: 0 success, 1 runtime failure, 2 usage error or refused overwrite, "
-                        + "3 no files matched, 4 nothing decrypted."
+                        + "3 no files matched, 4 nothing decrypted, 5 --require-sealed not met."
                 )
                 .WithExample(Decrypt, "app.log", "-k", PrivateKey)
                 .WithExample(Decrypt, "*.log", "-k", PrivateKey)
@@ -55,6 +60,16 @@ public static class CommandAppConfiguration
                 .WithExample(Decrypt, "app.log", "-k", PrivateKey, "-o", "decrypted.log")
                 .WithExample(Decrypt, "app.log", "-k", PrivateKey, "--strict")
                 .WithExample(Decrypt, "app.log", "-k", PrivateKey, "--force")
+                .WithExample(
+                    Decrypt,
+                    "app.log",
+                    "-k",
+                    PrivateKey,
+                    "--passphrase-env",
+                    "MY_PASSPHRASE"
+                )
+                .WithExample(Decrypt, "app.log", "-k", PrivateKey, "--json")
+                .WithExample(Decrypt, "app.log", "-k", PrivateKey, "--require-sealed")
                 .WithExample(Decrypt, "app.log", "-k", PrivateKey, "--verbose")
                 .WithExample(Decrypt, "./logs/*.log", "-k", PrivateKey, "--audit-log", "audit.log");
             c.ValidateExamples();

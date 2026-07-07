@@ -58,8 +58,49 @@ new EncryptionOptions(rsa, KeyId: "my-key");
 The `serilog-encrypt` CLI now returns distinct exit codes so scripts can react without parsing
 output: `0` success, `1` runtime failure, `2` usage error (parse/validation failures previously
 surfaced as `-1`), `3` no input files matched (previously `0`), `4` nothing decrypted (previously
-`0` — see below). When several apply across a multi-file run, the highest-priority code wins
-(`1` > `2` > `4` > `3`).
+`0` — see below), `5` `--require-sealed` not met. When several apply across a multi-file run, the
+highest-priority code wins (`1` > `2` > `4` > `5` > `3`).
+
+#### CLI `decrypt`: rich report, `--json`, and `--require-sealed` exit code ([#100](https://github.com/byte2pixel/serilog-sinks-file-encrypt/issues/100))
+
+- Human output now includes a per-file **session table** (Session | Version | KeyId |
+  Messages | Failed | Seal) and a run **summary table** (files, succeeded/failed/refused/
+  nothing-decrypted, total messages, resync attempts).
+- New **`--json`**: a machine-readable report on stdout (`schemaVersion: 1` with per-file
+  outcomes, per-session seal detail, summary, and the process exit code); all human text is
+  redirected to stderr so stdout stays parseable.
+- **Breaking:** `--require-sealed` now has teeth without `--strict` — when any session is not
+  cryptographically verified as sealed (v1 sessions count as unverified, matching the
+  library's `RequireSealed` semantics), the run exits `5` after reporting normally.
+  Exit-code precedence: `1` > `2` > `4` > `5` > `3`.
+
+#### CLI `decrypt`: encrypted private keys supported; `--key` default is now `private_key.pem` ([#98](https://github.com/byte2pixel/serilog-sinks-file-encrypt/issues/98))
+
+- `decrypt` accepts passphrase-encrypted PKCS#8 PEM private keys. The passphrase is resolved
+  from `--passphrase-file` → `--passphrase-env` → `SERILOG_ENCRYPT_PASSPHRASE` → interactive
+  prompt, and is only requested when the key file is actually encrypted.
+- **Breaking:** the `--key` default changed from `private_key.xml` to `private_key.pem`. When
+  the default is used and only `private_key.xml` exists, the error message points at it.
+- Library (additive, non-breaking): `LocalKeyProvider` gains passphrase constructor overloads,
+  and `CryptographicUtils` gains `FromString(key, passphrase)` plus `IsEncryptedPem(key)`.
+  The parameterless `FromString` now reports a clear "passphrase required" error for
+  encrypted keys.
+
+#### CLI `generate`: passphrase-encrypted keys by default, PEM + 3072-bit defaults ([#97](https://github.com/byte2pixel/serilog-sinks-file-encrypt/issues/97))
+
+- The private key is now written as a **passphrase-encrypted PKCS#8 PEM** by default
+  (PBKDF2-SHA256, 600,000 iterations, AES-256-CBC). The passphrase is resolved from
+  `--passphrase-file` → `--passphrase-env` → the `SERILOG_ENCRYPT_PASSPHRASE` environment
+  variable → an interactive hidden prompt with confirmation. There is deliberately no
+  `--passphrase` argv option (shell-history/process-list leakage). An unencrypted key now
+  requires the explicit `--plaintext` flag.
+- Default format is **Pem** (was Xml); Xml remains readable forever but is legacy on the
+  write side and requires `--plaintext`. Default key size is **3072** bits (was 2048).
+- The `-k` short option now belongs exclusively to `decrypt --key`; use `--key-size` on
+  `generate` (was `-k|--key-size`).
+- Library: `CryptographicUtils.GenerateRsaKeyPair` default `format` changed Xml → Pem, and a
+  new passphrase overload `GenerateRsaKeyPair(int, KeyFormat, ReadOnlySpan<char>)` produces
+  encrypted PKCS#8 private keys (PEM only).
 
 #### CLI: overwriting output requires `--force`; output paths are containment-checked ([#85](https://github.com/byte2pixel/serilog-sinks-file-encrypt/issues/85))
 
@@ -83,6 +124,11 @@ new `DecryptionResult.NothingDecrypted` property (additive, non-breaking).
 
 ### New Features
 
+- **CLI `generate` restricts private key file permissions** ([#99](https://github.com/byte2pixel/serilog-sinks-file-encrypt/issues/99)) —
+  the private key file is now owner-only: mode 600 on Unix (applied at creation time, so
+  there is no permissive window) and an owner-only DACL on Windows. The public key keeps
+  default permissions. If restriction fails, a warning is shown and generation still
+  succeeds.
 - **CLI `--quiet` / `--verbose`** — both commands accept `-q|--quiet` (suppress informational
   output; warnings and errors still shown) and `-v|--verbose` (adds per-file
   session/message/resync diagnostic detail).

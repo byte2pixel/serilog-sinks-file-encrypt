@@ -11,6 +11,84 @@ public class LocalKeyProviderTests
     private static readonly (string PublicKey, string PrivateKey) _keyPair4096 =
         CryptographicUtils.GenerateRsaKeyPair(keySize: 4096, format: KeyFormat.Xml);
 
+    private static readonly (string PublicKey, string PrivateKey) _encryptedPemKeyPair =
+        CryptographicUtils.GenerateRsaKeyPair(2048, KeyFormat.Pem, "provider-passphrase");
+
+    #region Passphrase-encrypted keys
+
+    [Fact]
+    public void Constructor_EncryptedKeyWithCorrectPassphrase_CreatesInstance()
+    {
+        Should.NotThrow(() =>
+        {
+            using var provider = new LocalKeyProvider(
+                "key1",
+                _encryptedPemKeyPair.PrivateKey,
+                "provider-passphrase"
+            );
+        });
+    }
+
+    [Fact]
+    public void Constructor_EncryptedKeyWithWrongPassphrase_ThrowsCryptographicException()
+    {
+        Should.Throw<CryptographicException>(() =>
+            new LocalKeyProvider("key1", _encryptedPemKeyPair.PrivateKey, "wrong-passphrase")
+        );
+    }
+
+    [Fact]
+    public void Constructor_EncryptedKeyWithoutPassphrase_ThrowsCryptographicException()
+    {
+        Should
+            .Throw<CryptographicException>(() =>
+                new LocalKeyProvider("key1", _encryptedPemKeyPair.PrivateKey)
+            )
+            .Message.ShouldContain("passphrase");
+    }
+
+    [Fact]
+    public void Constructor_KeyMapWithEncryptedKeys_SharesPassphrase()
+    {
+        var keyMap = new Dictionary<string, string>
+        {
+            { "enc", _encryptedPemKeyPair.PrivateKey },
+            { "plain", _pemKeyPair.PrivateKey }, // unencrypted keys ignore the passphrase
+        };
+
+        Should.NotThrow(() =>
+        {
+            using var provider = new LocalKeyProvider(keyMap, "provider-passphrase");
+        });
+    }
+
+    [Fact]
+    public async Task DecryptAsync_WithEncryptedKey_DecryptsHeaderPayload()
+    {
+        // Arrange — RSA-encrypt a payload with the public key, decrypt via the provider
+        using var rsa = RSA.Create();
+        rsa.FromString(_encryptedPemKeyPair.PublicKey);
+        byte[] payload = [1, 2, 3, 4];
+        byte[] cipherText = rsa.Encrypt(payload, RSAEncryptionPadding.OaepSHA256);
+        using var provider = new LocalKeyProvider(
+            "",
+            _encryptedPemKeyPair.PrivateKey,
+            "provider-passphrase"
+        );
+
+        // Act
+        byte[] decrypted = await provider.DecryptAsync(
+            "",
+            cipherText,
+            TestContext.Current.CancellationToken
+        );
+
+        // Assert
+        decrypted.ShouldBe(payload);
+    }
+
+    #endregion
+
     #region Constructor(Dictionary<string, string>)
 
     [Fact]

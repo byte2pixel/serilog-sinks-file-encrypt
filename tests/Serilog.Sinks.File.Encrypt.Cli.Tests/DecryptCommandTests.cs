@@ -8,6 +8,8 @@ public class DecryptCommandTests : CommandTestBase
 {
     private readonly IInputResolver _inputResolver = Substitute.For<IInputResolver>();
     private readonly IOutputResolver _outputResolver = Substitute.For<IOutputResolver>();
+    private readonly IPassphraseResolver _passphraseResolver =
+        Substitute.For<IPassphraseResolver>();
     private readonly string _publicKey;
     private readonly string _privateKey;
     private readonly string _privateKeyPath = Path.Join("keys", "private_key.xml");
@@ -334,7 +336,7 @@ public class DecryptCommandTests : CommandTestBase
         // Assert
         result.ShouldBe(1); // Failure due to one failed file
         TestConsole.Output.ShouldContain("Found 2 file(s) to decrypt");
-        TestConsole.Output.ShouldContain("✓ Success: 1");
+        TestConsole.Output.ShouldContain("Succeeded"); // summary table
         TestConsole.Output.ShouldContain("✗ Failed: 1");
     }
 
@@ -462,7 +464,7 @@ public class DecryptCommandTests : CommandTestBase
     }
 
     [Fact]
-    public async Task ExecuteAsync_UnsealedFile_RequireSealedWithoutStrict_StillSucceeds()
+    public async Task ExecuteAsync_UnsealedFile_RequireSealedWithoutStrict_ExitsNotSealed()
     {
         // Arrange
         string unsealedFile = Path.Join("logs", "crashed.log");
@@ -488,9 +490,11 @@ public class DecryptCommandTests : CommandTestBase
             CancellationToken.None
         );
 
-        // Assert: RequireSealed only becomes fatal together with --strict
-        result.ShouldBe(0);
+        // Assert: without --strict the file still decrypts and reports, but the run
+        // signals the unmet integrity requirement via exit code 5
+        result.ShouldBe(ExitCodes.NotSealed);
         TestConsole.Output.ShouldContain("UNSEALED");
+        TestConsole.Output.ShouldContain("--require-sealed");
     }
 
     [Fact]
@@ -726,6 +730,245 @@ public class DecryptCommandTests : CommandTestBase
     }
 
     [Fact]
+    public async Task ExecuteAsync_WithEncryptedKeyAndPassphrase_DecryptsSuccessfully()
+    {
+        // Arrange — full round trip with a passphrase-encrypted private key
+        const string Passphrase = "round-trip-secret";
+        (string publicKey, string encryptedPrivateKey) = CryptographicUtils.GenerateRsaKeyPair(
+            2048,
+            KeyFormat.Pem,
+            Passphrase
+        );
+        string keyPath = Path.Join("keys", "encrypted_key.pem");
+        FileSystem.AddFile(keyPath, new MockFileData(encryptedPrivateKey));
+        FileSystem.AddFile(
+            "enc.log",
+            new MockFileData(CreateEncryptedLogFile(LogContent1, publicKey))
+        );
+        ConfigureFileResolver("enc.log");
+        _passphraseResolver
+            .Resolve(Arg.Any<string?>(), Arg.Any<string?>(), confirm: false)
+            .Returns(Passphrase);
+
+        string decryptedFilePath = Path.Join("logs", "enc-decrypted.log");
+        DecryptCommand command = GetSut();
+        DecryptCommand.Settings settings = new()
+        {
+            InputPath = "enc.log",
+            KeyFile = keyPath,
+            OutputPath = decryptedFilePath,
+        };
+
+        // Act
+        int result = await command.ExecuteAsync(
+            new CommandContext(Arguments, Remaining, "decrypt", null),
+            settings,
+            CancellationToken.None
+        );
+
+        // Assert
+        result.ShouldBe(ExitCodes.Success);
+        (
+            await FileSystem.File.ReadAllTextAsync(
+                decryptedFilePath,
+                TestContext.Current.CancellationToken
+            )
+        ).ShouldBe(LogContent1);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_EncryptedKeyNoPassphraseSource_ExitsUsageError()
+    {
+        // Arrange
+        (_, string encryptedPrivateKey) = CryptographicUtils.GenerateRsaKeyPair(
+            2048,
+            KeyFormat.Pem,
+            "some-passphrase"
+        );
+        string keyPath = Path.Join("keys", "encrypted_key.pem");
+        FileSystem.AddFile(keyPath, new MockFileData(encryptedPrivateKey));
+        _passphraseResolver
+            .Resolve(Arg.Any<string?>(), Arg.Any<string?>(), confirm: false)
+            .Returns((string?)null);
+
+        DecryptCommand command = GetSut();
+        DecryptCommand.Settings settings = new() { InputPath = EncryptedFile, KeyFile = keyPath };
+
+        // Act
+        int result = await command.ExecuteAsync(
+            new CommandContext(Arguments, Remaining, "decrypt", null),
+            settings,
+            CancellationToken.None
+        );
+
+        // Assert
+        result.ShouldBe(ExitCodes.UsageError);
+        TestConsole.Output.ShouldContain("passphrase-encrypted");
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_EncryptedKeyWrongPassphrase_ExitsRuntimeFailure()
+    {
+        // Arrange
+        (_, string encryptedPrivateKey) = CryptographicUtils.GenerateRsaKeyPair(
+            2048,
+            KeyFormat.Pem,
+            "right-passphrase"
+        );
+        string keyPath = Path.Join("keys", "encrypted_key.pem");
+        FileSystem.AddFile(keyPath, new MockFileData(encryptedPrivateKey));
+        _passphraseResolver
+            .Resolve(Arg.Any<string?>(), Arg.Any<string?>(), confirm: false)
+            .Returns("wrong-passphrase");
+
+        DecryptCommand command = GetSut();
+        DecryptCommand.Settings settings = new() { InputPath = EncryptedFile, KeyFile = keyPath };
+
+        // Act
+        int result = await command.ExecuteAsync(
+            new CommandContext(Arguments, Remaining, "decrypt", null),
+            settings,
+            CancellationToken.None
+        );
+
+        // Assert — clear failure, not silent success
+        result.ShouldBe(ExitCodes.RuntimeFailure);
+        TestConsole.Output.ShouldContain("✗ Decryption failed:");
+    }
+
+    [Fact]
+    public void Validate_DefaultKeyMissingButXmlExists_HintsAtOldDefault()
+    {
+        // Arrange — no private_key.pem, but a legacy private_key.xml is present
+        FileSystem.AddFile("private_key.xml", new MockFileData(_privateKey));
+        DecryptCommand command = GetSut();
+        DecryptCommand.Settings settings = new() { InputPath = EncryptedFile };
+
+        // Act
+        ValidationResult result = command.Validate(
+            new CommandContext(Arguments, Remaining, "decrypt", null),
+            settings
+        );
+
+        // Assert
+        result.Successful.ShouldBeFalse();
+        result.Message.ShouldNotBeNull();
+        result.Message.ShouldContain("private_key.xml");
+        result.Message.ShouldContain("-k private_key.xml");
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WithJson_WritesOnlyJsonToStdoutAndHumanTextToStderr()
+    {
+        // Arrange — capture the error channel in a second console
+        using TestConsole stderrConsole = new();
+        Writer.ErrorConsoleFactory = () => stderrConsole;
+        string decryptedFilePath = Path.Join("logs", "decrypted.log");
+        DecryptCommand command = GetSut();
+        DecryptCommand.Settings settings = new()
+        {
+            InputPath = EncryptedFile,
+            KeyFile = _privateKeyPath,
+            OutputPath = decryptedFilePath,
+            Json = true,
+        };
+
+        // Act
+        int result = await command.ExecuteAsync(
+            new CommandContext(Arguments, Remaining, "decrypt", null),
+            settings,
+            CancellationToken.None
+        );
+
+        // Assert — stdout is pure JSON
+        result.ShouldBe(ExitCodes.Success);
+        string stdout = TestConsole.Output;
+        stdout.TrimStart().ShouldStartWith("{");
+        using System.Text.Json.JsonDocument doc = System.Text.Json.JsonDocument.Parse(stdout);
+        doc.RootElement.GetProperty("schemaVersion").GetInt32().ShouldBe(1);
+        doc.RootElement.GetProperty("exitCode").GetInt32().ShouldBe(0);
+        System.Text.Json.JsonElement files = doc.RootElement.GetProperty("files");
+        files.GetArrayLength().ShouldBe(1);
+        files[0].GetProperty("outcome").GetString().ShouldBe("Success");
+        files[0].GetProperty("decryptedMessages").GetInt32().ShouldBe(1);
+        files[0]
+            .GetProperty("sessions")[0]
+            .GetProperty("sealStatus")
+            .GetString()
+            .ShouldBe("Sealed");
+        doc.RootElement.GetProperty("summary").GetProperty("succeeded").GetInt32().ShouldBe(1);
+
+        // Human text went to the error channel
+        stderrConsole.Output.ShouldContain("✓ Decrypted:");
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WithJson_ZeroOutputFile_ReportsOutcomeAndExitCode()
+    {
+        // Arrange
+        using TestConsole stderrConsole = new();
+        Writer.ErrorConsoleFactory = () => stderrConsole;
+        FileSystem.AddFile("empty.log", new MockFileData(Array.Empty<byte>()));
+        ConfigureFileResolver("empty.log");
+        DecryptCommand command = GetSut();
+        DecryptCommand.Settings settings = new()
+        {
+            InputPath = "empty.log",
+            KeyFile = _privateKeyPath,
+            OutputPath = Path.Join("logs", "empty-decrypted.log"),
+            Json = true,
+        };
+
+        // Act
+        int result = await command.ExecuteAsync(
+            new CommandContext(Arguments, Remaining, "decrypt", null),
+            settings,
+            CancellationToken.None
+        );
+
+        // Assert
+        result.ShouldBe(ExitCodes.NothingDecrypted);
+        using System.Text.Json.JsonDocument doc = System.Text.Json.JsonDocument.Parse(
+            TestConsole.Output
+        );
+        doc.RootElement.GetProperty("exitCode").GetInt32().ShouldBe(ExitCodes.NothingDecrypted);
+        doc.RootElement.GetProperty("files")[0]
+            .GetProperty("outcome")
+            .GetString()
+            .ShouldBe("NothingDecrypted");
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_SuccessfulDecrypt_ShowsSessionTable()
+    {
+        // Arrange
+        TestConsole.Profile.Width = 200;
+        string decryptedFilePath = Path.Join("logs", "decrypted.log");
+        DecryptCommand command = GetSut();
+        DecryptCommand.Settings settings = new()
+        {
+            InputPath = EncryptedFile,
+            KeyFile = _privateKeyPath,
+            OutputPath = decryptedFilePath,
+        };
+
+        // Act
+        int result = await command.ExecuteAsync(
+            new CommandContext(Arguments, Remaining, "decrypt", null),
+            settings,
+            CancellationToken.None
+        );
+
+        // Assert — per-file session table and run summary table are rendered
+        result.ShouldBe(ExitCodes.Success);
+        TestConsole.Output.ShouldContain("Session");
+        TestConsole.Output.ShouldContain("Seal");
+        TestConsole.Output.ShouldContain("Sealed");
+        TestConsole.Output.ShouldContain("Summary");
+        TestConsole.Output.ShouldContain("Succeeded");
+    }
+
+    [Fact]
     public async Task ExecuteAsync_WithQuiet_SuppressesInfoButKeepsWarnings()
     {
         // Arrange
@@ -813,7 +1056,9 @@ public class DecryptCommandTests : CommandTestBase
             Writer,
             fileSystem ?? FileSystem,
             _inputResolver,
-            _outputResolver
+            _outputResolver,
+            _passphraseResolver,
+            new DecryptReporter(Writer)
         );
     }
 
