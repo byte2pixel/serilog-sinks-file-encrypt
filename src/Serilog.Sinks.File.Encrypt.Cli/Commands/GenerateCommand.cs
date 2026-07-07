@@ -135,7 +135,7 @@ public sealed class GenerateCommand(
                 writer.Info($"[yellow]Created directory:[/] {settings.OutputPath}");
             }
 
-            string fileExt = settings.Format.ToString().ToLower();
+            string fileExt = settings.Format.ToString().ToLowerInvariant();
 
             // Define file paths
             string privateKeyPath = fileSystem.Path.Join(

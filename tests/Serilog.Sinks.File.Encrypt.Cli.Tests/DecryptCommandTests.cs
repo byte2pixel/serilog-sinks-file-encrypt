@@ -1,4 +1,5 @@
 using NSubstitute.ExceptionExtensions;
+using NSubstitute.ReturnsExtensions;
 using Serilog.Sinks.File.Encrypt.Models;
 using Spectre.Console;
 
@@ -789,7 +790,7 @@ public class DecryptCommandTests : CommandTestBase
         FileSystem.AddFile(keyPath, new MockFileData(encryptedPrivateKey));
         _passphraseResolver
             .Resolve(Arg.Any<string?>(), Arg.Any<string?>(), confirm: false)
-            .Returns((string?)null);
+            .ReturnsNull();
 
         DecryptCommand command = GetSut();
         DecryptCommand.Settings settings = new() { InputPath = EncryptedFile, KeyFile = keyPath };
@@ -1048,6 +1049,38 @@ public class DecryptCommandTests : CommandTestBase
         result.ShouldBe(ExitCodes.Success);
         TestConsole.Output.ShouldContain("resync attempts:");
         TestConsole.Output.ShouldContain("sessions: 1");
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_PathWithMarkupCharacters_RendersLiterallyWithoutThrowing()
+    {
+        // Regression guard: '[' and ']' are legal in file names; every console write goes
+        // through MarkupLineInterpolated, which escapes interpolation holes, so a path
+        // like "weird[1].log" must render literally instead of crashing markup parsing.
+        string weirdFile = Path.Join("logs", "weird[1].log");
+        FileSystem.AddFile(
+            weirdFile,
+            new MockFileData(CreateEncryptedLogFile(LogContent1, _publicKey))
+        );
+        ConfigureFileResolver(weirdFile);
+        DecryptCommand command = GetSut();
+        DecryptCommand.Settings settings = new()
+        {
+            InputPath = weirdFile,
+            KeyFile = _privateKeyPath,
+            OutputPath = Path.Join("logs", "weird[1].decrypted.log"),
+        };
+
+        // Act
+        int result = await command.ExecuteAsync(
+            new CommandContext(Arguments, Remaining, "decrypt", null),
+            settings,
+            CancellationToken.None
+        );
+
+        // Assert
+        result.ShouldBe(ExitCodes.Success);
+        TestConsole.Output.ShouldContain("weird[1].log");
     }
 
     private DecryptCommand GetSut(IFileSystem? fileSystem = null)

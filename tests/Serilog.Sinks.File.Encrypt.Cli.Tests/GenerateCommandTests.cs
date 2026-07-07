@@ -1,3 +1,4 @@
+using NSubstitute.ReturnsExtensions;
 using Serilog.Sinks.File.Encrypt.Models;
 using Spectre.Console;
 
@@ -78,7 +79,7 @@ public class GenerateCommandTests : CommandTestBase
         // Arrange — resolver finds nothing and cannot prompt
         _passphraseResolver
             .Resolve(Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<bool>())
-            .Returns((string?)null);
+            .ReturnsNull();
         GenerateCommand command = GetSut();
         GenerateCommand.Settings settings = new() { OutputPath = "keys" };
 
@@ -384,6 +385,28 @@ public class GenerateCommandTests : CommandTestBase
         // Assert
         result.ShouldBe(1); // Error
         TestConsole.Output.ShouldContain("Error generating RSA key pair:");
+    }
+
+    [Fact]
+    public void Execute_OutputPathWithMarkupCharacters_RendersLiterallyWithoutThrowing()
+    {
+        // Regression guard: markup characters in the output path must not break the
+        // success/permission messages (interpolation holes are escaped by the writer).
+        string outputPath = Path.Join("keys[prod]");
+        GenerateCommand command = GetSut();
+        GenerateCommand.Settings settings = new() { OutputPath = outputPath, KeySize = 2048 };
+
+        // Act
+        int result = command.Execute(
+            new CommandContext(Arguments, Remaining, "generate", null),
+            settings,
+            CancellationToken.None
+        );
+
+        // Assert
+        result.ShouldBe(0);
+        FileSystem.File.Exists(Path.Join(outputPath, "private_key.pem")).ShouldBeTrue();
+        TestConsole.Output.ShouldContain("keys[prod]");
     }
 
     [Fact]
