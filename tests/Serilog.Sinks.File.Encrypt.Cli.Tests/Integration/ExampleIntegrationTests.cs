@@ -53,9 +53,9 @@ public class ExampleIntegrationTests : CliIntegrationTestBase
     [Fact]
     public async Task Generate_WithQuiet_ParsesAndSucceeds()
     {
-        // Act
+        // Act — --plaintext keeps the run independent of passphrase sources/interactivity
         CommandAppResult result = await Tester.RunAsync(
-            ["generate", "-o", "keys", "-q"],
+            ["generate", "-o", "keys", "-q", "--plaintext"],
             TestContext.Current.CancellationToken
         );
 

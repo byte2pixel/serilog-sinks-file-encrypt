@@ -6,6 +6,73 @@ public class OutputResolverTests
 
     private OutputResolver GetSut() => new(_fileSystem);
 
+    #region Path containment (#85)
+
+    [Fact]
+    public void GivenTraversalInputPath_MultiFileMode_ResultStaysUnderOutputRoot()
+    {
+        // Arrange — an input path with ".." segments must not drag the output outside the
+        // output directory (GetFileName strips directories; the containment guard backs it up)
+        string inputFile = Path.Join("logs", "..", "..", "evil.log");
+
+        // Act
+        string result = GetSut().ResolveOutputPath(inputFile, Path.Join("logs", "*.log"), "out");
+
+        // Assert
+        result.ShouldBe(Path.Join("out", "evil.decrypted.log"));
+        string canonicalParent = _fileSystem.Path.GetDirectoryName(
+            _fileSystem.Path.GetFullPath(result)
+        )!;
+        canonicalParent.ShouldBe(_fileSystem.Path.GetFullPath("out"));
+    }
+
+    [Fact]
+    public void GivenTraversalInputPath_SingleFileDirectoryMode_ResultStaysUnderOutputRoot()
+    {
+        // Arrange — single-file mode with a directory output and a ".."-relative input
+        string inputFile = Path.Join("..", "evil.log");
+        _fileSystem.AddFile(inputFile, new MockFileData("content"));
+        _fileSystem.AddDirectory("out");
+
+        // Act
+        string result = GetSut().ResolveOutputPath(inputFile, inputFile, "out");
+
+        // Assert
+        result.ShouldBe(Path.Join("out", "evil.decrypted.log"));
+    }
+
+    [Fact]
+    public void GivenAbsoluteExplicitFilePath_SingleFileMode_IsAllowed()
+    {
+        // Arrange — an explicit absolute file path is unambiguous user intent
+        string inputFile = Path.Join("logs", "app.log");
+        _fileSystem.AddFile(inputFile, new MockFileData("content"));
+        string absoluteOutput = _fileSystem.Path.GetFullPath(Path.Join("elsewhere", "target.log"));
+
+        // Act
+        string result = GetSut().ResolveOutputPath(inputFile, inputFile, absoluteOutput);
+
+        // Assert
+        result.ShouldBe(absoluteOutput);
+    }
+
+    [Fact]
+    public void GivenOutputDirectoryWithTrailingSeparator_NormalFileName_IsAllowed()
+    {
+        // Arrange — trailing separator on the output directory must not trigger a refusal
+        string inputFile = Path.Join("logs", "app.log");
+        _fileSystem.AddFile(inputFile, new MockFileData("content"));
+        string outputDir = "out" + Path.DirectorySeparatorChar;
+
+        // Act
+        string result = GetSut().ResolveOutputPath(inputFile, inputFile, outputDir);
+
+        // Assert
+        result.ShouldBe(Path.Join(outputDir, "app.decrypted.log"));
+    }
+
+    #endregion
+
     #region No output path specified (default behaviour)
 
     [Fact]

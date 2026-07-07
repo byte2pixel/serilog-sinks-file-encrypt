@@ -141,7 +141,7 @@ public sealed class EncryptedLogStreamAsyncTests : EncryptionTestBase
         (string publicKey, _) = CryptographicUtils.GenerateRsaKeyPair();
         using MemoryStream fs = new();
         using RSA rsa = RSA.Create();
-        rsa.FromXmlString(publicKey);
+        rsa.FromString(publicKey);
         EncryptionOptions options = new(rsa);
         await using LogWriter logWriter = new(fs, options);
 
@@ -162,7 +162,7 @@ public sealed class EncryptedLogStreamAsyncTests : EncryptionTestBase
         (string publicKey, _) = CryptographicUtils.GenerateRsaKeyPair();
         using MemoryStream fs = new();
         using RSA rsa = RSA.Create();
-        rsa.FromXmlString(publicKey);
+        rsa.FromString(publicKey);
         EncryptionOptions options = new(rsa);
         await using LogWriter logWriter = new(fs, options);
 
@@ -181,7 +181,7 @@ public sealed class EncryptedLogStreamAsyncTests : EncryptionTestBase
         (string publicKey, _) = CryptographicUtils.GenerateRsaKeyPair();
         using MemoryStream fs = new();
         using RSA rsa = RSA.Create();
-        rsa.FromXmlString(publicKey);
+        rsa.FromString(publicKey);
         EncryptionOptions options = new(rsa);
         await using LogWriter logWriter = new(fs, options);
 
@@ -202,7 +202,7 @@ public sealed class EncryptedLogStreamAsyncTests : EncryptionTestBase
         (string publicKey, _) = CryptographicUtils.GenerateRsaKeyPair();
         using MemoryStream fs = new();
         using RSA rsa = RSA.Create();
-        rsa.FromXmlString(publicKey);
+        rsa.FromString(publicKey);
         EncryptionOptions options = new(rsa);
         await using LogWriter logWriter = new(fs, options);
 

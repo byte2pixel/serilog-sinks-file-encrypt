@@ -26,6 +26,20 @@ public sealed class LocalKeyProvider : IKeyProvider, IDisposable
     /// <exception cref="ArgumentException">Thrown if the provided keyMap is empty</exception>
     /// <exception cref="CryptographicException">Thrown if any of the RSA keys in the keyMap are invalid or cannot be parsed.</exception>
     public LocalKeyProvider(Dictionary<string, string> keyMap)
+        : this(keyMap, passphrase: null) { }
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="LocalKeyProvider"/> class with a dictionary of key IDs
+    /// and their corresponding RSA private keys, where keys may be passphrase-encrypted PKCS#8 PEM
+    /// (<c>ENCRYPTED PRIVATE KEY</c> blocks). The same passphrase is applied to every encrypted key
+    /// in the map; unencrypted keys ignore it.
+    /// </summary>
+    /// <param name="keyMap">A dictionary mapping key IDs to their corresponding RSA private keys in string format.</param>
+    /// <param name="passphrase">The passphrase for encrypted keys, or null when no key is encrypted.</param>
+    /// <exception cref="ArgumentNullException">Thrown if the provided keyMap is null.</exception>
+    /// <exception cref="ArgumentException">Thrown if the provided keyMap is empty</exception>
+    /// <exception cref="CryptographicException">Thrown if any RSA key is invalid, encrypted without a passphrase, or the passphrase is wrong.</exception>
+    public LocalKeyProvider(Dictionary<string, string> keyMap, string? passphrase)
     {
         ArgumentNullException.ThrowIfNull(keyMap);
         if (keyMap.Count == 0)
@@ -35,38 +49,48 @@ public sealed class LocalKeyProvider : IKeyProvider, IDisposable
 
         foreach ((string key, string rsa) in keyMap)
         {
-            try
-            {
-                var rsaKey = RSA.Create();
-                rsaKey.FromString(rsa);
-                _rsaKeyCache.Add(key, rsaKey);
-            }
-            catch (Exception ex)
-                when (ex is CryptographicException or ArgumentNullException or ArgumentException
-                    || ex.GetType().Name.Contains("CryptographicException")
-                )
-            {
-                throw new CryptographicException(
-                    $"Invalid RSA key for key ID '{key}': {ex.Message}",
-                    ex
-                );
-            }
+            _rsaKeyCache.Add(key, ImportKey(key, rsa, passphrase));
         }
     }
 
     /// <summary>
     /// Initializes a new instance of the <see cref="LocalKeyProvider"/> class with a single RSA key.
     /// </summary>
-    /// <param name="keyId"></param>
-    /// <param name="privateKey"></param>
-    /// <exception cref="CryptographicException"></exception>
+    /// <param name="keyId">The key id associated with the private key.</param>
+    /// <param name="privateKey">The RSA private key in XML or PEM format.</param>
+    /// <exception cref="CryptographicException">Thrown if the RSA key is invalid or cannot be parsed.</exception>
     public LocalKeyProvider(string keyId, string privateKey)
+        : this(keyId, privateKey, passphrase: null) { }
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="LocalKeyProvider"/> class with a single RSA key
+    /// that may be a passphrase-encrypted PKCS#8 PEM (<c>ENCRYPTED PRIVATE KEY</c> block).
+    /// An unencrypted key ignores the passphrase.
+    /// </summary>
+    /// <param name="keyId">The key id associated with the private key.</param>
+    /// <param name="privateKey">The RSA private key in XML or PEM format, optionally encrypted.</param>
+    /// <param name="passphrase">The passphrase for an encrypted key, or null when the key is unencrypted.</param>
+    /// <exception cref="CryptographicException">Thrown if the RSA key is invalid, encrypted without a passphrase, or the passphrase is wrong.</exception>
+    public LocalKeyProvider(string keyId, string privateKey, string? passphrase)
+    {
+        _rsaKeyCache.Add(keyId, ImportKey(keyId, privateKey, passphrase));
+    }
+
+    private static RSA ImportKey(string keyId, string privateKey, string? passphrase)
     {
         try
         {
             var rsa = RSA.Create();
-            rsa.FromString(privateKey);
-            _rsaKeyCache.Add(keyId, rsa);
+            if (passphrase is null)
+            {
+                rsa.FromString(privateKey);
+            }
+            else
+            {
+                rsa.FromString(privateKey, passphrase);
+            }
+
+            return rsa;
         }
         catch (Exception ex)
             when (ex is CryptographicException or ArgumentNullException or ArgumentException
