@@ -141,6 +141,17 @@ new `DecryptionResult.NothingDecrypted` property (additive, non-breaking).
   detected `SealCountMismatch` always throws in `ThrowException` mode, even without the flag.
 - **CLI `--require-sealed`** — the `decrypt` command reports per-session seal status and, combined
   with `--strict`, fails on unsealed/legacy sessions.
+- **CLI `--version`** — `serilog-encrypt --version` (or `-v` at the root) prints the tool version,
+  sourced from the MinVer-stamped assembly informational version. Inside a command, `-v` remains
+  `--verbose`.
+
+### Fixed
+
+- **CLI now rejects unknown options** instead of silently ignoring them. Spectre.Console.Cli
+  does not reject unrecognized options by default, so an invocation like
+  `generate -o keys -k 4096` dropped the unknown `-k` and ran with the default key size,
+  exiting `0`. Strict parsing is now enabled, so any unknown option fails with an "Unknown
+  option" diagnostic and exit code `2` (usage error).
 
 ### Notes
 
