@@ -1,4 +1,5 @@
 using System.IO.Abstractions;
+using System.Reflection;
 using Microsoft.Extensions.DependencyInjection;
 using Serilog.Sinks.File.Encrypt.Cli.Commands;
 using Spectre.Console.Cli;
@@ -35,6 +36,8 @@ public static class CommandAppConfiguration
         return c =>
         {
             c.SetApplicationName("serilog-encrypt");
+            c.SetApplicationVersion(GetInformationalVersion());
+            c.UseStrictParsing();
             c.AddCommand<GenerateCommand>(Generate)
                 .WithDescription(
                     "Generate a new RSA key pair for log encryption. The private key is "
@@ -74,5 +77,20 @@ public static class CommandAppConfiguration
                 .WithExample(Decrypt, "./logs/*.log", "-k", PrivateKey, "--audit-log", "audit.log");
             c.ValidateExamples();
         };
+    }
+
+    /// <summary>
+    /// Resolves the version shown by <c>--version</c> from the assembly's MinVer-stamped
+    /// informational version, dropping any <c>+build</c> metadata. Falls back to "unknown"
+    /// when the attribute is absent (e.g. a MinVer-skipped Debug build).
+    /// </summary>
+    private static string GetInformationalVersion()
+    {
+        string? informational = Assembly
+            .GetExecutingAssembly()
+            .GetCustomAttribute<AssemblyInformationalVersionAttribute>()
+            ?.InformationalVersion;
+
+        return string.IsNullOrEmpty(informational) ? "unknown" : informational.Split('+')[0];
     }
 }
