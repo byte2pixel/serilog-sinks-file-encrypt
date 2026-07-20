@@ -937,6 +937,15 @@ public class DecryptCommandTests : CommandTestBase
             .GetProperty("outcome")
             .GetString()
             .ShouldBe("NothingDecrypted");
+        // Nothing was verified, so neither flag may claim sealed vacuously
+        doc.RootElement.GetProperty("files")[0]
+            .GetProperty("allSessionsSealed")
+            .GetBoolean()
+            .ShouldBeFalse();
+        doc.RootElement.GetProperty("summary")
+            .GetProperty("allSessionsSealed")
+            .GetBoolean()
+            .ShouldBeFalse();
     }
 
     [Fact]

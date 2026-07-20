@@ -178,7 +178,7 @@ foreach (SessionResult session in result.Sessions)
 }
 
 // Convenience aggregates
-bool trustworthy = result.AllSessionsSealed;   // every session Sealed or v1
+bool trustworthy = result.AllSessionsSealed;   // ≥1 session, every one Sealed or v1
 int suspect      = result.UnsealedSessions;    // Unsealed + SealCountMismatch + SealInvalid
 ```
 
@@ -296,7 +296,8 @@ public sealed class DecryptionResult
     // Per-session detail, in the order sessions appear in the file
     public IReadOnlyList<SessionResult> Sessions { get; init; }
     public int UnsealedSessions  { get; }   // Unsealed + SealCountMismatch + SealInvalid
-    public bool AllSessionsSealed { get; }  // every session Sealed or NotApplicable (v1)
+    public bool AllSessionsSealed { get; }  // ≥1 session and every one Sealed or NotApplicable (v1);
+                                            // false when nothing was decrypted
 }
 ```
 
