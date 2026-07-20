@@ -544,7 +544,7 @@ public sealed class DecryptCommand(
             FailedHeaders: 0,
             FailedMessages: 0,
             ResyncAttempts: 0,
-            AllSessionsSealed: true,
+            AllSessionsSealed: false,
             Sessions: [],
             Error: error
         );
@@ -562,9 +562,11 @@ public sealed class DecryptCommand(
             reports.Sum(r => r.ResyncAttempts),
             // Strict, matching the library's RequireSealed semantics: a v1 session
             // (NotApplicable) cannot be verified and therefore counts as not sealed.
-            reports
-                .Where(r => r.Outcome == FileOutcome.Success)
-                .All(r => r.Sessions.All(s => s.SealStatus == nameof(SealStatus.Sealed)))
+            // A run with zero successful files verified nothing, so it is never "all sealed".
+            reports.Any(r => r.Outcome == FileOutcome.Success)
+                && reports
+                    .Where(r => r.Outcome == FileOutcome.Success)
+                    .All(r => r.Sessions.All(s => s.SealStatus == nameof(SealStatus.Sealed)))
         );
     }
 

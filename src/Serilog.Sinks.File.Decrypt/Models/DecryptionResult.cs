@@ -70,10 +70,13 @@ public sealed class DecryptionResult
         );
 
     /// <summary>
-    /// True when every session either verified as sealed or predates seal support (v1).
+    /// True when at least one session was found and every session either verified as sealed
+    /// or predates seal support (v1). False when the result contains no sessions at all —
+    /// an empty result carries no seal evidence (see <see cref="NothingDecrypted"/>).
     /// </summary>
     public bool AllSessionsSealed =>
-        Sessions.All(s => s.SealStatus is SealStatus.Sealed or SealStatus.NotApplicable);
+        Sessions.Count > 0
+        && Sessions.All(s => s.SealStatus is SealStatus.Sealed or SealStatus.NotApplicable);
 
     /// <summary>
     /// <para>

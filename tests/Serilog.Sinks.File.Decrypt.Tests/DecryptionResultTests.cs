@@ -35,6 +35,38 @@ public sealed class DecryptionResultTests : EncryptionTestBase
     }
 
     [Fact]
+    public void AllSessionsSealed_FalseWhenNoSessions()
+    {
+        DecryptionResult result = new();
+
+        result.AllSessionsSealed.ShouldBeFalse();
+    }
+
+    [Theory]
+    [InlineData(SealStatus.Sealed, true)]
+    [InlineData(SealStatus.NotApplicable, true)]
+    [InlineData(SealStatus.Unsealed, false)]
+    [InlineData(SealStatus.SealCountMismatch, false)]
+    [InlineData(SealStatus.SealInvalid, false)]
+    public void AllSessionsSealed_ReflectsSealStatus(SealStatus status, bool expected)
+    {
+        DecryptionResult result = new()
+        {
+            Sessions =
+            [
+                new SessionResult
+                {
+                    Index = 0,
+                    FormatVersion = 2,
+                    SealStatus = status,
+                },
+            ],
+        };
+
+        result.AllSessionsSealed.ShouldBe(expected);
+    }
+
+    [Fact]
     public async Task SkipMode_WrongKey_ReportsNothingDecrypted()
     {
         // Arrange — encrypt with the test base key, decrypt with a different key
@@ -58,6 +90,7 @@ public sealed class DecryptionResultTests : EncryptionTestBase
         result.NothingDecrypted.ShouldBeTrue();
         result.FailedHeaders.ShouldBeGreaterThan(0);
         output.Length.ShouldBe(0);
+        result.AllSessionsSealed.ShouldBeFalse();
     }
 
     [Fact]

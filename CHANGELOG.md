@@ -48,6 +48,9 @@ new EncryptionOptions(rsa, KeyId: "my-key");
 
 - `DecryptionResult` is now `sealed` and gains `Sessions` (`IReadOnlyList<SessionResult>`),
   `UnsealedSessions`, and `AllSessionsSealed`. The existing flat counters are unchanged.
+  `AllSessionsSealed` requires at least one session — an empty result (nothing decrypted)
+  reports `false`, never a vacuous `true`; the `--json` report applies the same rule to its
+  per-file and summary `allSessionsSealed` fields.
 - `DecryptionContext` gains `Version`, `HeaderHash`, `SealNonce`, and `KeyId`; its constructor
   signature changed.
 - Internal writer/reader interfaces (`IFrameWriter`, `ISessionWriter`, `ISessionReader`) changed

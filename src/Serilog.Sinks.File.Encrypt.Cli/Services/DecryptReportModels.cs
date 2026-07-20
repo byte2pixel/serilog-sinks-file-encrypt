@@ -57,7 +57,9 @@ public sealed record FileReport(
 /// every session of every successful file is cryptographically verified as sealed — v1
 /// sessions (seal <c>NotApplicable</c>) count as NOT sealed, matching the library's
 /// <c>RequireSealed</c> semantics. Per-file <see cref="FileReport.AllSessionsSealed"/>
-/// keeps the library's v1-tolerant meaning.
+/// keeps the library's v1-tolerant meaning. Both are false when nothing was verified:
+/// the summary flag when no file succeeded, the per-file flag when the file produced no
+/// sessions (failed, refused, or nothing decrypted).
 /// </summary>
 public sealed record RunSummary(
     int Files,
