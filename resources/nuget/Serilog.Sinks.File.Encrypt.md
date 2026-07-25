@@ -74,9 +74,14 @@ Generate an RSA key pair using the CLI tool:
 serilog-encrypt generate --output ./keys
 ```
 
-This creates:
-- `public_key.xml`: Used for encryption (safe to include with your application)
-- `private_key.xml`: Used for decryption (keep secure, do not distribute)
+You are prompted for a passphrase (or supply one via `--passphrase-file`, `--passphrase-env`,
+or the `SERILOG_ENCRYPT_PASSPHRASE` environment variable), and two files are created:
+
+- `public_key.pem`: Used for encryption (safe to include with your application)
+- `private_key.pem`: Passphrase-encrypted PKCS#8 private key used for decryption (keep secure, do not distribute)
+
+Pass `--plaintext` for an unencrypted private key, or `--format Xml --plaintext` for legacy
+XML keys. **There is no recovery if the passphrase is lost.**
 
 ### 2. Configure Serilog with Encryption
 
@@ -84,15 +89,15 @@ This creates:
 using Serilog;
 using Serilog.Sinks.File.Encrypt;
 
-// Load your public key
-string publicKeyXml = File.ReadAllText("./keys/public_key.xml");
+// Load your public key (XML and PEM formats are both supported)
+string publicKey = File.ReadAllText("./keys/public_key.pem");
 
 // Configure Serilog with encryption.
 // Assign a key ID to support future key rotation (recommended).
 Log.Logger = new LoggerConfiguration()
     .WriteTo.File(
         path: "logs/app.log",
-        hooks: new EncryptHooks(publicKeyXml, keyId: "my-app-key-2026"))
+        hooks: new EncryptHooks(publicKey, keyId: "my-app-key-2026"))
     .CreateLogger();
 
 // Log as usual
@@ -118,14 +123,14 @@ For high-volume logging scenarios where you can tolerate potential data loss on 
 using Serilog;
 using Serilog.Sinks.File.Encrypt;
 
-string publicKeyXml = File.ReadAllText("./keys/public_key.xml");
+string publicKey = File.ReadAllText("./keys/public_key.pem");
 
 Log.Logger = new LoggerConfiguration()
     .WriteTo.File(
         path: "logs/app.log",
         buffered: true, // buffered writes
         flushToDiskInterval: TimeSpan.FromSeconds(5), // flush every X seconds (adjust as needed)
-        hooks: new EncryptHooks(publicKeyXml, keyId: "my-app-key-2026"))
+        hooks: new EncryptHooks(publicKey, keyId: "my-app-key-2026"))
     .CreateLogger();
 
 // CRITICAL: Always flush on shutdown
@@ -221,7 +226,7 @@ Each file open starts a **session**: a header (`magic(8) + version(1) + keyId(32
 
 - Keep private keys secure and never include them in your application deployment
 - Store private keys in secure key management systems in production (Azure Key Vault, AWS Secrets Manager, etc.)
-- Use 2048-bit RSA keys minimum (4096-bit for enhanced security)
+- Use 2048-bit RSA keys minimum; the CLI default is 3072-bit (use 4096-bit for enhanced security)
 - Restrict filesystem access to encrypted log files and private keys
 - Rotate keys periodically and use the `keyId` parameter to track which key encrypted which files
 

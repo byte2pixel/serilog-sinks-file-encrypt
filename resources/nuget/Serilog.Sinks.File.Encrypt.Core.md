@@ -16,6 +16,7 @@ All packages in this repository (`Serilog.Sinks.File.Encrypt`, `Serilog.Sinks.Fi
 
 ## What's Included
 
-- `CryptographicUtils.GenerateRsaKeyPair` — generates RSA key pairs for use with the encrypt/decrypt packages
-- `CryptographicUtils.FromString` — RSA key import extension for XML and PEM formats
+- `CryptographicUtils.GenerateRsaKeyPair` — generates RSA key pairs (PEM by default), including an overload that produces passphrase-encrypted PKCS#8 PEM private keys
+- `CryptographicUtils.FromString` — RSA key import extension for XML, PEM, and passphrase-encrypted PKCS#8 PEM formats
+- `CryptographicUtils.IsEncryptedPem` — detects whether a key string is a passphrase-encrypted PKCS#8 PEM (`ENCRYPTED PRIVATE KEY`)
 - `KeyFormat` — enum for specifying XML or PEM key format

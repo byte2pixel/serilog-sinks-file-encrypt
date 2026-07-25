@@ -26,7 +26,7 @@ All packages in this repository are released **in lockstep** — every package i
 | `Serilog.Sinks.File.Encrypt.Cli` | ✅ |
 | `Serilog.Sinks.File.Encrypt.Core` | ✅ |
 
-**Always use the same version across all packages.** For example, if you install `Serilog.Sinks.File.Encrypt` v5.1.0, install `Serilog.Sinks.File.Decrypt` v5.1.0 as well. Mixing versions is not supported and may produce unexpected behaviour.
+**Always use the same version across all packages.** For example, if you install `Serilog.Sinks.File.Encrypt` v6.0.0, install `Serilog.Sinks.File.Decrypt` v6.0.0 as well. Mixing versions is not supported and may produce unexpected behaviour.
 
 ## ✨ Features
 
@@ -48,6 +48,12 @@ Detailed installation, configuration, and usage instructions are provided in the
 - 📄 [Serilog.Sinks.File.Encrypt.Core](resources/nuget/Serilog.Sinks.File.Encrypt.Core.md) — shared primitives (transitive dependency)
 - 📊 [Performance Benchmarks & Analysis](examples/Example.Benchmarks/README.md)
 - 📋 [Changelog & Migration Guide](CHANGELOG.md)
+
+Runnable examples live in [`examples/`](examples):
+
+- 🖥️ [Console application](examples/Example.Console) — end-to-end walkthrough: generate keys, write encrypted logs, decrypt with the CLI
+- 🌐 [ASP.NET Core Web API](examples/Example.WebApi) — environment-specific configuration with encryption enabled only in Production
+- 🔀 [Mixed-version decryption](examples/Example.FileBasedApp) — proves v6.0.0 decrypts a single file containing sessions written by both v4.0.0 (v1 format) and v6.0.0 (v2 format)
 
 Please refer to these files for up-to-date and comprehensive documentation for each package.
 
