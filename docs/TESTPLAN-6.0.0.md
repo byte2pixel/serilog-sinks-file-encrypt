@@ -4,7 +4,9 @@ Tests the packaged output of PR #103 end-to-end: the `serilog-encrypt` tool inst
 `./.artifacts/`, real encrypted logs produced by `Example.Console` referencing your generated
 key, and the frozen v1 fixtures for backward compatibility.
 
-> This file is untracked — commit it, move it to `docs/`, or delete it when done.
+> **Status: executed in full against the 6.0.0 preview artifacts — all checks green
+> (2026-07-19).** Kept as a record of the acceptance run and as a reusable template for
+> future CLI releases.
 >
 > Shell convention: PowerShell commands check `$LASTEXITCODE`; WSL/bash sections check `$?`.
 > Run everything from the repo root unless stated. `$SB` is a scratch sandbox:

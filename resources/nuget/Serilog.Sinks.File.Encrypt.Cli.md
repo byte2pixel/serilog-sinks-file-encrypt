@@ -9,11 +9,14 @@
 A command-line tool for managing RSA key pairs and decrypting log files created by the [Serilog.Sinks.File.Encrypt](https://www.nuget.org/packages/Serilog.Sinks.File.Encrypt#readme-body-tab) package.
 
 > [!WARNING]
-> **v5.0.0 — Package split**
-> The `Serilog.Sinks.File.Encrypt` NuGet package has been split. Decryption types (`LogReader`, `LocalKeyProvider`, `IKeyProvider`, `DecryptionOptions`) are now in [`Serilog.Sinks.File.Decrypt`](https://www.nuget.org/packages/Serilog.Sinks.File.Decrypt). The CLI tool itself is unaffected.
+> **v6.0.0 Breaking Changes**
+> - The CLI returns **distinct exit codes** `0`–`5`: usage errors exit `2` (previously `-1`), no files matched exits `3` (previously `0`), and a decryption that produces nothing exits `4` (previously a silent success). See *Exit codes* below.
+> - `generate` writes a **passphrase-encrypted PEM** private key by default (3072-bit). An unencrypted key requires `--plaintext`; legacy XML output requires `--format Xml --plaintext`.
+> - The `decrypt --key` default changed from `private_key.xml` to **`private_key.pem`**.
+> - Existing output and key files are **never overwritten** without `--force`.
+> - Unknown options are rejected with exit code `2` instead of being silently ignored.
 >
-> **v4.x can decrypt log files written by v3.0.0, but not v2.x.**
-> The v3.x CLI cannot decrypt log files written by v2.x. Decrypt existing v2.x files with the v2.x CLI **before** upgrading. See the [CHANGELOG](https://github.com/byte2pixel/serilog-sinks-file-encrypt/blob/main/CHANGELOG.md) for the full migration guide.
+> See the [CHANGELOG](https://github.com/byte2pixel/serilog-sinks-file-encrypt/blob/main/CHANGELOG.md) for details. The v6 CLI still decrypts log files written by v3.0.0 and later.
 
 > [!NOTE]
 > The CLI is designed for simplicity and ease of use, with a focus mainly on testing and development scenarios.
@@ -73,30 +76,30 @@ Windows. If the restriction fails, a warning is printed and generation still suc
 Decrypt encrypted log files using your RSA private key:
 
 ```bash
-# Decrypt a single file (output: app.decrypted.log in same directory)
-serilog-encrypt decrypt app.log -k private_key.xml
+# Decrypt a single file (uses ./private_key.pem by default; output: app.decrypted.log)
+serilog-encrypt decrypt app.log
 
-# Decrypt with a key ID (must match the keyId used during encryption)
-serilog-encrypt decrypt app.log -k private_key.xml --id my-app-key-2026
+# Decrypt with an explicit key file and key ID (--id must match the keyId used during encryption)
+serilog-encrypt decrypt app.log -k private_key.pem --id my-app-key-2026
 
 # Decrypt a single file with custom output
-serilog-encrypt decrypt app.log -k private_key.xml -o decrypted.log
+serilog-encrypt decrypt app.log -k private_key.pem -o decrypted.log
 
 # Decrypt all .log files using a glob pattern
-serilog-encrypt decrypt "*.log" -k private_key.xml --id my-app-key-2026
+serilog-encrypt decrypt "*.log" -k private_key.pem --id my-app-key-2026
 
 # Decrypt all .log files under a directory using a glob pattern
-serilog-encrypt decrypt "logs/*.log" -k private_key.xml --id my-app-key-2026
+serilog-encrypt decrypt "logs/*.log" -k private_key.pem --id my-app-key-2026
 
 # Decrypt to a specific output directory
-serilog-encrypt decrypt "logs/*.log" -k private_key.xml -o ./decrypted
+serilog-encrypt decrypt "logs/*.log" -k private_key.pem -o ./decrypted
 ```
 
 **Arguments:**
 - `<PATH>`: Path to an encrypted log file, or a glob pattern (e.g., `*.log`, `logs/*.txt`). Directories are not accepted directly — append a pattern such as `logs/*.log`.
 
 **Options:**
-- `-k|--key <KEY>`: Path to the RSA private key file (default: `private_key.pem`). Passphrase-encrypted PKCS#8 PEM keys are supported.
+- `-k|--key <KEY>`: Path to the RSA private key file (default: `private_key.pem`). Passphrase-encrypted PKCS#8 PEM keys and legacy plaintext XML keys are both supported.
 - `--passphrase-env <NAME>` / `--passphrase-file <PATH>`: Passphrase source for an encrypted private key; `SERILOG_ENCRYPT_PASSPHRASE` is checked as a fallback, then an interactive hidden prompt. Only consulted when the key file is actually encrypted.
 - `--id <KEY_ID>`: The key ID that was supplied to `EncryptHooks` during encryption (default: `""` — matches files encrypted without a key ID)
 - `-o|--output <OUTPUT>`: Output directory or file path (default: adds `.decrypted` to original filename)
@@ -134,41 +137,47 @@ When several conditions apply across a multi-file run, the highest-priority code
 
 ### Basic Key Generation
 ```bash
-# Generate keys in the current directory
+# Generate keys in the current directory (prompts for a passphrase)
 serilog-encrypt generate --output .
 
 # Generate keys in a specific directory
 serilog-encrypt generate --output ./keys
+
+# Generate an unencrypted private key (not recommended outside development)
+serilog-encrypt generate --output ./keys --plaintext
+
+# Generate legacy plaintext XML keys (readable by every version of these packages)
+serilog-encrypt generate --output ./keys --format Xml --plaintext
 ```
 
 ### Single File Decryption
 ```bash
 # Decrypt a single file (creates app.decrypted.log)
-serilog-encrypt decrypt app.log -k ./keys/private_key.xml
+serilog-encrypt decrypt app.log -k ./keys/private_key.pem
 
 # Decrypt with key ID (recommended when keyId was set during encryption)
-serilog-encrypt decrypt app.log -k ./keys/private_key.xml --id my-app-key-2026
+serilog-encrypt decrypt app.log -k ./keys/private_key.pem --id my-app-key-2026
 
 # Decrypt with custom output name
-serilog-encrypt decrypt app.log -k ./keys/private_key.xml -o readable.log
+serilog-encrypt decrypt app.log -k ./keys/private_key.pem -o readable.log
 
 # Decrypt with strict error checking
-serilog-encrypt decrypt app.log -k ./keys/private_key.xml --strict
+serilog-encrypt decrypt app.log -k ./keys/private_key.pem --strict
 ```
 
 ### Batch Decryption
 ```bash
 # Decrypt all .log files in the current directory
-serilog-encrypt decrypt "*.log" -k ./keys/private_key.xml --id my-app-key-2026
+serilog-encrypt decrypt "*.log" -k ./keys/private_key.pem --id my-app-key-2026
 
 # Decrypt all .log files under a subdirectory using a glob pattern
-serilog-encrypt decrypt "logs/*.log" -k ./keys/private_key.xml --id my-app-key-2026
+serilog-encrypt decrypt "logs/*.log" -k ./keys/private_key.pem --id my-app-key-2026
 
 # Decrypt with a custom glob pattern (e.g., only specific file names)
-serilog-encrypt decrypt "logs/app*.txt" -k ./keys/private_key.xml
+serilog-encrypt decrypt "logs/app*.txt" -k ./keys/private_key.pem
 
 # Decrypt to a different output directory
-serilog-encrypt decrypt "logs/*.log" -k ./keys/private_key.xml -o ./decrypted-logs
+serilog-encrypt decrypt "logs/*.log" -k ./keys/private_key.pem -o ./decrypted-logs
 ```
 
 ### Key Rotation
@@ -178,10 +187,10 @@ corresponding key and `--id`:
 
 ```bash
 # Files encrypted with the 2025 key
-serilog-encrypt decrypt "logs/2025/*.log" -k ./keys/private_key_2025.xml --id my-app-key-2025
+serilog-encrypt decrypt "logs/2025/*.log" -k ./keys/private_key_2025.pem --id my-app-key-2025
 
 # Files encrypted with the 2026 key
-serilog-encrypt decrypt "logs/2026/*.log" -k ./keys/private_key_2026.xml --id my-app-key-2026
+serilog-encrypt decrypt "logs/2026/*.log" -k ./keys/private_key_2026.pem --id my-app-key-2026
 ```
 
 > [!NOTE]
@@ -192,26 +201,26 @@ serilog-encrypt decrypt "logs/2026/*.log" -k ./keys/private_key_2026.xml --id my
 **Default Behavior (Recommended):**
 By default, the tool continues processing all files even if some fail to decrypt:
 ```bash
-serilog-encrypt decrypt "logs/*.log" -k private_key.xml --id my-app-key-2026
+serilog-encrypt decrypt "logs/*.log" -k private_key.pem --id my-app-key-2026
 ```
 
 **Strict Mode:**
 Stop immediately on first error (useful for validation):
 ```bash
-serilog-encrypt decrypt app.log -k private_key.xml --strict
+serilog-encrypt decrypt app.log -k private_key.pem --strict
 ```
 
 **Seal Verification (v2-format logs, v6.0.0+):**
 Each decrypted session's end-of-log seal status is reported: `✓ All N session(s) sealed and complete` for verified logs, a warning for unsealed sessions (the application crashed or the tail was truncated — indistinguishable), and an error when a sealed log's tail was provably truncated or the seal was tampered with. To fail on anything that is not verified complete:
 ```bash
-serilog-encrypt decrypt app.log -k private_key.xml --strict --require-sealed
+serilog-encrypt decrypt app.log -k private_key.pem --strict --require-sealed
 ```
 
 **Audit Logging:**
 Write detailed diagnostic information to a separate rolling log file. If `--audit-log` is not specified, one is always created in the temp directory:
 ```bash
 # If not specified, a randomly-named audit log will be created in the temporary directory
-serilog-encrypt decrypt "logs/*.log" -k private_key.xml --audit-log decryption-audit.log
+serilog-encrypt decrypt "logs/*.log" -k private_key.pem --audit-log decryption-audit.log
 ```
 
 ## Security Notes
@@ -231,13 +240,13 @@ The tool automatically skips files with `.decrypted.` in the filename to prevent
 **Example:**
 ```bash
 # First run: decrypts app.log → app.decrypted.log
-serilog-encrypt decrypt "logs/*.log" -k key.xml --id my-app-key-2026
+serilog-encrypt decrypt "logs/*.log" -k key.pem --id my-app-key-2026
 
 # Later, after new logs are added
 # Second run: only processes app.log; skips trying to decrypt app.decrypted.log.
 # --force is required to overwrite the existing app.decrypted.log (without it the
 # file is refused and the run exits with code 2)
-serilog-encrypt decrypt "logs/*.log" -k key.xml --id my-app-key-2026 --force
+serilog-encrypt decrypt "logs/*.log" -k key.pem --id my-app-key-2026 --force
 ```
 
 ## Integration with Serilog

@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [6.0.0] - Unreleased
+## [6.0.0] - 2026-07-25
 
 ### ⚠️ Breaking Changes
 
@@ -164,6 +164,9 @@ new `DecryptionResult.NothingDecrypted` property (additive, non-breaking).
   (requires a producer-side secret); see the threat model in the package README.
 - Write-path performance is unchanged in structure: the AAD adds ~41 hashed bytes per frame with
   zero additional allocations, plus one 28-byte seal per session at close.
+- Mixed-version compatibility is demonstrated end-to-end in
+  [`examples/Example.FileBasedApp`](examples/Example.FileBasedApp): v4.0.0 (v1 format) and
+  v6.0.0 (v2 format) sessions written to the same file decrypt in one pass.
 
 ## [5.0.0] - 2026-06-29
 
