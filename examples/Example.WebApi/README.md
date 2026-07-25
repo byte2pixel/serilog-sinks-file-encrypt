@@ -40,8 +40,9 @@ Generate a key pair using the CLI tool:
 # Install tool if needed
 dotnet tool install --global Serilog.Sinks.File.Encrypt.Cli
 
-# Generate key pair
-serilog-encrypt generate -o .
+# Generate key pair (XML keys are single-line, so they embed cleanly in JSON
+# configuration; --plaintext is required for the XML format)
+serilog-encrypt generate -o . --format Xml --plaintext
 ```
 
 Open the appsettings.json and configure the common Serilog settings by adding:
@@ -53,7 +54,7 @@ Open the appsettings.json and configure the common Serilog settings by adding:
 }
 ```
 
-Configure the Production environment to log only to an ecrypted file by creating an `appsettings.Production.json`:
+Configure the Production environment to log only to an encrypted file by creating an `appsettings.Production.json`:
 Take note of the `hooks` parameter in the File sink configuration, this points to the static method that sets up the encryption hook.
 Also note the `LogPublicKey` setting that contains the RSA public key used for encryption.  The static method will read this setting from configuration.
 ```json

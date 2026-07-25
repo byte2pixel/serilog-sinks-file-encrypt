@@ -26,12 +26,18 @@ Generate fresh encryption keys for this example:
 cd examples/Example.Console
 
 # Generate new RSA keys
-serilog-encrypt generate --output .
+serilog-encrypt generate --output . --format Xml --plaintext
 ```
 
 This creates two files:
 - `public_key.xml` - Used by the application for encryption
 - `private_key.xml` - Used for decryption (keep secure!)
+
+> [!NOTE]
+> XML format is required here because the example project embeds `public_key.xml` as a
+> resource, and `--plaintext` is required for XML keys (only PEM keys support passphrase
+> encryption). For real applications, prefer the CLI's default: a passphrase-protected
+> PEM key pair.
 
 ### 3. Build and Run the Example
 
@@ -82,13 +88,13 @@ Use the CLI tool to decrypt and view the log contents:
 ```bash
 # Decrypt a specific log file (replace the date portion with your actual filename)
 # --id must match the keyId used in EncryptHooks — see Program.cs
-serilog-encrypt decrypt log20251123.txt -k ../../../private_key.xml --id console-key-2026
+serilog-encrypt decrypt log20251123.txt -k ../../../../private_key.xml --id console-key-2026
 
 # Or decrypt all log files in the Logs directory using a glob pattern
-serilog-encrypt decrypt *.txt -k ../../../private_key.xml --id console-key-2026
+serilog-encrypt decrypt *.txt -k ../../../../private_key.xml --id console-key-2026
 
 # Decrypt to a custom output name
-serilog-encrypt decrypt log20251123.txt -k ../../../private_key.xml --id console-key-2026 -o decrypted-log.txt
+serilog-encrypt decrypt log20251123.txt -k ../../../../private_key.xml --id console-key-2026 -o decrypted-log.txt
 
 # View the decrypted content
 cat log20251123.decrypted.txt
