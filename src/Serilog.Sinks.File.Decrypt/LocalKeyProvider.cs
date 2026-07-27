@@ -12,7 +12,7 @@ namespace Serilog.Sinks.File.Decrypt;
 /// </summary>
 public sealed class LocalKeyProvider : IKeyProvider, IDisposable
 {
-    private readonly Dictionary<string, RSA> _rsaKeyCache = new();
+    private readonly Dictionary<string, RSA> _rsaKeyCache = [];
 
     /// <summary>
     /// Initializes a new instance of the <see cref="LocalKeyProvider"/> class with a dictionary of key IDs

@@ -1,7 +1,6 @@
 using System.Buffers;
 using System.Buffers.Binary;
 using System.Security.Cryptography;
-using Serilog.Sinks.File.Decrypt.Interfaces;
 using Serilog.Sinks.File.Decrypt.Models;
 using Serilog.Sinks.File.Encrypt;
 
@@ -318,6 +317,9 @@ public sealed class LogReader : IDisposable
     /// so any dropped, reordered, duplicated, or cross-session-spliced frame fails authentication.
     /// v1 frames carry no associated data.
     /// </summary>
+    /// <param name="encryptedMessage">the encrypted message</param>
+    /// <param name="ciphertextLength">the length of the encrypted text</param>
+    /// <param name="plaintext">the buffer that the decrypted text goes into</param>
     private void DecryptFrame(byte[] encryptedMessage, int ciphertextLength, byte[] plaintext)
     {
         using var aes = new AesGcm(_context.SessionKey, EncryptionConstants.TagLength);
@@ -348,11 +350,14 @@ public sealed class LogReader : IDisposable
     /// Composes the associated data for a v2 record from the active session's header hash,
     /// the given frame sequence, and the record type.
     /// </summary>
+    /// <param name="aad">the aad buffer</param>
+    /// <param name="frameSequence">the frame sequence</param>
+    /// <param name="frameType">the frame type</param>
     private void BuildAad(Span<byte> aad, ulong frameSequence, byte frameType)
     {
         _context.HeaderHash.CopyTo(aad);
         BinaryPrimitives.WriteUInt64BigEndian(
-            aad.Slice(EncryptionConstants.HeaderHashLength),
+            aad[EncryptionConstants.HeaderHashLength..],
             frameSequence
         );
         aad[EncryptionConstants.AadLength - 1] = frameType;
@@ -366,6 +371,8 @@ public sealed class LogReader : IDisposable
     /// A partially written seal is an unclean close, not tampering: the session stays unsealed and
     /// no error is raised. A seal that fails authentication, or a second seal, is tampering.
     /// </summary>
+    /// <param name="cancellationToken">the cancellation token</param>
+    /// <exception cref="CryptographicException">Thrown when the seal has already been seen or </exception>
     private async Task ProcessSealAsync(CancellationToken cancellationToken)
     {
         if (_context.SealSeen)
@@ -446,6 +453,7 @@ public sealed class LogReader : IDisposable
     /// nonce (initial nonce counter − 1), which keeps the seal verifiable regardless of how many
     /// data frames survived. Returns the declared final frame count.
     /// </summary>
+    /// <param name="sealRecord">The seal record that will be decrypted.</param>
     private ulong DecryptSeal(byte[] sealRecord)
     {
         Span<byte> aad = stackalloc byte[EncryptionConstants.AadLength];
@@ -475,6 +483,7 @@ public sealed class LogReader : IDisposable
     /// detected truncation (seal count mismatch) and — when
     /// <see cref="DecryptionOptions.RequireSealed"/> is set — any non-sealed session fail the run.
     /// </summary>
+    /// <exception cref="CryptographicException">Thrown when there is a seal count mismatch or when the RequireSealed option is set and the session was not sealed.</exception>
     private void FinalizeSession()
     {
         if (!_context.HasKeys)
@@ -625,7 +634,7 @@ public sealed class LogReader : IDisposable
             {
                 throw new NotSupportedException($"Unsupported encryption version: {version[0]}");
             }
-            ISessionReader sessionReader = new SessionReader();
+            var sessionReader = new SessionReader();
             ReplaceContext(
                 await sessionReader.ReadSessionAsync(
                     _input,
@@ -669,6 +678,7 @@ public sealed class LogReader : IDisposable
     /// Replaces the active decryption context, zeroing the previous session's key material first
     /// so it does not linger in managed memory.
     /// </summary>
+    /// <param name="next">The next context.</param>
     private void ReplaceContext(DecryptionContext next)
     {
         _context.Clear();

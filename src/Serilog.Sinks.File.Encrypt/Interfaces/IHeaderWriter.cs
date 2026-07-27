@@ -14,6 +14,6 @@ internal interface IHeaderWriter
     /// </summary>
     /// <param name="aesKey">The AES session key.</param>
     /// <param name="nonce">The AES-GCM nonce.</param>
-    /// <returns></returns>
+    /// <returns>The encrypted session header information.</returns>
     internal ReadOnlySpan<byte> Encrypt(ReadOnlySpan<byte> aesKey, ReadOnlySpan<byte> nonce);
 }
