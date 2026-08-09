@@ -3,12 +3,15 @@ using System.Security.Cryptography;
 namespace Serilog.Sinks.File.Encrypt.Models;
 
 /// <summary>
+/// <para>
 /// Encryption options for Serilog.Sinks.File.Encrypt configuration.
 /// This information will be stored in the header of the encrypted log file to allow decryption tools
 /// to identify the encryption method and key used for encryption.
-///
+/// </para>
+/// <para>
 /// The <see cref="KeyId"/> can be used to identify which key was used for encryption (Key rotation)
 /// The <see cref="Rsa"/> is used to RSA encrypt the AES-GCM session information.
+/// </para>
 /// </summary>
 /// <param name="Rsa">The RSA public key used to encrypt the AES-GCM session information.</param>
 /// <param name="KeyId">The key id to include in the header for key rotation. Allows decryption tools to identify which key was used for encryption.</param>

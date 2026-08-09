@@ -41,4 +41,4 @@ public sealed record DecryptionOptions
     /// indistinguishable from a truncated one and still decrypts fully.
     /// </remarks>
     public bool RequireSealed { get; init; }
-};
+}
