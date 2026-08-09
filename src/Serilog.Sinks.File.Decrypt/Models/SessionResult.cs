@@ -31,8 +31,8 @@ public sealed record SessionResult
 
     /// <summary>
     /// The frame count declared by the session's seal record. Only present when the seal was
-    /// found and authenticated (<see cref="Models.SealStatus.Sealed"/> or
-    /// <see cref="Models.SealStatus.SealCountMismatch"/>).
+    /// found and authenticated (<see cref="SealStatus.Sealed"/> or
+    /// <see cref="SealStatus.SealCountMismatch"/>).
     /// </summary>
     public ulong? DeclaredFrameCount { get; init; }
 

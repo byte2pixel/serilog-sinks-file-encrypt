@@ -1,7 +1,6 @@
 using System.Buffers;
 using System.Buffers.Binary;
 using System.Security.Cryptography;
-using Serilog.Sinks.File.Encrypt.Interfaces;
 using Serilog.Sinks.File.Encrypt.Models;
 
 namespace Serilog.Sinks.File.Encrypt;
@@ -14,7 +13,7 @@ namespace Serilog.Sinks.File.Encrypt;
 public sealed class LogWriter : Stream
 {
     private readonly Stream _inner;
-    private readonly ISessionWriter _writer;
+    private readonly SessionWriter _writer;
 
     /// <summary>
     /// Reusable buffer for AES key
@@ -71,16 +70,15 @@ public sealed class LogWriter : Stream
     /// <summary>
     /// Seeking is not supported on <see cref="LogWriter"/> as it is designed for sequential writes.
     /// </summary>
-    /// <param name="offset"></param>
-    /// <param name="origin"></param>
-    /// <returns></returns>
+    /// <param name="offset">Not Supported</param>
+    /// <param name="origin">Not Supported</param>
     /// <exception cref="NotSupportedException"></exception>
     public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
 
     /// <summary>
     /// Setting length is not supported on <see cref="LogWriter"/> as it is designed for sequential writes.
     /// </summary>
-    /// <param name="value"></param>
+    /// <param name="value">Not Supported</param>
     /// <exception cref="NotSupportedException"></exception>
     public override void SetLength(long value) => throw new NotSupportedException();
 
@@ -269,10 +267,9 @@ public sealed class LogWriter : Stream
     /// <summary>
     /// Reading from <see cref="LogWriter"/> is not supported as it is designed for write-only log encryption.
     /// </summary>
-    /// <param name="buffer"></param>
-    /// <param name="offset"></param>
-    /// <param name="count"></param>
-    /// <returns></returns>
+    /// <param name="buffer">Not Supported</param>
+    /// <param name="offset">Not Supported</param>
+    /// <param name="count">Not Supported</param>
     /// <exception cref="NotSupportedException">
     /// Reading is not supported on <see cref="LogWriter"/> as it is designed for write-only log encryption.
     /// </exception>
@@ -286,7 +283,7 @@ public sealed class LogWriter : Stream
     /// If writing the seal fails (e.g. the disk is full), the stream is still disposed and key
     /// material still wiped; the file then simply ends unsealed, which the decryptor reports.
     /// </summary>
-    /// <param name="disposing"></param>
+    /// <param name="disposing">Set to true for disposing</param>
     protected override void Dispose(bool disposing)
     {
         if (disposing && !_disposed)

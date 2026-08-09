@@ -8,7 +8,7 @@ public class KeyService
 
     private static string GetPublicKeyXml()
     {
-        Assembly assembly = Assembly.GetExecutingAssembly();
+        var assembly = Assembly.GetExecutingAssembly();
         string resourceName =
             assembly.GetManifestResourceNames().FirstOrDefault(n => n.EndsWith("public_key.xml"))
             ?? throw new InvalidOperationException(
