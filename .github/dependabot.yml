@@ -1,9 +1,15 @@
 version: 2
 
 updates:
-  # NuGet dependencies for source projects
+  # NuGet dependencies for all three package trees (src, tests, examples).
+  # Deliberately a single entry: Dependabot's NuGet discovery walks up from each
+  # directory to the repo root and picks up .config/dotnet-tools.json, so separate
+  # entries per tree each open their own PR for the same tool update (see #132/#133).
   - package-ecosystem: "nuget"
-    directory: "/src"
+    directories:
+      - "/src"
+      - "/tests"
+      - "/examples"
     schedule:
       interval: "monthly"
     open-pull-requests-limit: 5
@@ -20,43 +26,6 @@ updates:
         update-types:
           - "minor"
           - "patch"
-
-  # NuGet dependencies for test projects
-  - package-ecosystem: "nuget"
-    directory: "/tests"
-    schedule:
-      interval: "monthly"
-    open-pull-requests-limit: 5
-    reviewers:
-      - "byte2pixel"
-    labels:
-      - "dependencies"
-      - "nuget"
-      - "test"
-    commit-message:
-      prefix: "deps"
-      include: "scope"
-    groups:
-      minor-and-patch:
-        update-types:
-          - "minor"
-          - "patch"
-
-  # NuGet dependencies for example projects
-  - package-ecosystem: "nuget"
-    directory: "/examples"
-    schedule:
-      interval: "monthly"
-    open-pull-requests-limit: 3
-    reviewers:
-      - "byte2pixel"
-    labels:
-      - "dependencies"
-      - "nuget"
-      - "examples"
-    commit-message:
-      prefix: "deps"
-      include: "scope"
 
   # GitHub Actions
   - package-ecosystem: "github-actions"
@@ -72,4 +41,3 @@ updates:
     commit-message:
       prefix: "ci"
       include: "scope"
-
