@@ -19,12 +19,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
 
       - name: Setup .NET SDK
-        uses: actions/setup-dotnet@v6
+        uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6.1.0
         with:
           dotnet-version: |
             8.0.x
@@ -32,15 +32,16 @@ jobs:
 
       # Get a short-lived NuGet API key
       - name: NuGet login (OIDC → temp API key)
-        uses: NuGet/login@v1
+        uses: NuGet/login@8d196754b4036150537f80ac539e15c2f1028841 # v1.2.0
         id: login
         with:
           user: ${{ secrets.NUGET_USER_NAME }}
 
       - name: Publish
         shell: bash
+        env:
+          NUGET_API_KEY: ${{ steps.login.outputs.nuget_api_key }}
         run: |
           dotnet tool restore
           dotnet make publish \
-            --nuget-key="${{ steps.login.outputs.nuget_api_key }}" \
-            --github-key="${{secrets.GITHUB_TOKEN}}"
+            --nuget-key="$NUGET_API_KEY"
