@@ -36,7 +36,7 @@ public class EncryptedLogStreamBenchmarks
                 UserId = 12345,
                 Action = "UpdateProfile",
                 Duration = 156,
-                IpAddress = "192.168.1.100",
+                IpAddress = "203.0.113.100",
             },
         };
 

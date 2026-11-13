@@ -105,7 +105,7 @@ public class SerilogFileSinkBenchmarks
                     logger.Information(
                         message,
                         i,
-                        "192.168.1.100",
+                        "203.0.113.100",
                         new { Action = "Update", ResourceId = i }
                     );
                     break;
